@@ -44,7 +44,7 @@ import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not defined");
+	throw new Error("DATABASE_URL is not defined");
 }
 
 const sql = neon(databaseUrl);
@@ -52,82 +52,82 @@ const sql = neon(databaseUrl);
 export const db = drizzle(sql, { schema });
 
 export const queries = {
-  projects: {
-    // read
-    getAll: async () => {
-      console.log("TODO: Task 4.1 - Implement project CRUD operations");
-      return await db.query.projects.findMany();
-    },
-    getById: async (id: string) => {
-      console.log(`TODO: Get project by ID: ${id}`);
-      return await db.query.projects.findFirst({
-        where: eq(schema.projects.id, id),
-      });
-    },
+	projects: {
+		// read
+		getAll: async () => {
+			console.log("TODO: Task 4.1 - Implement project CRUD operations");
+			return await db.query.projects.findMany();
+		},
+		getById: async (id: string) => {
+			console.log(`TODO: Get project by ID: ${id}`);
+			return await db.query.projects.findFirst({
+				where: eq(schema.projects.id, id),
+			});
+		},
 
-    // create
-    create: async (data: typeof schema.projects.$inferInsert) => {
-      console.log("TODO: Create project", data);
-      return await db.insert(schema.projects).values(data).returning();
-    },
+		// create
+		create: async (data: typeof schema.projects.$inferInsert) => {
+			console.log("TODO: Create project", data);
+			return await db.insert(schema.projects).values(data).returning();
+		},
 
-    // update
-    update: async (
-      id: string,
-      data: Partial<typeof schema.projects.$inferInsert>,
-    ) => {
-      console.log(`TODO: Update project ${id}`, data);
-      return await db
-        .update(schema.projects)
-        .set(data)
-        .where(eq(schema.projects.id, id))
-        .returning();
-    },
+		// update
+		update: async (
+			id: string,
+			data: Partial<typeof schema.projects.$inferInsert>,
+		) => {
+			console.log(`TODO: Update project ${id}`, data);
+			return await db
+				.update(schema.projects)
+				.set(data)
+				.where(eq(schema.projects.id, id))
+				.returning();
+		},
 
-    //delete
-    delete: async (id: string) => {
-      console.log(`TODO: Delete project ${id}`);
-      return await db
-        .delete(schema.projects)
-        .where(eq(schema.projects.id, id))
-        .returning();
-    },
-  },
-  tasks: {
-    // read
-    getByProject: async (projectId: string) => {
-      console.log(`TODO: Task 4.4 - Get tasks for project ${projectId}`);
-      return await db.query.lists.findMany({
-        where: eq(schema.lists.projectId, projectId),
-        with: { tasks: true }
-      });
-    },
-    // create
-    create: async (data: typeof schema.tasks.$inferInsert) => {
-      console.log("TODO: Create task", data);
-      return await db.insert(schema.tasks).values(data).returning();
-    },
+		//delete
+		delete: async (id: string) => {
+			console.log(`TODO: Delete project ${id}`);
+			return await db
+				.delete(schema.projects)
+				.where(eq(schema.projects.id, id))
+				.returning();
+		},
+	},
+	tasks: {
+		// read
+		getByProject: async (projectId: string) => {
+			console.log(`TODO: Task 4.4 - Get tasks for project ${projectId}`);
+			return await db.query.lists.findMany({
+				where: eq(schema.lists.projectId, projectId),
+				with: { tasks: true },
+			});
+		},
+		// create
+		create: async (data: typeof schema.tasks.$inferInsert) => {
+			console.log("TODO: Create task", data);
+			return await db.insert(schema.tasks).values(data).returning();
+		},
 
-    // update
-    update: async (
-      id: string,
-      data: Partial<typeof schema.tasks.$inferInsert>,
-    ) => {
-      console.log(`TODO: Update task ${id}`, data);
-      return await db
-        .update(schema.tasks)
-        .set(data)
-        .where(eq(schema.tasks.id, id))
-        .returning();
-    },
+		// update
+		update: async (
+			id: string,
+			data: Partial<typeof schema.tasks.$inferInsert>,
+		) => {
+			console.log(`TODO: Update task ${id}`, data);
+			return await db
+				.update(schema.tasks)
+				.set(data)
+				.where(eq(schema.tasks.id, id))
+				.returning();
+		},
 
-    // delete
-    delete: async (id: string) => {
-      console.log(`TODO: Delete task ${id}`);
-      return await db
-        .delete(schema.tasks)
-        .where(eq(schema.tasks.id, id))
-        .returning();
-    },
-  },
+		// delete
+		delete: async (id: string) => {
+			console.log(`TODO: Delete task ${id}`);
+			return await db
+				.delete(schema.tasks)
+				.where(eq(schema.tasks.id, id))
+				.returning();
+		},
+	},
 };
