@@ -14,7 +14,10 @@ export default function ProjectsPage() {
 							Manage and organize your team projects
 						</p>
 					</div>
-					<button className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors">
+					<button
+						type="button"
+						className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
+					>
 						<Plus size={20} className="mr-2" />
 						New Project
 					</button>
@@ -48,7 +51,10 @@ export default function ProjectsPage() {
 							className="w-full pl-10 pr-4 py-2 bg-white dark:bg-outer_space-500 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-outer_space-500 dark:text-platinum-500 placeholder-paynes_gray-500 dark:placeholder-french_gray-400 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
 						/>
 					</div>
-					<button className="inline-flex items-center px-4 py-2 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors">
+					<button
+						type="button"
+						className="inline-flex items-center px-4 py-2 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors"
+					>
 						<Filter size={16} className="mr-2" />
 						Filter
 					</button>

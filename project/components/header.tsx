@@ -54,6 +54,12 @@ export function Header() {
 								>
 									Dashboard
 								</Link>
+								<Link
+									href="/projects"
+									className="px-4 py-2 text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500 transition-colors font-medium mr-2"
+								>
+									Projects
+								</Link>
 								<UserButton />
 							</>
 						)}
