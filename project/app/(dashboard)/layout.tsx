@@ -16,6 +16,7 @@ import Link from "next/link";
 import type React from "react";
 import { Suspense, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserButton } from "@clerk/nextjs";
 
 const navigation = [
 	{ name: "Dashboard", href: "/dashboard", icon: Home, current: true },
@@ -37,9 +38,19 @@ export default function DashboardLayout({
 		<div className="min-h-screen bg-platinum-900 dark:bg-outer_space-600">
 			{/* Mobile sidebar overlay */}
 			{sidebarOpen && (
-				<div
+				<button
+					type="button"
+					aria-label="Close sidebar"
 					className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
 					onClick={() => setSidebarOpen(false)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							setSidebarOpen(false);
+						}
+						if (e.key === "Escape") {
+							setSidebarOpen(false);
+						}
+					}}
 				/>
 			)}
 
@@ -52,6 +63,7 @@ export default function DashboardLayout({
 						ProjectFlow
 					</Link>
 					<button
+						type="button"
 						onClick={() => setSidebarOpen(false)}
 						className="lg:hidden p-2 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
 					>
@@ -60,22 +72,16 @@ export default function DashboardLayout({
 				</div>
 
 				<nav className="mt-6 px-3">
-					<div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-						<p className="text-xs text-yellow-800 dark:text-yellow-200">
-							📋 <strong>Task 2.6:</strong> Create protected dashboard layout
-						</p>
-					</div>
 
 					<ul className="space-y-1">
 						{navigation.map((item) => (
 							<li key={item.name}>
 								<Link
 									href={item.href}
-									className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-										item.current
+									className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${item.current
 											? "bg-blue_munsell-100 dark:bg-blue_munsell-900 text-blue_munsell-700 dark:text-blue_munsell-300"
 											: "text-outer_space-500 dark:text-platinum-500 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
-									}`}
+										}`}
 								>
 									<item.icon className="mr-3" size={20} />
 									{item.name}
@@ -91,6 +97,7 @@ export default function DashboardLayout({
 				{/* Top bar */}
 				<div className="sticky top-0 z-30 flex h-16 items-center gap-x-4 border-b border-french_gray-300 dark:border-paynes_gray-400 bg-white dark:bg-outer_space-500 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
 					<button
+						type="button"
 						onClick={() => setSidebarOpen(true)}
 						className="lg:hidden p-2 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
 					>
@@ -114,14 +121,17 @@ export default function DashboardLayout({
 						</div>
 
 						<div className="flex items-center gap-x-4 lg:gap-x-6">
-							<button className="p-2 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400">
+							<button
+								type="button"
+								className="p-2 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
+							>
 								<Bell size={20} />
 							</button>
 
 							<ThemeToggle />
 
-							<div className="w-8 h-8 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white font-semibold">
-								U
+							<div className="flex items-center justify-center">
+								<UserButton />
 							</div>
 						</div>
 					</div>
