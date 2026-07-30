@@ -52,6 +52,30 @@ const sql = neon(databaseUrl);
 export const db = drizzle(sql, { schema });
 
 export const queries = {
+	users: {
+		// create
+		create: async (data: typeof schema.users.$inferInsert) => {
+			return await db.insert(schema.users).values(data).returning();
+		},
+		// update by clerkId
+		update: async (
+			clerkId: string,
+			data: Partial<typeof schema.users.$inferInsert>,
+		) => {
+			return await db
+				.update(schema.users)
+				.set(data)
+				.where(eq(schema.users.clerkId, clerkId))
+				.returning();
+		},
+		// delete by clerkId
+		delete: async (clerkId: string) => {
+			return await db
+				.delete(schema.users)
+				.where(eq(schema.users.clerkId, clerkId))
+				.returning();
+		},
+	},
 	projects: {
 		// read
 		getAll: async () => {
