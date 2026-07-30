@@ -38,7 +38,7 @@ export const queries = {
 */
 
 import { neon } from "@neondatabase/serverless";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
@@ -91,8 +91,18 @@ export const queries = {
 
 		// create
 		create: async (data: typeof schema.projects.$inferInsert) => {
-			console.log("TODO: Create project", data);
-			return await db.insert(schema.projects).values(data).returning();
+			return await db.transaction(async (tx) => {
+				const [project] = await tx
+					.insert(schema.projects)
+					.values(data)
+					.returning();
+				await tx.insert(schema.projectMembers).values({
+					projectId: project.id,
+					userId: data.ownerId,
+					role: "owner",
+				});
+				return [project];
+			});
 		},
 
 		// update
@@ -152,6 +162,40 @@ export const queries = {
 				.delete(schema.tasks)
 				.where(eq(schema.tasks.id, id))
 				.returning();
+		},
+	},
+	projectMembers: {
+		addMember: async (data: typeof schema.projectMembers.$inferInsert) => {
+			return await db.insert(schema.projectMembers).values(data).returning();
+		},
+		updateRole: async (projectId: string, userId: string, role: string) => {
+			return await db
+				.update(schema.projectMembers)
+				.set({ role })
+				.where(
+					and(
+						eq(schema.projectMembers.projectId, projectId),
+						eq(schema.projectMembers.userId, userId),
+					),
+				)
+				.returning();
+		},
+		removeMember: async (projectId: string, userId: string) => {
+			return await db
+				.delete(schema.projectMembers)
+				.where(
+					and(
+						eq(schema.projectMembers.projectId, projectId),
+						eq(schema.projectMembers.userId, userId),
+					),
+				)
+				.returning();
+		},
+		getMembersByProject: async (projectId: string) => {
+			return await db.query.projectMembers.findMany({
+				where: eq(schema.projectMembers.projectId, projectId),
+				with: { user: true },
+			});
 		},
 	},
 };

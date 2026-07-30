@@ -50,6 +50,7 @@ export const users = pgTable("users", {
 	clerkId: text("clerk_id").notNull().unique(),
 	email: text("email").notNull(),
 	name: text("name").notNull(),
+	role: text("role").notNull().default("user"), // global role: "user", "admin"
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at")
 		.defaultNow()
@@ -139,17 +140,38 @@ export const comments = pgTable(
 	],
 );
 
+export const projectMembers = pgTable(
+	"project_members",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		projectId: uuid("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		role: text("role").notNull().default("member"), // project role: "owner", "admin", "member", "viewer"
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => [
+		index("member_project_idx").on(table.projectId),
+		index("member_user_idx").on(table.userId),
+	],
+);
+
 // Relations
 
 export const usersRelations = relations(users, ({ many }) => ({
 	projects: many(projects),
 	tasks: many(tasks),
 	comments: many(comments),
+	projectMembers: many(projectMembers),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
 	owner: one(users, { fields: [projects.ownerId], references: [users.id] }),
 	lists: many(lists),
+	members: many(projectMembers),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -169,4 +191,15 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 export const commentsRelations = relations(comments, ({ one }) => ({
 	task: one(tasks, { fields: [comments.taskId], references: [tasks.id] }),
 	author: one(users, { fields: [comments.authorId], references: [users.id] }),
+}));
+
+export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
+	project: one(projects, {
+		fields: [projectMembers.projectId],
+		references: [projects.id],
+	}),
+	user: one(users, {
+		fields: [projectMembers.userId],
+		references: [users.id],
+	}),
 }));
