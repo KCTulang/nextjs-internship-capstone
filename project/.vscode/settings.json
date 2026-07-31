@@ -4,5 +4,5 @@
 	"editor.codeActionsOnSave": {
 		"source.organizeImports.biome": "explicit"
 	},
-	"biome.lspBin": "./node_modules/.bin/biome"
+	"biome.lsp.bin": "./node_modules/.bin/biome"
 }
