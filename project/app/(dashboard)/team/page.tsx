@@ -5,16 +5,14 @@ export default function TeamPage() {
 		<div className="space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
-					<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
-						Team
-					</h1>
-					<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
+					<h1 className="text-3xl font-bold text-foreground">Team</h1>
+					<p className="text-muted-foreground mt-2">
 						Manage team members and permissions
 					</p>
 				</div>
 				<button
 					type="button"
-					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
+					className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary transition-colors"
 				>
 					<UserPlus size={20} className="mr-2" />
 					Invite Member
@@ -79,31 +77,26 @@ export default function TeamPage() {
 				].map((member) => (
 					<div
 						key={member.email}
-						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
+						className="bg-card rounded-lg border border-border p-6"
 					>
 						<div className="flex items-start justify-between mb-4">
 							<div className="flex items-center space-x-3">
-								<div className="w-12 h-12 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white font-semibold">
+								<div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold">
 									{member.avatar}
 								</div>
 								<div>
-									<h3 className="font-semibold text-outer_space-500 dark:text-platinum-500">
+									<h3 className="font-semibold text-foreground">
 										{member.name}
 									</h3>
-									<p className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
-										{member.role}
-									</p>
+									<p className="text-sm text-muted-foreground">{member.role}</p>
 								</div>
 							</div>
-							<button
-								type="button"
-								className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
-							>
+							<button type="button" className="p-1 hover:bg-muted rounded">
 								<MoreHorizontal size={16} />
 							</button>
 						</div>
 
-						<div className="flex items-center text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-4">
+						<div className="flex items-center text-sm text-muted-foreground mb-4">
 							<Mail size={16} className="mr-2" />
 							{member.email}
 						</div>
@@ -112,7 +105,7 @@ export default function TeamPage() {
 							<span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
 								Active
 							</span>
-							<div className="text-sm text-paynes_gray-500 dark:text-french_gray-400">
+							<div className="text-sm text-muted-foreground">
 								{Math.floor(Math.random() * 10) + 1} projects
 							</div>
 						</div>

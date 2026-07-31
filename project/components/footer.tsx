@@ -2,14 +2,12 @@ import Link from "next/link";
 
 export function Footer() {
 	return (
-		<footer className="bg-outer_space-500 dark:bg-outer_space-600 text-platinum-500 py-12">
+		<footer className="bg-background text-muted-foreground py-12">
 			<div className="container mx-auto px-4 sm:px-6 lg:px-8">
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-8">
 					<div>
-						<h3 className="text-2xl font-bold text-blue_munsell-400 mb-4">
-							TaskFlow
-						</h3>
-						<p className="text-french_gray-400">
+						<h3 className="text-2xl font-bold text-primary mb-4">TaskFlow</h3>
+						<p className="text-muted-foreground">
 							The modern project management platform that helps teams
 							collaborate and deliver results.
 						</p>
@@ -21,7 +19,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Features
 								</Link>
@@ -29,7 +27,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Pricing
 								</Link>
@@ -37,7 +35,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Security
 								</Link>
@@ -51,7 +49,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									About
 								</Link>
@@ -59,7 +57,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Blog
 								</Link>
@@ -67,7 +65,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Careers
 								</Link>
@@ -81,7 +79,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Help Center
 								</Link>
@@ -89,7 +87,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									Contact
 								</Link>
@@ -97,7 +95,7 @@ export function Footer() {
 							<li>
 								<Link
 									href="#"
-									className="text-french_gray-400 hover:text-platinum-500 transition-colors"
+									className="text-muted-foreground hover:text-muted-foreground transition-colors"
 								>
 									API Docs
 								</Link>
@@ -106,8 +104,8 @@ export function Footer() {
 					</div>
 				</div>
 
-				<div className="border-t border-paynes_gray-400 mt-8 pt-8 text-center">
-					<p className="text-french_gray-400">
+				<div className="border-t border-border mt-8 pt-8 text-center">
+					<p className="text-muted-foreground">
 						© 2024 TaskFlow. All rights reserved.
 					</p>
 				</div>

@@ -19,7 +19,7 @@
 
 @utility scrollbar-thin {
 	scrollbar-width: thin;
-	scrollbar-color: var(--color-french_gray-500) transparent;
+	scrollbar-color: var(--muted-foreground) transparent;
 
 	&::-webkit-scrollbar {
 		width: 6px;
@@ -30,31 +30,12 @@
 	}
 
 	&::-webkit-scrollbar-thumb {
-		background-color: var(--color-french_gray-500);
+		background-color: var(--muted-foreground);
 		border-radius: 3px;
 	}
 }
 
 @theme inline {
-	--color-platinum-500: #dcdcdd;
-	--color-platinum-800: #a5a5a6;
-	--color-platinum-900: #8c8b89;
-
-	--color-french_gray-300: #d6d5d7;
-	--color-french_gray-400: #ceccce;
-	--color-french_gray-500: #c5c3c6;
-
-	--color-outer_space-400: #5c6063;
-	--color-outer_space-500: #46494c;
-
-	--color-paynes_gray-400: #5e7281;
-	--color-paynes_gray-500: #4c5c68;
-
-	--color-blue_munsell-50: #e6f2f5;
-	--color-blue_munsell-500: #1985a1;
-	--color-blue_munsell-600: #146b82;
-	--color-blue_munsell-900: #082830;
-
 	--font-heading: var(--font-sans);
 	--font-sans: var(--font-sans);
 

@@ -132,13 +132,13 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
 			case "low":
 				return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
 			default:
-				return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+				return "bg-secondary text-secondary-foreground";
 		}
 	};
 
 	return (
-		<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-			<div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
+		<div className="bg-card rounded-lg border border-border p-6">
+			<div className="text-center text-muted-foreground">
 				<h3 className="text-lg font-semibold mb-2">
 					TODO: Implement Kanban Board
 				</h3>

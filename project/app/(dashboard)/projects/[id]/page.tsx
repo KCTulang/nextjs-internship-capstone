@@ -15,15 +15,15 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 				<div className="flex items-center space-x-4">
 					<Link
 						href="/projects"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						className="p-2 hover:bg-muted rounded-lg transition-colors"
 					>
 						<ArrowLeft size={20} />
 					</Link>
 					<div>
-						<h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">
+						<h1 className="text-3xl font-bold text-foreground">
 							Project #{params.id}
 						</h1>
-						<p className="text-paynes_gray-500 dark:text-french_gray-500 mt-1">
+						<p className="text-muted-foreground mt-1">
 							Kanban board view for project management
 						</p>
 					</div>
@@ -32,25 +32,25 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 				<div className="flex items-center space-x-2">
 					<button
 						type="button"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						className="p-2 hover:bg-muted rounded-lg transition-colors"
 					>
 						<Users size={20} />
 					</button>
 					<button
 						type="button"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						className="p-2 hover:bg-muted rounded-lg transition-colors"
 					>
 						<Calendar size={20} />
 					</button>
 					<button
 						type="button"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						className="p-2 hover:bg-muted rounded-lg transition-colors"
 					>
 						<Settings size={20} />
 					</button>
 					<button
 						type="button"
-						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+						className="p-2 hover:bg-muted rounded-lg transition-colors"
 					>
 						<MoreHorizontal size={20} />
 					</button>
@@ -75,23 +75,23 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 			</div>
 
 			{/* Kanban Board Placeholder */}
-			<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
+			<div className="bg-card rounded-lg border border-border p-6">
 				<div className="flex space-x-6 overflow-x-auto pb-4">
 					{["To Do", "In Progress", "Review", "Done"].map(
 						(columnTitle, _columnIndex) => (
 							<div key={columnTitle} className="shrink-0 w-80">
-								<div className="bg-platinum-800 dark:bg-outer_space-400 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400">
-									<div className="p-4 border-b border-french_gray-300 dark:border-paynes_gray-400">
+								<div className="bg-muted rounded-lg border border-border">
+									<div className="p-4 border-b border-border">
 										<div className="flex items-center justify-between">
-											<h3 className="font-semibold text-outer_space-500 dark:text-platinum-500">
+											<h3 className="font-semibold text-foreground">
 												{columnTitle}
-												<span className="ml-2 px-2 py-1 text-xs bg-french_gray-300 dark:bg-paynes_gray-400 rounded-full">
+												<span className="ml-2 px-2 py-1 text-xs bg-muted rounded-full">
 													{Math.floor(Math.random() * 5) + 1}
 												</span>
 											</h3>
 											<button
 												type="button"
-												className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+												className="p-1 hover:bg-muted rounded"
 											>
 												<MoreHorizontal size={16} />
 											</button>
@@ -102,19 +102,19 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 										{[1, 2, 3].map((taskIndex) => (
 											<div
 												key={taskIndex}
-												className="p-4 bg-white dark:bg-outer_space-300 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 cursor-pointer hover:shadow-md transition-shadow"
+												className="p-4 bg-card rounded-lg border border-border cursor-pointer hover:shadow-md transition-shadow"
 											>
-												<h4 className="font-medium text-outer_space-500 dark:text-platinum-500 text-sm mb-2">
+												<h4 className="font-medium text-foreground text-sm mb-2">
 													Sample Task {taskIndex}
 												</h4>
-												<p className="text-xs text-paynes_gray-500 dark:text-french_gray-400 mb-3">
+												<p className="text-xs text-muted-foreground mb-3">
 													This is a placeholder task description
 												</p>
 												<div className="flex items-center justify-between">
-													<span className="px-2 py-1 text-xs font-medium rounded-full bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300">
+													<span className="px-2 py-1 text-xs font-medium rounded-full bg-primary text-primary dark:bg-primary dark:text-primary">
 														Medium
 													</span>
-													<div className="w-6 h-6 bg-blue_munsell-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+													<div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
 														U
 													</div>
 												</div>
@@ -123,7 +123,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
 										<button
 											type="button"
-											className="w-full p-3 border-2 border-dashed border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-paynes_gray-500 dark:text-french_gray-400 hover:border-blue_munsell-500 hover:text-blue_munsell-500 transition-colors"
+											className="w-full p-3 border-2 border-dashed border-border rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors"
 										>
 											+ Add task
 										</button>
@@ -137,10 +137,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
 			{/* Component Implementation Guide */}
 			<div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-				<h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+				<h3 className="text-lg font-semibold text-card-foreground mb-4">
 					🛠️ Components & Features to Implement
 				</h3>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600 dark:text-gray-400">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
 					<div>
 						<strong className="block mb-2">Core Components:</strong>
 						<ul className="space-y-1 list-disc list-inside">
