@@ -21,7 +21,6 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-
 		<ClerkProvider>
 			<html lang="en" suppressHydrationWarning className="h-full antialiased">
 				<body className={`${inter.className} min-h-full flex flex-col`}>

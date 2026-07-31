@@ -14,7 +14,7 @@ export default function DashboardPage() {
 			{/* Implementation Status Banner */}
 			<div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
 				<div className="flex items-start">
-					<div className="flex-shrink-0">
+					<div className="shrink-0">
 						<div className="w-8 h-8 bg-blue_munsell-500 rounded-full flex items-center justify-center">
 							<TrendingUp className="text-white" size={16} />
 						</div>
@@ -68,7 +68,7 @@ export default function DashboardPage() {
 						className="bg-white dark:bg-outer_space-500 overflow-hidden rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
 					>
 						<div className="flex items-center">
-							<div className="flex-shrink-0">
+							<div className="shrink-0">
 								<div className="w-8 h-8 bg-blue_munsell-100 dark:bg-blue_munsell-900 rounded-lg flex items-center justify-center">
 									<stat.icon className="text-blue_munsell-500" size={20} />
 								</div>
@@ -133,15 +133,24 @@ export default function DashboardPage() {
 						Quick Actions
 					</h3>
 					<div className="space-y-3">
-						<button className="w-full flex items-center justify-center px-4 py-3 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors">
+						<button
+							type="button"
+							className="w-full flex items-center justify-center px-4 py-3 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
+						>
 							<Plus size={20} className="mr-2" />
 							Create New Project
 						</button>
-						<button className="w-full flex items-center justify-center px-4 py-3 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors">
+						<button
+							type="button"
+							className="w-full flex items-center justify-center px-4 py-3 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors"
+						>
 							<Plus size={20} className="mr-2" />
 							Add Team Member
 						</button>
-						<button className="w-full flex items-center justify-center px-4 py-3 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors">
+						<button
+							type="button"
+							className="w-full flex items-center justify-center px-4 py-3 border border-french_gray-300 dark:border-paynes_gray-400 text-outer_space-500 dark:text-platinum-500 rounded-lg hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 transition-colors"
+						>
 							<Plus size={20} className="mr-2" />
 							Create Task
 						</button>

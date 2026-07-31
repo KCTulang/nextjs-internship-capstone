@@ -30,16 +30,28 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 				</div>
 
 				<div className="flex items-center space-x-2">
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<Users size={20} />
 					</button>
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<Calendar size={20} />
 					</button>
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<Settings size={20} />
 					</button>
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<MoreHorizontal size={20} />
 					</button>
 				</div>
@@ -58,9 +70,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 					<li>
 						• Task 5.4: Implement optimistic UI updates for smooth interactions
 					</li>
-					<li>
-						• Task 5.6: Create task detail modals and editing interfaces
-					</li>
+					<li>• Task 5.6: Create task detail modals and editing interfaces</li>
 				</ul>
 			</div>
 
@@ -69,7 +79,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 				<div className="flex space-x-6 overflow-x-auto pb-4">
 					{["To Do", "In Progress", "Review", "Done"].map(
 						(columnTitle, columnIndex) => (
-							<div key={columnTitle} className="flex-shrink-0 w-80">
+							<div key={columnTitle} className="shrink-0 w-80">
 								<div className="bg-platinum-800 dark:bg-outer_space-400 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400">
 									<div className="p-4 border-b border-french_gray-300 dark:border-paynes_gray-400">
 										<div className="flex items-center justify-between">
@@ -79,13 +89,16 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 													{Math.floor(Math.random() * 5) + 1}
 												</span>
 											</h3>
-											<button className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded">
+											<button
+												type="button"
+												className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+											>
 												<MoreHorizontal size={16} />
 											</button>
 										</div>
 									</div>
 
-									<div className="p-4 space-y-3 min-h-[400px]">
+									<div className="p-4 space-y-3 min-h-100">
 										{[1, 2, 3].map((taskIndex) => (
 											<div
 												key={taskIndex}
@@ -108,7 +121,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 											</div>
 										))}
 
-										<button className="w-full p-3 border-2 border-dashed border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-paynes_gray-500 dark:text-french_gray-400 hover:border-blue_munsell-500 hover:text-blue_munsell-500 transition-colors">
+										<button
+											type="button"
+											className="w-full p-3 border-2 border-dashed border-french_gray-300 dark:border-paynes_gray-400 rounded-lg text-paynes_gray-500 dark:text-french_gray-400 hover:border-blue_munsell-500 hover:text-blue_munsell-500 transition-colors"
+										>
 											+ Add task
 										</button>
 									</div>

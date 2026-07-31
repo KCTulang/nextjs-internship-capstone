@@ -1,5 +1,6 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
 import {
 	BarChart3,
 	Bell,
@@ -16,7 +17,6 @@ import Link from "next/link";
 import type React from "react";
 import { Suspense, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { UserButton } from "@clerk/nextjs";
 
 const navigation = [
 	{ name: "Dashboard", href: "/dashboard", icon: Home, current: true },
@@ -72,16 +72,16 @@ export default function DashboardLayout({
 				</div>
 
 				<nav className="mt-6 px-3">
-
 					<ul className="space-y-1">
 						{navigation.map((item) => (
 							<li key={item.name}>
 								<Link
 									href={item.href}
-									className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${item.current
+									className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+										item.current
 											? "bg-blue_munsell-100 dark:bg-blue_munsell-900 text-blue_munsell-700 dark:text-blue_munsell-300"
 											: "text-outer_space-500 dark:text-platinum-500 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
-										}`}
+									}`}
 								>
 									<item.icon className="mr-3" size={20} />
 									{item.name}

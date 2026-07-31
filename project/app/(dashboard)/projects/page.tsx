@@ -103,9 +103,7 @@ export default function ProjectsPage() {
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
 					<div>
 						<strong>components/project-card.tsx</strong>
-						<p>
-							Project display component with progress, members, and actions
-						</p>
+						<p>Project display component with progress, members, and actions</p>
 					</div>
 					<div>
 						<strong>components/modals/create-project-modal.tsx</strong>

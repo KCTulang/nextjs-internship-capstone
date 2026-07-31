@@ -29,10 +29,11 @@ export default function SettingsPage() {
 						].map((item) => (
 							<button
 								key={item.name}
-								className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${item.active
+								className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+									item.active
 										? "bg-blue_munsell-100 dark:bg-blue_munsell-900 text-blue_munsell-700 dark:text-blue_munsell-300"
 										: "text-outer_space-500 dark:text-platinum-500 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400"
-									}`}
+								}`}
 							>
 								<item.icon className="mr-3" size={16} />
 								{item.name}
