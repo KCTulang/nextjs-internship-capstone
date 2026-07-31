@@ -90,7 +90,10 @@ export function RecentProjects() {
 								</div>
 							</div>
 
-							<button className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded">
+							<button
+								type="button"
+								className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+							>
 								<MoreHorizontal size={16} />
 							</button>
 						</div>

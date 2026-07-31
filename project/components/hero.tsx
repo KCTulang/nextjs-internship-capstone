@@ -25,7 +25,10 @@ export function Hero() {
 							<ArrowRight className="ml-2" size={20} />
 						</Link>
 
-						<button className="inline-flex items-center px-8 py-4 border-2 border-blue_munsell-500 text-blue_munsell-500 rounded-lg hover:bg-blue_munsell-50 dark:hover:bg-blue_munsell-900 transition-colors text-lg font-semibold">
+						<button
+							type="button"
+							className="inline-flex items-center px-8 py-4 border-2 border-blue_munsell-500 text-blue_munsell-500 rounded-lg hover:bg-blue_munsell-50 dark:hover:bg-blue_munsell-900 transition-colors text-lg font-semibold"
+						>
 							Watch Demo
 						</button>
 					</div>

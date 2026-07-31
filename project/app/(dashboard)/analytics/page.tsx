@@ -54,9 +54,9 @@ export default function AnalyticsPage() {
 						icon: Clock,
 						color: "orange",
 					},
-				].map((metric, index) => (
+				].map((metric) => (
 					<div
-						key={index}
+						key={metric.title}
 						className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
 					>
 						<div className="flex items-center justify-between mb-4">

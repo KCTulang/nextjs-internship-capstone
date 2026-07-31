@@ -1,6 +1,10 @@
 import { Calendar, MoreHorizontal, Settings, Users } from "lucide-react";
 
-export function ProjectHeader({ projectId }: { projectId: string }) {
+export function ProjectHeader({
+	projectId: _projectId,
+}: {
+	projectId: string;
+}) {
 	return (
 		<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
 			<div className="flex items-start justify-between">
@@ -33,10 +37,16 @@ export function ProjectHeader({ projectId }: { projectId: string }) {
 				</div>
 
 				<div className="flex items-center space-x-2">
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<Settings size={20} />
 					</button>
-					<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors">
+					<button
+						type="button"
+						className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg transition-colors"
+					>
 						<MoreHorizontal size={20} />
 					</button>
 				</div>

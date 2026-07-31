@@ -54,9 +54,9 @@ export function Features() {
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-					{features.map((feature, index) => (
+					{features.map((feature) => (
 						<div
-							key={index}
+							key={feature.title}
 							className="p-6 bg-white dark:bg-outer_space-400 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-french_gray-300 dark:border-paynes_gray-400"
 						>
 							<div className="w-12 h-12 bg-blue_munsell-100 dark:bg-blue_munsell-900 rounded-lg flex items-center justify-center mb-4">

@@ -28,6 +28,7 @@ export default function SettingsPage() {
 							{ name: "Appearance", icon: Palette, active: false },
 						].map((item) => (
 							<button
+								type="button"
 								key={item.name}
 								className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
 									item.active

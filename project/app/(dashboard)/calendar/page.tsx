@@ -12,7 +12,10 @@ export default function CalendarPage() {
 						View project deadlines and team schedules
 					</p>
 				</div>
-				<button className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors">
+				<button
+					type="button"
+					className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
+				>
 					<Plus size={20} className="mr-2" />
 					Add Event
 				</button>
@@ -33,24 +36,39 @@ export default function CalendarPage() {
 			<div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
 				<div className="flex items-center justify-between mb-6">
 					<div className="flex items-center space-x-4">
-						<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg">
+						<button
+							type="button"
+							className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg"
+						>
 							<ChevronLeft size={20} />
 						</button>
 						<h2 className="text-xl font-semibold text-outer_space-500 dark:text-platinum-500">
 							December 2024
 						</h2>
-						<button className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg">
+						<button
+							type="button"
+							className="p-2 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded-lg"
+						>
 							<ChevronRight size={20} />
 						</button>
 					</div>
 					<div className="flex space-x-2">
-						<button className="px-3 py-1 text-sm bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300 rounded">
+						<button
+							type="button"
+							className="px-3 py-1 text-sm bg-blue_munsell-100 text-blue_munsell-700 dark:bg-blue_munsell-900 dark:text-blue_munsell-300 rounded"
+						>
 							Month
 						</button>
-						<button className="px-3 py-1 text-sm text-paynes_gray-500 dark:text-french_gray-400 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded">
+						<button
+							type="button"
+							className="px-3 py-1 text-sm text-paynes_gray-500 dark:text-french_gray-400 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+						>
 							Week
 						</button>
-						<button className="px-3 py-1 text-sm text-paynes_gray-500 dark:text-french_gray-400 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded">
+						<button
+							type="button"
+							className="px-3 py-1 text-sm text-paynes_gray-500 dark:text-french_gray-400 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+						>
 							Day
 						</button>
 					</div>
@@ -86,9 +104,9 @@ export default function CalendarPage() {
 							date: "Dec 22, 2024",
 							type: "Milestone",
 						},
-					].map((event, index) => (
+					].map((event) => (
 						<div
-							key={index}
+							key={event.title}
 							className="flex items-center justify-between p-3 bg-platinum-800 dark:bg-outer_space-400 rounded-lg"
 						>
 							<div>

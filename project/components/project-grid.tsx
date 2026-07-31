@@ -74,7 +74,10 @@ export function ProjectGrid() {
 				>
 					<div className="flex items-start justify-between mb-4">
 						<div className={`w-3 h-3 rounded-full ${project.color}`} />
-						<button className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded">
+						<button
+							type="button"
+							className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
+						>
 							<MoreHorizontal size={16} />
 						</button>
 					</div>

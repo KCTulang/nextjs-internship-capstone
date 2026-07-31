@@ -9,6 +9,7 @@ export function CreateProjectButton() {
 	return (
 		<>
 			<button
+				type="button"
 				onClick={() => setIsOpen(true)}
 				className="inline-flex items-center px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors"
 			>
@@ -24,6 +25,7 @@ export function CreateProjectButton() {
 								Create New Project
 							</h3>
 							<button
+								type="button"
 								onClick={() => setIsOpen(false)}
 								className="p-1 hover:bg-platinum-500 dark:hover:bg-paynes_gray-400 rounded"
 							>
@@ -33,10 +35,14 @@ export function CreateProjectButton() {
 
 						<form className="space-y-4">
 							<div>
-								<label className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2">
+								<label
+									htmlFor="projectName"
+									className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2"
+								>
 									Project Name
 								</label>
 								<input
+									id="projectName"
 									type="text"
 									className="w-full px-3 py-2 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg bg-white dark:bg-outer_space-400 text-outer_space-500 dark:text-platinum-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
 									placeholder="Enter project name"
@@ -44,10 +50,14 @@ export function CreateProjectButton() {
 							</div>
 
 							<div>
-								<label className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2">
+								<label
+									htmlFor="description"
+									className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2"
+								>
 									Description
 								</label>
 								<textarea
+									id="description"
 									rows={3}
 									className="w-full px-3 py-2 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg bg-white dark:bg-outer_space-400 text-outer_space-500 dark:text-platinum-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
 									placeholder="Project description"
@@ -55,10 +65,14 @@ export function CreateProjectButton() {
 							</div>
 
 							<div>
-								<label className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2">
+								<label
+									htmlFor="dueDate"
+									className="block text-sm font-medium text-outer_space-500 dark:text-platinum-500 mb-2"
+								>
 									Due Date
 								</label>
 								<input
+									id="dueDate"
 									type="date"
 									className="w-full px-3 py-2 border border-french_gray-300 dark:border-paynes_gray-400 rounded-lg bg-white dark:bg-outer_space-400 text-outer_space-500 dark:text-platinum-500 focus:outline-none focus:ring-2 focus:ring-blue_munsell-500"
 								/>

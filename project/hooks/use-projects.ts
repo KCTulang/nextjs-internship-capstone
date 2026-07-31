@@ -62,8 +62,8 @@ export function useProjects() {
 		projects: [],
 		isLoading: false,
 		error: null,
-		createProject: (data: any) => console.log("TODO: Create project", data),
-		updateProject: (id: string, data: any) =>
+		createProject: (data: unknown) => console.log("TODO: Create project", data),
+		updateProject: (id: string, data: unknown) =>
 			console.log(`TODO: Update project ${id}`, data),
 		deleteProject: (id: string) => console.log(`TODO: Delete project ${id}`),
 	};

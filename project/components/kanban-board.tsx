@@ -121,9 +121,9 @@ const initialColumns = [
 ];
 
 export function KanbanBoard({ projectId }: { projectId: string }) {
-	const [columns, setColumns] = useState(initialColumns);
+	const [_columns, _setColumns] = useState(initialColumns);
 
-	const getPriorityColor = (priority: string) => {
+	const _getPriorityColor = (priority: string) => {
 		switch (priority) {
 			case "high":
 				return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
