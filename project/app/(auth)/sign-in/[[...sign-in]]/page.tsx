@@ -2,47 +2,12 @@
 
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSignIn } from "@clerk/nextjs/legacy";
-import { Eye, EyeOff, Github, Loader2, Moon, Sun } from "lucide-react";
+import { Eye, EyeOff, Github, Loader2, Moon, Sun, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
-
-function AuthGlow() {
-	return (
-		<div
-			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 overflow-hidden"
-		>
-			<div
-				className="absolute rounded-full blur-[120px]"
-				style={{
-					width: "80%",
-					height: "80%",
-					top: "10%",
-					left: "10%",
-					background:
-						"radial-gradient(ellipse, rgba(147,197,253,0.38) 0%, rgba(96,165,250,0.2) 50%, transparent 72%)",
-					animation: "glow-float 12s ease-in-out infinite",
-				}}
-			/>
-			<div
-				className="absolute rounded-full blur-[80px]"
-				style={{
-					width: "45%",
-					height: "45%",
-					bottom: "5%",
-					right: "-5%",
-					background:
-						"radial-gradient(ellipse, rgba(56,189,248,0.22) 0%, transparent 70%)",
-					animation: "glow-drift 16s ease-in-out infinite",
-					animationDelay: "-5s",
-				}}
-			/>
-		</div>
-	);
-}
 
 function GoogleIcon() {
 	return (
@@ -141,218 +106,193 @@ export default function SignInPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-background text-foreground flex">
-			<div className="hidden lg:flex relative flex-1 flex-col items-center justify-center px-12 overflow-hidden border-r border-border">
-				<AuthGlow />
-				<div className="relative z-10 flex flex-col items-center text-center gap-8 max-w-xs">
+		<div className="min-h-screen text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors">
+			{/* Top Left: Back to Home */}
+			<div className="absolute top-6 left-6 md:top-8 md:left-8 z-20">
+				<Link
+					href="/"
+					className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
+				>
+					<ArrowLeft size={16} />
+					Back to home
+				</Link>
+			</div>
+
+
+
+			{/* Top Right: Theme Toggle */}
+			<div className="absolute top-6 right-6 md:top-8 md:right-8 z-20">
+				<button
+					type="button"
+					onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+					className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg hover:scale-105 transition-transform"
+					aria-label="Toggle theme"
+				>
+					{theme === "light" ? <Moon size={20} fill="currentColor" /> : <Sun size={20} />}
+				</button>
+			</div>
+
+			{/* Center Container */}
+			<div className="w-full max-w-[380px] z-10 flex flex-col items-center">
+				{/* Logo */}
+				<div className="mb-8">
 					<Image
 						src="/LockInLogo.svg"
 						alt="LockIn"
-						width={320}
-						height={140}
-						className="w-full h-auto dark:invert"
+						width={140}
+						height={36}
+						className="dark:invert object-contain h-auto w-auto"
+						style={{ width: "auto", height: "auto" }}
 						priority
 					/>
-					<div className="space-y-2">
-						<h2 className="text-xl font-bold text-foreground tracking-tight">
-							Tune out the noise.
-						</h2>
-						<p className="text-muted-foreground text-sm leading-relaxed">
-							Lock into your work. A Kanban workspace to manage your projects
-							and execute your deliverables.
-						</p>
-					</div>
 				</div>
-				<div className="absolute bottom-8 left-0 right-0 flex justify-center">
-					<Link
-						href="/"
-						className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+
+				{/* Title */}
+				<div className="mb-8 text-center w-full">
+					<h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+						Welcome back
+					</h1>
+					<p className="text-sm text-slate-500 dark:text-zinc-400">
+						Sign in to your LockIn account
+					</p>
+				</div>
+
+				{/* OAuth Buttons */}
+				<div className="flex flex-col gap-3 w-full mb-8">
+					<button
+						type="button"
+						onClick={() => handleOAuth("oauth_google")}
+						disabled={!isLoaded || oauthLoading !== null || isSubmitting}
+						className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
 					>
-						← Back to LockIn
-					</Link>
+						{oauthLoading === "oauth_google" ? (
+							<Loader2 size={18} className="animate-spin" />
+						) : (
+							<GoogleIcon />
+						)}
+						Continue with Google
+					</button>
+					<button
+						type="button"
+						onClick={() => handleOAuth("oauth_github")}
+						disabled={!isLoaded || oauthLoading !== null || isSubmitting}
+						className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+					>
+						{oauthLoading === "oauth_github" ? (
+							<Loader2 size={18} className="animate-spin" />
+						) : (
+							<Github size={18} />
+						)}
+						Continue with GitHub
+					</button>
 				</div>
-			</div>
 
-			<div className="relative flex flex-1 flex-col items-center justify-center px-4 sm:px-8 py-12 overflow-hidden">
-				<div className="lg:hidden absolute inset-0">
-					<AuthGlow />
+				{/* OR Divider */}
+				<div className="flex items-center gap-4 w-full mb-8">
+					<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
+					<span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+						Or
+					</span>
+					<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
 				</div>
 
-				<div className="relative z-10 w-full max-w-sm">
-					<div className="flex items-center justify-between mb-8">
-						<div className="lg:hidden">
-							<Image
-								src="/LockLogo.svg"
-								alt="LockIn"
-								width={22}
-								height={40}
-								className="h-auto dark:invert"
-								priority
-							/>
-						</div>
-						<div className="lg:hidden" />
-						<button
-							type="button"
-							onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-							className="p-2 rounded-full text-foreground/60 hover:text-foreground hover:bg-muted transition-colors ml-auto"
-							aria-label="Toggle theme"
+				{/* Form */}
+				<form onSubmit={handleSubmit} noValidate className="w-full space-y-5">
+					{error && (
+						<div
+							role="alert"
+							className="flex items-start gap-3 px-5 py-3.5 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm"
 						>
-							{theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-						</button>
+							<span className="mt-0.5 shrink-0">⚠</span>
+							<span>{error}</span>
+						</div>
+					)}
+
+					<div className="space-y-2">
+						<label
+							htmlFor="sign-in-email"
+							className="block text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400"
+						>
+							Email address
+						</label>
+						<input
+							id="sign-in-email"
+							type="email"
+							autoComplete="email"
+							required
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+							placeholder="you@example.com"
+							className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+						/>
 					</div>
 
-					<div className="bg-card border border-border rounded-2xl p-7 shadow-xl shadow-primary/5">
-						<div className="mb-6">
-							<h1 className="text-2xl font-bold tracking-tight text-foreground">
-								Welcome back
-							</h1>
-							<p className="text-sm text-muted-foreground mt-1">
-								Sign in to your LockIn account
-							</p>
-						</div>
-
-						<div className="flex flex-col gap-2.5 mb-5">
-							<button
-								type="button"
-								onClick={() => handleOAuth("oauth_google")}
-								disabled={!isLoaded || oauthLoading !== null || isSubmitting}
-								className="flex items-center justify-center gap-2.5 w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					<div className="space-y-2">
+						<div className="flex items-center justify-between">
+							<label
+								htmlFor="sign-in-password"
+								className="block text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400"
 							>
-								{oauthLoading === "oauth_google" ? (
-									<Loader2 size={16} className="animate-spin" />
-								) : (
-									<GoogleIcon />
-								)}
-								Continue with Google
-							</button>
-							<button
-								type="button"
-								onClick={() => handleOAuth("oauth_github")}
-								disabled={!isLoaded || oauthLoading !== null || isSubmitting}
-								className="flex items-center justify-center gap-2.5 w-full px-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								{oauthLoading === "oauth_github" ? (
-									<Loader2 size={16} className="animate-spin" />
-								) : (
-									<Github size={16} />
-								)}
-								Continue with GitHub
-							</button>
-						</div>
-
-						<div className="flex items-center gap-3 mb-5">
-							<div className="flex-1 h-px bg-border" />
-							<span className="text-xs text-muted-foreground uppercase tracking-wider">
-								or
-							</span>
-							<div className="flex-1 h-px bg-border" />
-						</div>
-
-						<form onSubmit={handleSubmit} noValidate className="space-y-4">
-							{error && (
-								<div
-									role="alert"
-									className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm"
-								>
-									<span className="mt-0.5 shrink-0">⚠</span>
-									<span>{error}</span>
-								</div>
-							)}
-
-							<div className="space-y-1.5">
-								<label
-									htmlFor="sign-in-email"
-									className="block text-sm font-medium text-foreground"
-								>
-									Email address
-								</label>
-								<input
-									id="sign-in-email"
-									type="email"
-									autoComplete="email"
-									required
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									placeholder="you@example.com"
-									className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-shadow"
-								/>
-							</div>
-
-							<div className="space-y-1.5">
-								<div className="flex items-center justify-between">
-									<label
-										htmlFor="sign-in-password"
-										className="block text-sm font-medium text-foreground"
-									>
-										Password
-									</label>
-									<Link
-										href="/forgot-password"
-										className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-									>
-										Forgot password?
-									</Link>
-								</div>
-								<div className="relative">
-									<input
-										id="sign-in-password"
-										type={showPassword ? "text" : "password"}
-										autoComplete="current-password"
-										required
-										value={password}
-										onChange={(e) => setPassword(e.target.value)}
-										placeholder="Enter your password"
-										className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-shadow"
-									/>
-									<button
-										type="button"
-										onClick={() => setShowPassword((v) => !v)}
-										className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-										aria-label={
-											showPassword ? "Hide password" : "Show password"
-										}
-									>
-										{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-									</button>
-								</div>
-							</div>
-
-							<button
-								type="submit"
-								disabled={!isLoaded || isSubmitting || oauthLoading !== null}
-								className="w-full flex items-center justify-center gap-2 mt-1 py-2.5 px-4 rounded-full bg-foreground text-background text-sm font-semibold hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-							>
-								{isSubmitting ? (
-									<>
-										<Loader2 size={16} className="animate-spin" />
-										Signing in…
-									</>
-								) : (
-									"Sign in"
-								)}
-							</button>
-						</form>
-
-						<p className="mt-5 text-center text-xs text-muted-foreground">
-							Don't have an account?{" "}
+								Password
+							</label>
 							<Link
-								href="/sign-up"
-								className="font-semibold text-foreground hover:text-primary transition-colors"
+								href="/forgot-password"
+								className="text-[12px] font-medium text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors"
 							>
-								Sign up free
+								Forgot password?
 							</Link>
-						</p>
+						</div>
+						<div className="relative">
+							<input
+								id="sign-in-password"
+								type={showPassword ? "text" : "password"}
+								autoComplete="current-password"
+								required
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								placeholder="Enter your password"
+								className="w-full px-5 py-3.5 pr-12 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+							/>
+							<button
+								type="button"
+								onClick={() => setShowPassword((v) => !v)}
+								className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white transition-colors"
+								aria-label={
+									showPassword ? "Hide password" : "Show password"
+								}
+							>
+								{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+							</button>
+						</div>
 					</div>
 
-					<div className="flex lg:hidden justify-center mt-6">
-						<Link
-							href="/"
-							className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-						>
-							← Back to LockIn
-						</Link>
-					</div>
-				</div>
+					<button
+						type="submit"
+						disabled={!isLoaded || isSubmitting || oauthLoading !== null}
+						className="w-full flex items-center justify-center gap-2 mt-4 py-3.5 px-6 rounded-full bg-[#0F172A] dark:bg-white text-white dark:text-black text-sm font-bold hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+					>
+						{isSubmitting ? (
+							<>
+								<Loader2 size={18} className="animate-spin" />
+								Signing in…
+							</>
+						) : (
+							"Sign in"
+						)}
+					</button>
+				</form>
+
+				<p className="mt-8 text-center text-sm text-slate-500 dark:text-zinc-400">
+					Don't have an account?{" "}
+					<Link
+						href="/sign-up"
+						className="font-bold text-slate-900 dark:text-white hover:underline transition-all"
+					>
+						Sign up free
+					</Link>
+				</p>
+				
+
 			</div>
 		</div>
 	);
