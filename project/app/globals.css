@@ -101,7 +101,7 @@
 
 		--radius: 0.625rem;
 
-		--sidebar: #f8fafc;
+		--sidebar: #ffffff;
 		--sidebar-foreground: #0f172a;
 		--sidebar-primary: #93c5fd;
 		--sidebar-primary-foreground: #0f172a;
@@ -135,7 +135,7 @@
 		--input: #27272a;
 		--ring: #60a5fa;
 
-		--sidebar: #09090b;
+		--sidebar: #000000;
 		--sidebar-foreground: #fafafa;
 		--sidebar-primary: #93c5fd;
 		--sidebar-primary-foreground: #09090b;
@@ -253,9 +253,3 @@
 	}
 }
 
-body .cl-footer,
-body .cl-badge[data-localization-key="badge__devMode"],
-body .cl-devModeWarning,
-body [class*="cl-internal"][class*="development"] {
-	display: none;
-}

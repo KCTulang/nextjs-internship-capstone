@@ -55,7 +55,7 @@ export function Sidebar({
 			)}
 
 			<div
-				className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transform transition-all duration-300 ease-in-out lg:translate-x-0 ${
+				className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar text-sidebar-foreground border-r border-border rounded-r-[2rem] transform transition-all duration-300 ease-in-out lg:translate-x-0 ${
 					mobileOpen ? "translate-x-0" : "-translate-x-full"
 				} ${isCollapsed ? "w-20" : "w-64"}`}
 			>
@@ -72,14 +72,15 @@ export function Sidebar({
 					)}
 				</button>
 
-				<div className="flex items-center justify-between h-16 px-4 sm:px-6 border-b border-border shrink-0">
-					<Link href="/" className="flex items-center h-8">
+				<div className="flex items-center justify-between lg:justify-center h-20 px-4 sm:px-6 shrink-0">
+					<Link href="/" className="flex items-center justify-center">
 						<Image
 							src={isCollapsed ? "/LockLogo.png?v=1" : "/LockInLogo.svg"}
 							alt="LockIn"
-							width={isCollapsed ? 24 : 80}
-							height={isCollapsed ? 32 : 32}
+							width={isCollapsed ? 48 : 240}
+							height={isCollapsed ? 48 : 64}
 							className="dark:invert object-contain transition-all duration-300 origin-left"
+							style={{ width: "auto", height: isCollapsed ? "44px" : "64px" }}
 							priority
 						/>
 					</Link>
