@@ -1,111 +1,44 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
-import {
-	BarChart3,
-	Bell,
-	Calendar,
-	FolderOpen,
-	Home,
-	Menu,
-	Search,
-	Settings,
-	Users,
-	X,
-} from "lucide-react";
-import Link from "next/link";
+import { Bell, Menu, Search } from "lucide-react";
 import type React from "react";
 import { Suspense, useState } from "react";
+import { CustomUserButton } from "@/components/custom-user-button";
+import { Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-const navigation = [
-	{ name: "Dashboard", href: "/dashboard", icon: Home, current: true },
-	{ name: "Projects", href: "/projects", icon: FolderOpen, current: false },
-	{ name: "Team", href: "/team", icon: Users, current: false },
-	{ name: "Analytics", href: "/analytics", icon: BarChart3, current: false },
-	{ name: "Calendar", href: "/calendar", icon: Calendar, current: false },
-	{ name: "Settings", href: "/settings", icon: Settings, current: false },
-];
 
 export default function DashboardLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
-	const [sidebarOpen, setSidebarOpen] = useState(false);
+	const [mobileOpen, setMobileOpen] = useState(false);
+	const [isCollapsed, setIsCollapsed] = useState(false);
 
 	return (
 		<div className="min-h-screen bg-background">
-			{/* Mobile sidebar overlay */}
-			{sidebarOpen && (
-				<button
-					type="button"
-					aria-label="Close sidebar"
-					className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-					onClick={() => setSidebarOpen(false)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter" || e.key === " ") {
-							setSidebarOpen(false);
-						}
-						if (e.key === "Escape") {
-							setSidebarOpen(false);
-						}
-					}}
-				/>
-			)}
+			<Sidebar
+				mobileOpen={mobileOpen}
+				setMobileOpen={setMobileOpen}
+				isCollapsed={isCollapsed}
+				setIsCollapsed={setIsCollapsed}
+			/>
 
-			{/* Sidebar */}
 			<div
-				className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+				className={`transition-all duration-300 ease-in-out ${
+					isCollapsed ? "lg:pl-20" : "lg:pl-64"
+				}`}
 			>
-				<div className="flex items-center justify-between h-16 px-6 border-b border-border">
-					<Link href="/" className="text-2xl font-bold text-primary">
-						ProjectFlow
-					</Link>
-					<button
-						type="button"
-						onClick={() => setSidebarOpen(false)}
-						className="lg:hidden p-2 rounded-lg hover:bg-muted"
-					>
-						<X size={20} />
-					</button>
-				</div>
-
-				<nav className="mt-6 px-3">
-					<ul className="space-y-1">
-						{navigation.map((item) => (
-							<li key={item.name}>
-								<Link
-									href={item.href}
-									className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-										item.current
-											? "bg-primary dark:bg-primary text-primary dark:text-primary"
-											: "text-foreground hover:bg-muted"
-									}`}
-								>
-									<item.icon className="mr-3" size={20} />
-									{item.name}
-								</Link>
-							</li>
-						))}
-					</ul>
-				</nav>
-			</div>
-
-			{/* Main content */}
-			<div className="lg:pl-64">
-				{/* Top bar */}
 				<div className="sticky top-0 z-30 flex h-16 items-center gap-x-4 border-b border-border bg-card px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
 					<button
 						type="button"
-						onClick={() => setSidebarOpen(true)}
+						onClick={() => setMobileOpen(true)}
 						className="lg:hidden p-2 rounded-lg hover:bg-muted"
 					>
 						<Menu size={20} />
 					</button>
 
 					<div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-						{/* Search bar placeholder */}
 						<div className="flex flex-1 items-center">
 							<div className="relative flex-1 max-w-md">
 								<Search
@@ -128,13 +61,12 @@ export default function DashboardLayout({
 							<ThemeToggle />
 
 							<div className="flex items-center justify-center">
-								<UserButton />
+								<CustomUserButton />
 							</div>
 						</div>
 					</div>
 				</div>
 
-				{/* Page content */}
 				<main className="py-8 px-4 sm:px-6 lg:px-8">
 					<Suspense>{children}</Suspense>
 				</main>

@@ -10,9 +10,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "Project Management Tool",
-	description: "Team collaboration and project management platform",
-	generator: "v0.dev",
+	title: "LockIn — Tune out the noise",
+	description:
+		"A Kanban workspace to manage your projects and execute your deliverables. Tune out the noise. Lock into your work.",
 };
 
 export default function RootLayout({
@@ -21,7 +21,21 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<ClerkProvider>
+		<ClerkProvider
+			appearance={{
+				elements: {
+					userButtonPopoverCard:
+						"bg-card border border-border shadow-xl rounded-xl",
+					userButtonPopoverActionButton:
+						"hover:bg-muted text-foreground transition-colors",
+					userButtonPopoverActionButtonText: "text-foreground font-medium",
+					userButtonPopoverActionButtonIconBox: "text-foreground",
+					userPreviewMainIdentifier: "text-foreground font-semibold",
+					userPreviewSecondaryIdentifier: "text-muted-foreground",
+					userButtonPopoverFooter: "border-border",
+				},
+			}}
+		>
 			<html lang="en" suppressHydrationWarning className="h-full antialiased">
 				<body className={`${inter.className} min-h-full flex flex-col`}>
 					<ThemeProvider>{children}</ThemeProvider>
