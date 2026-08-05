@@ -1,0 +1,395 @@
+"use client";
+
+import { useDroppable } from "@dnd-kit/core";
+import {
+	SortableContext,
+	useSortable,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+	Check,
+	GripHorizontal,
+	MoreHorizontal,
+	Pencil,
+	Plus,
+	Trash2,
+	X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { List, Task } from "@/hooks/use-tasks";
+import { useTasksStore } from "@/hooks/use-tasks";
+import { useUIStore } from "@/stores/ui-store";
+import { TaskCard } from "./task-card";
+
+const COLUMN_COLORS = [
+	{
+		name: "slate",
+		accent: "#64748b",
+		bg: "bg-slate-500/10",
+		text: "text-slate-500 dark:text-slate-400",
+		border: "border-slate-500/20",
+		dot: "bg-slate-400",
+	},
+	{
+		name: "blue",
+		accent: "#3b82f6",
+		bg: "bg-blue-500/10",
+		text: "text-blue-500 dark:text-blue-400",
+		border: "border-blue-500/20",
+		dot: "bg-blue-400",
+	},
+	{
+		name: "violet",
+		accent: "#8b5cf6",
+		bg: "bg-violet-500/10",
+		text: "text-violet-500 dark:text-violet-400",
+		border: "border-violet-500/20",
+		dot: "bg-violet-400",
+	},
+	{
+		name: "amber",
+		accent: "#f59e0b",
+		bg: "bg-amber-500/10",
+		text: "text-amber-600 dark:text-amber-400",
+		border: "border-amber-500/20",
+		dot: "bg-amber-400",
+	},
+	{
+		name: "emerald",
+		accent: "#10b981",
+		bg: "bg-emerald-500/10",
+		text: "text-emerald-600 dark:text-emerald-400",
+		border: "border-emerald-500/20",
+		dot: "bg-emerald-400",
+	},
+	{
+		name: "rose",
+		accent: "#f43f5e",
+		bg: "bg-rose-500/10",
+		text: "text-rose-500 dark:text-rose-400",
+		border: "border-rose-500/20",
+		dot: "bg-rose-400",
+	},
+];
+
+function getDefaultColor(name: string) {
+	const lower = name.toLowerCase();
+	if (
+		lower.includes("do") ||
+		lower.includes("todo") ||
+		lower.includes("backlog")
+	)
+		return COLUMN_COLORS[0];
+	if (lower.includes("progress") || lower.includes("doing"))
+		return COLUMN_COLORS[1];
+	if (lower.includes("review") || lower.includes("test"))
+		return COLUMN_COLORS[2];
+	if (lower.includes("hold") || lower.includes("block"))
+		return COLUMN_COLORS[3];
+	if (lower.includes("done") || lower.includes("complete"))
+		return COLUMN_COLORS[4];
+	return COLUMN_COLORS[0];
+}
+
+interface KanbanColumnProps {
+	list: List;
+	projectId: string;
+	isOverlay?: boolean;
+	isMobileView?: boolean;
+	onMoveTaskClick?: (task: Task) => void;
+}
+
+export function KanbanColumn({
+	list,
+	projectId,
+	isOverlay = false,
+	isMobileView = false,
+	onMoveTaskClick,
+}: KanbanColumnProps) {
+	const { renameList, removeList } = useTasksStore();
+	const { openCreateTaskModal } = useUIStore();
+
+	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
+		id: list.id,
+		data: { type: "Column", list },
+	});
+
+	const {
+		setNodeRef: setSortableNodeRef,
+		attributes,
+		listeners,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({
+		id: list.id,
+		data: { type: "Column", list },
+		disabled: isOverlay || isMobileView,
+	});
+
+	const style = {
+		transition,
+		transform: CSS.Translate.toString(transform),
+	};
+
+	const colorKey = `kanban-color-${list.id}`;
+	const [colorIdx, setColorIdx] = useState<number>(() => {
+		if (typeof window !== "undefined") {
+			const saved = localStorage.getItem(colorKey);
+			if (saved !== null) return parseInt(saved, 10);
+		}
+		return COLUMN_COLORS.indexOf(getDefaultColor(list.name));
+	});
+	const color = COLUMN_COLORS[colorIdx] ?? COLUMN_COLORS[0];
+
+	const [isRenaming, setIsRenaming] = useState(false);
+	const [renameValue, setRenameValue] = useState(list.name);
+	const renameInputRef = useRef<HTMLInputElement>(null);
+
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [showColorPicker, setShowColorPicker] = useState(false);
+	const menuRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (isRenaming) renameInputRef.current?.select();
+	}, [isRenaming]);
+
+	useEffect(() => {
+		const handler = (e: MouseEvent) => {
+			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+				setMenuOpen(false);
+				setShowColorPicker(false);
+			}
+		};
+		document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, []);
+
+	const commitRename = () => {
+		const trimmed = renameValue.trim();
+		if (trimmed && trimmed !== list.name) {
+			renameList(list.id, trimmed, projectId);
+		} else {
+			setRenameValue(list.name);
+		}
+		setIsRenaming(false);
+	};
+
+	const handleColorSelect = (idx: number) => {
+		setColorIdx(idx);
+		localStorage.setItem(colorKey, String(idx));
+		setShowColorPicker(false);
+		setMenuOpen(false);
+	};
+
+	const handleDelete = () => {
+		if (window.confirm(`Delete column "${list.name}" and all its tasks?`)) {
+			removeList(list.id, projectId);
+		}
+		setMenuOpen(false);
+	};
+
+	if (isDragging && !isOverlay) {
+		return (
+			<div
+				ref={setSortableNodeRef}
+				style={style}
+				className="flex flex-col rounded-2xl shrink-0 w-[300px] h-[500px] bg-card/40 border-2 border-dashed border-primary/50 opacity-40 backdrop-blur-sm"
+			/>
+		);
+	}
+
+	return (
+		<div
+			ref={setSortableNodeRef}
+			style={style}
+			className={`flex flex-col shrink-0 max-h-full transition-colors duration-200
+				bg-card dark:bg-white/[0.03] border
+				${isOver ? "border-primary/50 shadow-lg shadow-primary/10" : "border-border/60"}
+				backdrop-blur-sm group/column
+				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-[275px] sm:w-[300px] rounded-2xl"}
+			`}
+		>
+			{/* Colored top accent bar */}
+			<div
+				className="h-1 rounded-t-2xl w-full"
+				style={{ background: color.accent }}
+			/>
+
+			{/* Column header */}
+			<div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
+				<div className="flex items-center gap-2 flex-1 min-w-0">
+					{/* Drag handle */}
+					{!isMobileView && (
+						<div
+							{...attributes}
+							{...listeners}
+							className="cursor-grab active:cursor-grabbing p-1 -ml-2 text-transparent group-hover/column:text-muted-foreground hover:bg-muted rounded-md transition-colors"
+						>
+							<GripHorizontal size={14} />
+						</div>
+					)}
+
+					{/* Status dot */}
+					<span className={`w-2 h-2 rounded-full shrink-0 ${color.dot}`} />
+
+					{isRenaming ? (
+						<input
+							ref={renameInputRef}
+							type="text"
+							value={renameValue}
+							onChange={(e) => setRenameValue(e.target.value)}
+							onBlur={commitRename}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") commitRename();
+								if (e.key === "Escape") {
+									setRenameValue(list.name);
+									setIsRenaming(false);
+								}
+							}}
+							className="flex-1 min-w-0 text-sm font-semibold bg-transparent border-b border-primary outline-none text-foreground"
+						/>
+					) : (
+						<h3
+							className="text-sm font-semibold text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+							title="Double-click to rename"
+							onDoubleClick={() => {
+								setIsRenaming(true);
+								setRenameValue(list.name);
+							}}
+						>
+							{list.name}
+						</h3>
+					)}
+
+					{/* Task count badge */}
+					<span
+						className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${color.bg} ${color.text}`}
+					>
+						{list.tasks?.length || 0}
+					</span>
+				</div>
+
+				<div className="flex items-center gap-1 shrink-0">
+					{/* Add task button */}
+					<button
+						type="button"
+						onClick={() => openCreateTaskModal(list.id, projectId)}
+						title="Add task"
+						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+					>
+						<Plus size={15} />
+					</button>
+
+					{/* More menu */}
+					<div ref={menuRef} className="relative">
+						<button
+							type="button"
+							onClick={() => {
+								setMenuOpen((v) => !v);
+								setShowColorPicker(false);
+							}}
+							title="Column options"
+							className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+						>
+							<MoreHorizontal size={15} />
+						</button>
+
+						{menuOpen && (
+							<div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+								<button
+									type="button"
+									onClick={() => {
+										setIsRenaming(true);
+										setRenameValue(list.name);
+										setMenuOpen(false);
+									}}
+									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+								>
+									<Pencil size={14} className="text-muted-foreground" />
+									Rename
+								</button>
+								<button
+									type="button"
+									onClick={() => setShowColorPicker((v) => !v)}
+									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+								>
+									<span className={`w-3.5 h-3.5 rounded-full ${color.dot}`} />
+									Color
+								</button>
+								{showColorPicker && (
+									<div className="px-3 pb-3 pt-1">
+										<div className="flex flex-wrap gap-2">
+											{COLUMN_COLORS.map((c, i) => (
+												<button
+													key={c.name}
+													type="button"
+													title={c.name}
+													onClick={() => handleColorSelect(i)}
+													className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${c.dot} ${colorIdx === i ? "ring-2 ring-offset-1 ring-foreground/40 scale-110" : ""}`}
+												/>
+											))}
+										</div>
+									</div>
+								)}
+								<div className="h-px bg-border my-1" />
+								<button
+									type="button"
+									onClick={handleDelete}
+									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+								>
+									<Trash2 size={14} />
+									Delete column
+								</button>
+							</div>
+						)}
+					</div>
+				</div>
+			</div>
+
+			{/* Task list drop zone */}
+			<div
+				ref={setDroppableNodeRef}
+				className={`flex-1 overflow-y-auto px-3 pb-3 space-y-2.5 min-h-[120px] transition-colors duration-150 ${
+					isOver ? "bg-primary/[0.03] rounded-b-2xl" : ""
+				}`}
+			>
+				<SortableContext
+					items={list.tasks?.map((t) => t.id) || []}
+					strategy={verticalListSortingStrategy}
+				>
+					{list.tasks?.map((task) => (
+						<TaskCard
+							key={task.id}
+							task={task}
+							isMobileView={isMobileView}
+							onMoveClick={onMoveTaskClick}
+						/>
+					))}
+				</SortableContext>
+
+				{/* Empty drop hint */}
+				{(list.tasks?.length || 0) === 0 && (
+					<div
+						className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+							isOver ? `${color.border} ${color.bg}` : "border-border/40"
+						}`}
+					>
+						<p className="text-xs text-muted-foreground">Drop tasks here</p>
+					</div>
+				)}
+			</div>
+
+			{/* Add task footer */}
+			<button
+				type="button"
+				onClick={() => openCreateTaskModal(list.id, projectId)}
+				className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
+			>
+				<Plus size={14} />
+				Add task
+			</button>
+		</div>
+	);
+}
