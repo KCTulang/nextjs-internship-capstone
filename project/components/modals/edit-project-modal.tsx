@@ -1,37 +1,47 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/hooks/use-projects";
-import { createProjectSchema } from "@/lib/validations";
+import { updateProjectSchema } from "@/lib/validations";
 import { useUIStore } from "@/stores/ui-store";
 
-export function CreateProjectModal() {
-	const { userId } = useAuth();
-	const { createProject } = useProjectStore();
-	const { isCreateProjectModalOpen, closeCreateProjectModal } = useUIStore();
+export function EditProjectModal() {
+	const { updateProject } = useProjectStore();
+	const {
+		isEditProjectModalOpen,
+		closeEditProjectModal,
+		selectedProjectForEdit,
+	} = useUIStore();
 
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	useEffect(() => {
+		if (selectedProjectForEdit) {
+			setName(selectedProjectForEdit.name);
+			setDescription(selectedProjectForEdit.description || "");
+		}
+	}, [selectedProjectForEdit]);
+
 	const nameInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
-		if (isCreateProjectModalOpen) {
+		if (isEditProjectModalOpen) {
 			const timer = setTimeout(() => nameInputRef.current?.focus(), 50);
 			return () => clearTimeout(timer);
 		}
-	}, [isCreateProjectModalOpen]);
+	}, [isEditProjectModalOpen]);
 
-	if (!isCreateProjectModalOpen) return null;
+	if (!isEditProjectModalOpen || !selectedProjectForEdit) return null;
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!name.trim() || !userId) return;
+		if (!name.trim()) return;
 
 		// Validate with Zod before sending to server
-		const parsed = createProjectSchema.safeParse({ name, description });
+		const parsed = updateProjectSchema.safeParse({ name, description });
 		if (!parsed.success) {
 			const first = parsed.error.issues[0];
 			useUIStore.getState().addToast({
@@ -44,14 +54,11 @@ export function CreateProjectModal() {
 		setIsSubmitting(true);
 
 		try {
-			await createProject({
+			await updateProject(selectedProjectForEdit.id, {
 				name: parsed.data.name,
 				description: parsed.data.description,
-				ownerId: userId,
 			});
-			setName("");
-			setDescription("");
-			closeCreateProjectModal();
+			closeEditProjectModal();
 		} catch {
 			// Error is already handled globally by useProjectStore
 		} finally {
@@ -60,14 +67,18 @@ export function CreateProjectModal() {
 	};
 
 	const handleBackdropClick = (e: React.MouseEvent) => {
-		if (e.target === e.currentTarget) closeCreateProjectModal();
+		if (e.target === e.currentTarget) closeEditProjectModal();
 	};
+
+	const hasChanges =
+		name.trim() !== selectedProjectForEdit.name ||
+		(description.trim() || "") !== (selectedProjectForEdit.description || "");
 
 	return (
 		<div
 			role="dialog"
 			aria-modal="true"
-			aria-labelledby="create-project-title"
+			aria-labelledby="edit-project-title"
 			className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
 			onClick={handleBackdropClick}
 			onKeyDown={(e) => {
@@ -81,18 +92,18 @@ export function CreateProjectModal() {
 				<div className="flex items-center justify-between mb-6">
 					<div>
 						<h3
-							id="create-project-title"
+							id="edit-project-title"
 							className="text-xl font-semibold text-foreground"
 						>
-							Create New Project
+							Edit Project
 						</h3>
 						<p className="text-sm text-muted-foreground mt-0.5">
-							Set up your project workspace
+							Update your project details
 						</p>
 					</div>
 					<button
 						type="button"
-						onClick={closeCreateProjectModal}
+						onClick={closeEditProjectModal}
 						className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
 						aria-label="Close modal"
 					>
@@ -104,13 +115,13 @@ export function CreateProjectModal() {
 					{/* Project Name */}
 					<div>
 						<label
-							htmlFor="project-name"
+							htmlFor="edit-project-name"
 							className="block text-sm font-medium text-foreground mb-1.5"
 						>
 							Project Name <span className="text-destructive">*</span>
 						</label>
 						<input
-							id="project-name"
+							id="edit-project-name"
 							ref={nameInputRef}
 							type="text"
 							required
@@ -130,7 +141,7 @@ export function CreateProjectModal() {
 					{/* Description */}
 					<div>
 						<label
-							htmlFor="project-description"
+							htmlFor="edit-project-description"
 							className="block text-sm font-medium text-foreground mb-1.5"
 						>
 							Description{" "}
@@ -139,7 +150,7 @@ export function CreateProjectModal() {
 							</span>
 						</label>
 						<textarea
-							id="project-description"
+							id="edit-project-description"
 							rows={3}
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
@@ -158,14 +169,14 @@ export function CreateProjectModal() {
 					<div className="flex justify-end gap-3 pt-2">
 						<button
 							type="button"
-							onClick={closeCreateProjectModal}
+							onClick={closeEditProjectModal}
 							className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
 						>
 							Cancel
 						</button>
 						<button
 							type="submit"
-							disabled={isSubmitting || !name.trim()}
+							disabled={isSubmitting || !name.trim() || !hasChanges}
 							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[120px]"
 						>
 							{isSubmitting ? (
@@ -190,10 +201,10 @@ export function CreateProjectModal() {
 											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 										/>
 									</svg>
-									Creating...
+									Saving...
 								</span>
 							) : (
-								"Create Project"
+								"Save Changes"
 							)}
 						</button>
 					</div>

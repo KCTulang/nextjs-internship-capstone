@@ -1,7 +1,21 @@
+"use client";
+
 import { CheckCircle, Clock, Plus, TrendingUp, Users } from "lucide-react";
+import { useEffect } from "react";
+import { ProjectCard } from "@/components/project-card";
+import { useProjectStore } from "@/hooks/use-projects";
+import { useUIStore } from "@/stores/ui-store";
+
 export default function DashboardPage() {
+	const { openCreateProjectModal } = useUIStore();
+	const { projects, isLoading, fetchProjects } = useProjectStore();
+
+	useEffect(() => {
+		fetchProjects(true);
+	}, [fetchProjects]);
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-8">
 			<div>
 				<h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
 				<p className="text-muted-foreground mt-2">
@@ -9,41 +23,11 @@ export default function DashboardPage() {
 				</p>
 			</div>
 
-			{/* Implementation Status Banner */}
-			<div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-				<div className="flex items-start">
-					<div className="shrink-0">
-						<div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-							<TrendingUp className="text-primary-foreground" size={16} />
-						</div>
-					</div>
-					<div className="ml-3">
-						<h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-							Dashboard Implementation Tasks
-						</h3>
-						<div className="mt-2 text-sm text-blue-800 dark:text-blue-200">
-							<ul className="list-disc list-inside space-y-1">
-								<li>
-									Task 4.2: Create project listing and dashboard interface
-								</li>
-								<li>
-									Task 5.3: Set up client-side state management with Zustand
-								</li>
-								<li>
-									Task 6.6: Optimize performance and implement loading states
-								</li>
-							</ul>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			{/* Stats Grid - Placeholder */}
 			<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 				{[
 					{
 						name: "Active Projects",
-						value: "12",
+						value: projects.length.toString(), // Automatically updates!
 						icon: TrendingUp,
 						change: "+2.5%",
 					},
@@ -91,73 +75,63 @@ export default function DashboardPage() {
 				))}
 			</div>
 
-			{/* Recent Activity & Quick Actions */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				{/* Recent Projects */}
-				<div className="bg-card rounded-lg border border-border p-6">
-					<h3 className="text-lg font-semibold text-foreground mb-4">
-						Recent Projects
-					</h3>
-					<div className="space-y-3">
-						{[1, 2, 3].map((i) => (
-							<div
-								key={i}
-								className="flex items-center justify-between p-3 bg-muted rounded-lg"
-							>
-								<div>
-									<div className="font-medium text-foreground">Project {i}</div>
-									<div className="text-sm text-muted-foreground">
-										Last updated 2 hours ago
-									</div>
-								</div>
-								<div className="w-12 h-2 bg-muted rounded-full">
-									<div className="w-8 h-2 bg-primary rounded-full"></div>
-								</div>
-							</div>
-						))}
-					</div>
-					<div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-						<p className="text-sm text-yellow-800 dark:text-yellow-200">
-							📋 <strong>Task 4.1:</strong> Implement project CRUD operations
-						</p>
-					</div>
+			<div className="bg-card rounded-lg border border-border p-6">
+				<h3 className="text-lg font-semibold text-foreground mb-4">
+					Quick Actions
+				</h3>
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<button
+						type="button"
+						onClick={openCreateProjectModal}
+						className="w-full flex items-center justify-center px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary transition-colors"
+					>
+						<Plus size={20} className="mr-2" />
+						Create New Project
+					</button>
+					<button
+						type="button"
+						className="w-full flex items-center justify-center px-4 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+					>
+						<Plus size={20} className="mr-2" />
+						Add Team Member
+					</button>
+					<button
+						type="button"
+						className="w-full flex items-center justify-center px-4 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+					>
+						<Plus size={20} className="mr-2" />
+						Create Task
+					</button>
+				</div>
+			</div>
+
+			<div className="mt-8">
+				<div className="flex items-center justify-between mb-6">
+					<h2 className="text-xl font-bold text-foreground">All Projects</h2>
 				</div>
 
-				{/* Quick Actions */}
-				<div className="bg-card rounded-lg border border-border p-6">
-					<h3 className="text-lg font-semibold text-foreground mb-4">
-						Quick Actions
-					</h3>
-					<div className="space-y-3">
+				{isLoading && projects.length === 0 ? (
+					<div className="text-center py-10 text-muted-foreground animate-pulse">
+						Loading projects...
+					</div>
+				) : projects.length === 0 ? (
+					<div className="text-center py-10 border border-dashed border-border rounded-xl">
+						<p className="text-muted-foreground mb-4">No projects yet.</p>
 						<button
 							type="button"
-							className="w-full flex items-center justify-center px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary transition-colors"
+							onClick={openCreateProjectModal}
+							className="text-primary hover:underline font-medium"
 						>
-							<Plus size={20} className="mr-2" />
-							Create New Project
-						</button>
-						<button
-							type="button"
-							className="w-full flex items-center justify-center px-4 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
-						>
-							<Plus size={20} className="mr-2" />
-							Add Team Member
-						</button>
-						<button
-							type="button"
-							className="w-full flex items-center justify-center px-4 py-3 border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
-						>
-							<Plus size={20} className="mr-2" />
-							Create Task
+							Create your first project
 						</button>
 					</div>
-					<div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-						<p className="text-sm text-yellow-800 dark:text-yellow-200">
-							📋 <strong>Task 4.4:</strong> Build task creation and editing
-							functionality
-						</p>
+				) : (
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+						{projects.map((project) => (
+							<ProjectCard key={project.id} project={project} />
+						))}
 					</div>
-				</div>
+				)}
 			</div>
 		</div>
 	);

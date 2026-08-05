@@ -1,9 +1,13 @@
 "use client";
 
 import { Bell, Menu, Search } from "lucide-react";
-import React, { Suspense, useState } from "react";
 import Link from "next/link";
+import type React from "react";
+import { Suspense, useState } from "react";
 import { CustomUserButton } from "@/components/custom-user-button";
+import { CreateProjectModal } from "@/components/modals/create-project-modal";
+import { CreateTaskModal } from "@/components/modals/create-task-modal";
+import { EditProjectModal } from "@/components/modals/edit-project-modal";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -72,6 +76,9 @@ export default function DashboardLayout({
 					<Suspense>{children}</Suspense>
 				</main>
 			</div>
+			<CreateProjectModal />
+			<EditProjectModal />
+			<CreateTaskModal />
 		</div>
 	);
 }
