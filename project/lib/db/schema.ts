@@ -61,6 +61,7 @@ export const projects = pgTable(
 	"projects",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
+		slug: text("slug").notNull().unique(),
 		name: text("name").notNull(),
 		description: text("description"),
 		ownerId: uuid("owner_id")
