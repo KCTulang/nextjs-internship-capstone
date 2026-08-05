@@ -2,7 +2,15 @@
 
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSignIn } from "@clerk/nextjs/legacy";
-import { Eye, EyeOff, Github, Loader2, Moon, Sun, ArrowLeft } from "lucide-react";
+import {
+	ArrowLeft,
+	Eye,
+	EyeOff,
+	Github,
+	Loader2,
+	Moon,
+	Sun,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -107,7 +115,6 @@ export default function SignInPage() {
 
 	return (
 		<div className="min-h-screen text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors">
-			{/* Top Left: Back to Home */}
 			<div className="absolute top-6 left-6 md:top-8 md:left-8 z-20">
 				<Link
 					href="/"
@@ -118,9 +125,6 @@ export default function SignInPage() {
 				</Link>
 			</div>
 
-
-
-			{/* Top Right: Theme Toggle */}
 			<div className="absolute top-6 right-6 md:top-8 md:right-8 z-20">
 				<button
 					type="button"
@@ -128,13 +132,15 @@ export default function SignInPage() {
 					className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg hover:scale-105 transition-transform"
 					aria-label="Toggle theme"
 				>
-					{theme === "light" ? <Moon size={20} fill="currentColor" /> : <Sun size={20} />}
+					{theme === "light" ? (
+						<Moon size={20} fill="currentColor" />
+					) : (
+						<Sun size={20} />
+					)}
 				</button>
 			</div>
 
-			{/* Center Container */}
-			<div className="w-full max-w-[380px] z-10 flex flex-col items-center">
-				{/* Logo */}
+			<div className="w-full max-w-95 z-10 flex flex-col items-center">
 				<div className="mb-8">
 					<Image
 						src="/LockInLogo.svg"
@@ -147,7 +153,6 @@ export default function SignInPage() {
 					/>
 				</div>
 
-				{/* Title */}
 				<div className="mb-8 text-center w-full">
 					<h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white mb-2">
 						Welcome back
@@ -157,7 +162,6 @@ export default function SignInPage() {
 					</p>
 				</div>
 
-				{/* OAuth Buttons */}
 				<div className="flex flex-col gap-3 w-full mb-8">
 					<button
 						type="button"
@@ -187,7 +191,6 @@ export default function SignInPage() {
 					</button>
 				</div>
 
-				{/* OR Divider */}
 				<div className="flex items-center gap-4 w-full mb-8">
 					<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
 					<span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
@@ -196,7 +199,6 @@ export default function SignInPage() {
 					<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
 				</div>
 
-				{/* Form */}
 				<form onSubmit={handleSubmit} noValidate className="w-full space-y-5">
 					{error && (
 						<div
@@ -257,9 +259,7 @@ export default function SignInPage() {
 								type="button"
 								onClick={() => setShowPassword((v) => !v)}
 								className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white transition-colors"
-								aria-label={
-									showPassword ? "Hide password" : "Show password"
-								}
+								aria-label={showPassword ? "Hide password" : "Show password"}
 							>
 								{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
 							</button>
@@ -291,8 +291,6 @@ export default function SignInPage() {
 						Sign up free
 					</Link>
 				</p>
-				
-
 			</div>
 		</div>
 	);

@@ -2,7 +2,15 @@
 
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSignUp } from "@clerk/nextjs/legacy";
-import { Eye, EyeOff, Github, Loader2, Moon, Sun, ArrowLeft } from "lucide-react";
+import {
+	ArrowLeft,
+	Eye,
+	EyeOff,
+	Github,
+	Loader2,
+	Moon,
+	Sun,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -140,7 +148,6 @@ export default function SignUpPage() {
 
 	return (
 		<div className="min-h-screen text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors">
-			{/* Top Left: Back to Home */}
 			<div className="absolute top-6 left-6 md:top-8 md:left-8 z-20">
 				<Link
 					href="/"
@@ -151,9 +158,6 @@ export default function SignUpPage() {
 				</Link>
 			</div>
 
-
-
-			{/* Top Right: Theme Toggle */}
 			<div className="absolute top-6 right-6 md:top-8 md:right-8 z-20">
 				<button
 					type="button"
@@ -161,13 +165,15 @@ export default function SignUpPage() {
 					className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg hover:scale-105 transition-transform"
 					aria-label="Toggle theme"
 				>
-					{theme === "light" ? <Moon size={20} fill="currentColor" /> : <Sun size={20} />}
+					{theme === "light" ? (
+						<Moon size={20} fill="currentColor" />
+					) : (
+						<Sun size={20} />
+					)}
 				</button>
 			</div>
 
-			{/* Center Container */}
 			<div className="w-full max-w-[380px] z-10 flex flex-col items-center">
-				{/* Logo */}
 				<div className="mb-8">
 					<Image
 						src="/LockInLogo.svg"
@@ -182,7 +188,6 @@ export default function SignUpPage() {
 
 				{stage === "register" ? (
 					<>
-						{/* Title */}
 						<div className="mb-8 text-center w-full">
 							<h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white mb-2">
 								Create your account
@@ -192,7 +197,6 @@ export default function SignUpPage() {
 							</p>
 						</div>
 
-						{/* OAuth Buttons */}
 						<div className="flex flex-col gap-3 w-full mb-8">
 							<button
 								type="button"
@@ -222,7 +226,6 @@ export default function SignUpPage() {
 							</button>
 						</div>
 
-						{/* OR Divider */}
 						<div className="flex items-center gap-4 w-full mb-8">
 							<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
 							<span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
@@ -231,8 +234,11 @@ export default function SignUpPage() {
 							<div className="flex-1 h-px bg-slate-200 dark:bg-zinc-800" />
 						</div>
 
-						{/* Form */}
-						<form onSubmit={handleRegister} noValidate className="w-full space-y-5">
+						<form
+							onSubmit={handleRegister}
+							noValidate
+							className="w-full space-y-5"
+						>
 							{error && (
 								<div
 									role="alert"
@@ -339,7 +345,11 @@ export default function SignUpPage() {
 							</p>
 						</div>
 
-						<form onSubmit={handleVerify} noValidate className="w-full space-y-5">
+						<form
+							onSubmit={handleVerify}
+							noValidate
+							className="w-full space-y-5"
+						>
 							{error && (
 								<div
 									role="alert"
@@ -365,9 +375,7 @@ export default function SignUpPage() {
 									maxLength={6}
 									required
 									value={code}
-									onChange={(e) =>
-										setCode(e.target.value.replace(/\D/g, ""))
-									}
+									onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
 									placeholder="123456"
 									className="w-full px-5 py-4 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-lg text-center tracking-[0.5em] placeholder:text-slate-400 dark:placeholder:text-zinc-600 placeholder:tracking-normal focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm font-mono"
 								/>
@@ -414,8 +422,6 @@ export default function SignUpPage() {
 						</div>
 					</>
 				)}
-
-
 			</div>
 		</div>
 	);
