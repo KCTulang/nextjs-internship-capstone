@@ -5,8 +5,10 @@ import type React from "react";
 
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ThemeProvider } from "@/components/theme-provider";
 import { AmbientGlow } from "@/components/ambient-glow";
+import { ThemeProvider } from "@/components/theme-provider";
+
+import { Toaster } from "@/components/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,10 +39,16 @@ export default function RootLayout({
 				},
 			}}
 		>
-			<html lang="en" suppressHydrationWarning className="h-full antialiased" data-scroll-behavior="smooth">
+			<html
+				lang="en"
+				suppressHydrationWarning
+				className="h-full antialiased"
+				data-scroll-behavior="smooth"
+			>
 				<body className={`${inter.className} min-h-full flex flex-col`}>
 					<ThemeProvider>
 						<AmbientGlow />
+						<Toaster />
 						{children}
 					</ThemeProvider>
 				</body>

@@ -1,41 +1,112 @@
-// TODO: Task 3.6 - Set up data validation with Zod schemas
+import { z } from "zod";
 
-/*
-TODO: Implementation Notes for Interns:
+export const createProjectSchema = z.object({
+	name: z
+		.string()
+		.min(1, "Project name is required")
+		.max(80, "Project name must be 80 characters or fewer")
+		.trim(),
+	description: z
+		.string()
+		.max(500, "Description must be 500 characters or fewer")
+		.trim()
+		.optional(),
+});
 
-1. Install Zod: pnpm add zod
-2. Create validation schemas for all forms and API endpoints
-3. Add proper error messages
-4. Set up client and server-side validation
+export const updateProjectSchema = createProjectSchema.partial();
 
-Example schemas needed:
-- Project creation/update
-- Task creation/update
-- User profile update
-- List/column management
-- Comment creation
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
-Example structure:
-import { z } from 'zod'
+export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
-export const projectSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  description: z.string().max(500, 'Description too long').optional(),
-  dueDate: z.date().min(new Date(), 'Due date must be in future').optional(),
-})
+export const createTaskSchema = z.object({
+	title: z
+		.string()
+		.min(1, "Task title is required")
+		.max(200, "Task title must be 200 characters or fewer")
+		.trim(),
+	description: z
+		.string()
+		.max(2000, "Description must be 2000 characters or fewer")
+		.trim()
+		.optional(),
+	listId: z.string().uuid("Invalid list ID"),
+	priority: z.enum(TASK_PRIORITIES).default("medium"),
+	dueDate: z.coerce.date().optional(),
+	position: z.number().int().nonnegative().default(1000),
+});
 
-export const taskSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
-  description: z.string().max(1000, 'Description too long').optional(),
-  priority: z.enum(['low', 'medium', 'high']),
-  dueDate: z.date().optional(),
-  assigneeId: z.string().uuid().optional(),
-})
-*/
+export const updateTaskSchema = createTaskSchema
+	.omit({ listId: true, position: true })
+	.partial()
+	.extend({
+		listId: z.string().uuid("Invalid list ID").optional(),
+		position: z.number().int().nonnegative().optional(),
+	});
 
-// Placeholder exports to prevent import errors
-export const projectSchema = "TODO: Implement project validation schema";
-export const taskSchema = "TODO: Implement task validation schema";
-export const userSchema = "TODO: Implement user validation schema";
-export const listSchema = "TODO: Implement list validation schema";
-export const commentSchema = "TODO: Implement comment validation schema";
+export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+
+export const createListSchema = z.object({
+	name: z
+		.string()
+		.min(1, "List name is required")
+		.max(50, "List name must be 50 characters or fewer")
+		.trim(),
+	projectId: z.string().uuid("Invalid project ID"),
+	position: z.number().int().nonnegative().default(1000),
+});
+
+export const updateListSchema = createListSchema
+	.omit({ projectId: true, position: true })
+	.partial()
+	.extend({
+		position: z.number().int().nonnegative().optional(),
+	});
+
+export type CreateListInput = z.infer<typeof createListSchema>;
+export type UpdateListInput = z.infer<typeof updateListSchema>;
+
+
+export const createCommentSchema = z.object({
+	content: z
+		.string()
+		.min(1, "Comment cannot be empty")
+		.max(1000, "Comment must be 1000 characters or fewer")
+		.trim(),
+	taskId: z.string().uuid("Invalid task ID"),
+});
+
+export type CreateCommentInput = z.infer<typeof createCommentSchema>;
+
+
+export const userProfileSchema = z.object({
+	name: z
+		.string()
+		.min(1, "Name is required")
+		.max(100, "Name must be 100 characters or fewer")
+		.trim(),
+	email: z.string().email("Invalid email address"),
+});
+
+export type UserProfileInput = z.infer<typeof userProfileSchema>;
+
+export function validate<T>(
+	schema: z.ZodSchema<T>,
+	data: unknown,
+):
+	| { success: true; data: T }
+	| { success: false; errors: Record<string, string> } {
+	const result = schema.safeParse(data);
+	if (result.success) {
+		return { success: true, data: result.data };
+	}
+	const errors: Record<string, string> = {};
+	for (const issue of result.error.issues) {
+		const key = issue.path.join(".");
+		errors[key] = issue.message;
+	}
+	return { success: false, errors };
+}
