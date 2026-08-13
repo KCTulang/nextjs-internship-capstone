@@ -38,7 +38,7 @@ export const queries = {
 */
 
 import { neon } from "@neondatabase/serverless";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
@@ -58,11 +58,11 @@ export const queries = {
 				where: eq(schema.users.clerkId, clerkId),
 			});
 		},
-	
+
 		create: async (data: typeof schema.users.$inferInsert) => {
 			return await db.insert(schema.users).values(data).returning();
 		},
-	
+
 		update: async (
 			clerkId: string,
 			data: Partial<typeof schema.users.$inferInsert>,
@@ -73,7 +73,7 @@ export const queries = {
 				.where(eq(schema.users.clerkId, clerkId))
 				.returning();
 		},
-	
+
 		delete: async (clerkId: string) => {
 			return await db
 				.delete(schema.users)
@@ -82,13 +82,20 @@ export const queries = {
 		},
 	},
 	projects: {
-	
-		getAll: async (limit = 10, offset = 0) => {
+		getAll: async (userId: string, limit = 10, offset = 0) => {
+			const memberships = await db.query.projectMembers.findMany({
+				where: eq(schema.projectMembers.userId, userId),
+				columns: { projectId: true },
+			});
+			const projectIds = memberships.map((m) => m.projectId);
+
+			if (projectIds.length === 0) return [];
+
 			return await db.query.projects.findMany({
 				limit,
 				offset,
+				where: inArray(schema.projects.id, projectIds),
 				orderBy: (projects, { desc }) => [desc(projects.createdAt)],
-
 				with: {
 					members: true,
 					lists: {
@@ -119,7 +126,6 @@ export const queries = {
 			id: string,
 			data: Partial<typeof schema.projects.$inferInsert>,
 		) => {
-			console.log(`TODO: Update project ${id}`, data);
 			return await db
 				.update(schema.projects)
 				.set(data)
@@ -127,22 +133,30 @@ export const queries = {
 				.returning();
 		},
 
-		//delete
+		// delete
 		delete: async (id: string) => {
-			console.log(`TODO: Delete project ${id}`);
 			return await db
 				.delete(schema.projects)
 				.where(eq(schema.projects.id, id))
 				.returning();
 		},
-		getBySlug: async (slug: string) => {
-			return await db.query.projects.findFirst({
+		getBySlug: async (slug: string, userId?: string) => {
+			const project = await db.query.projects.findFirst({
 				where: eq(schema.projects.slug, slug),
 				with: {
 					members: { with: { user: true } },
 					owner: true,
 				},
 			});
+
+			if (!project) return null;
+
+			if (userId) {
+				const isMember = project.members.some((m) => m.userId === userId);
+				if (!isMember) return null;
+			}
+
+			return project;
 		},
 	},
 	lists: {
@@ -156,6 +170,14 @@ export const queries = {
 				with: {
 					tasks: {
 						orderBy: (tasks, { asc }) => [asc(tasks.position)],
+						with: {
+							assignee: true,
+							comments: {
+								columns: {
+									id: true,
+								},
+							},
+						},
 					},
 				},
 			});
@@ -229,6 +251,45 @@ export const queries = {
 			return await db.query.projectMembers.findMany({
 				where: eq(schema.projectMembers.projectId, projectId),
 				with: { user: true },
+			});
+		},
+	},
+	comments: {
+		create: async (data: typeof schema.comments.$inferInsert) => {
+			return await db.insert(schema.comments).values(data).returning();
+		},
+		getById: async (id: string) => {
+			return await db.query.comments.findFirst({
+				where: eq(schema.comments.id, id),
+			});
+		},
+		getByTask: async (taskId: string) => {
+			return await db.query.comments.findMany({
+				where: eq(schema.comments.taskId, taskId),
+				orderBy: (comments, { asc }) => [asc(comments.createdAt)],
+				with: {
+					author: true,
+				},
+			});
+		},
+		delete: async (id: string) => {
+			return await db
+				.delete(schema.comments)
+				.where(eq(schema.comments.id, id))
+				.returning();
+		},
+	},
+	activityLogs: {
+		create: async (data: typeof schema.activityLogs.$inferInsert) => {
+			return await db.insert(schema.activityLogs).values(data).returning();
+		},
+		getByTask: async (taskId: string) => {
+			return await db.query.activityLogs.findMany({
+				where: eq(schema.activityLogs.taskId, taskId),
+				orderBy: (logs, { asc }) => [asc(logs.createdAt)],
+				with: {
+					user: true,
+				},
 			});
 		},
 	},

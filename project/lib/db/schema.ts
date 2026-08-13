@@ -107,6 +107,7 @@ export const tasks = pgTable(
 		}),
 		priority: text("priority").notNull().default("medium"),
 		dueDate: timestamp("due_date"),
+		labels: text("labels").array(),
 		position: integer("position").notNull(),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at")
@@ -151,12 +152,39 @@ export const projectMembers = pgTable(
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		role: text("role").notNull().default("member"), // project role: "owner", "admin", "member", "viewer"
+		role: text("role").notNull().default("member"),
+		projectRole: text("project_role").notNull().default("Other"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => [
 		index("member_project_idx").on(table.projectId),
 		index("member_user_idx").on(table.userId),
+	],
+);
+
+export const projectInvitations = pgTable(
+	"project_invitations",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		projectId: uuid("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		email: text("email").notNull(),
+		role: text("role").notNull().default("member"),
+		projectRole: text("project_role").notNull().default("Other"),
+		status: text("status").notNull().default("pending"),
+		inviterId: uuid("inviter_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at")
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+	},
+	(table) => [
+		index("invitation_project_idx").on(table.projectId),
+		index("invitation_email_idx").on(table.email),
+		index("invitation_status_idx").on(table.status),
 	],
 );
 
@@ -167,13 +195,29 @@ export const usersRelations = relations(users, ({ many }) => ({
 	tasks: many(tasks),
 	comments: many(comments),
 	projectMembers: many(projectMembers),
+	sentInvitations: many(projectInvitations),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
 	owner: one(users, { fields: [projects.ownerId], references: [users.id] }),
 	lists: many(lists),
 	members: many(projectMembers),
+	invitations: many(projectInvitations),
 }));
+
+export const projectInvitationsRelations = relations(
+	projectInvitations,
+	({ one }) => ({
+		project: one(projects, {
+			fields: [projectInvitations.projectId],
+			references: [projects.id],
+		}),
+		inviter: one(users, {
+			fields: [projectInvitations.inviterId],
+			references: [users.id],
+		}),
+	}),
+);
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
 	project: one(projects, {
@@ -183,10 +227,39 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
 	tasks: many(tasks),
 }));
 
+export const activityLogs = pgTable(
+	"activity_logs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		taskId: uuid("task_id")
+			.notNull()
+			.references(() => tasks.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		type: text("type").notNull(), // "status_changed" | "assigned" | "unassigned" | "priority_changed" | "due_date_changed" | "title_changed" | "description_changed" | "label_added" | "label_removed" | "comment_added"
+		fromValue: text("from_value"),
+		toValue: text("to_value"),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => [
+		index("activity_task_idx").on(table.taskId),
+		index("activity_user_idx").on(table.userId),
+	],
+);
+
+// Relations
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+	task: one(tasks, { fields: [activityLogs.taskId], references: [tasks.id] }),
+	user: one(users, { fields: [activityLogs.userId], references: [users.id] }),
+}));
+
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	list: one(lists, { fields: [tasks.listId], references: [lists.id] }),
 	assignee: one(users, { fields: [tasks.assigneeId], references: [users.id] }),
 	comments: many(comments),
+	activityLogs: many(activityLogs),
 }));
 
 export const commentsRelations = relations(comments, ({ one }) => ({
