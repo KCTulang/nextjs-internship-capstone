@@ -5,7 +5,7 @@ import { useTasksStore } from "@/hooks/use-tasks";
 import { useUIStore } from "@/stores/ui-store";
 
 export function CreateTaskModal() {
-	const { createTask } = useTasksStore();
+	const { createTask, members } = useTasksStore();
 	const {
 		isCreateTaskModalOpen,
 		closeCreateTaskModal,
@@ -16,6 +16,9 @@ export function CreateTaskModal() {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [priority, setPriority] = useState("medium");
+	const [assigneeId, setAssigneeId] = useState("unassigned");
+	const [dueDate, setDueDate] = useState("");
+	const [labels, setLabels] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	if (!isCreateTaskModalOpen || !selectedListIdForNewTask || !activeProjectId)
@@ -32,8 +35,16 @@ export function CreateTaskModal() {
 				title: title.trim(),
 				description: description.trim() || undefined,
 				priority,
+				assigneeId: assigneeId === "unassigned" ? null : assigneeId,
+				dueDate: dueDate ? new Date(dueDate) : null,
+				labels: labels
+					? labels
+							.split(",")
+							.map((l) => l.trim())
+							.filter(Boolean)
+					: null,
 				listId: selectedListIdForNewTask,
-				position: 1000, // In a real app, query max position of current tasks and add 1000.
+				position: 1000,
 			},
 			activeProjectId,
 		);
@@ -42,6 +53,9 @@ export function CreateTaskModal() {
 		setTitle("");
 		setDescription("");
 		setPriority("medium");
+		setAssigneeId("unassigned");
+		setDueDate("");
+		setLabels("");
 		closeCreateTaskModal();
 	};
 
@@ -88,23 +102,81 @@ export function CreateTaskModal() {
 						/>
 					</div>
 
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label
+								htmlFor="task-priority"
+								className="block text-sm font-medium text-foreground mb-1"
+							>
+								Priority
+							</label>
+							<select
+								id="task-priority"
+								value={priority}
+								onChange={(e) => setPriority(e.target.value)}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+							>
+								<option value="low">Low</option>
+								<option value="medium">Medium</option>
+								<option value="high">High</option>
+								<option value="urgent">Urgent</option>
+							</select>
+						</div>
+
+						<div>
+							<label
+								htmlFor="task-assignee"
+								className="block text-sm font-medium text-foreground mb-1"
+							>
+								Assignee
+							</label>
+							<select
+								id="task-assignee"
+								value={assigneeId}
+								onChange={(e) => setAssigneeId(e.target.value)}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+							>
+								<option value="unassigned">Unassigned</option>
+								{members?.map((member) => (
+									<option key={member.id} value={member.id}>
+										{member.name || member.email}
+									</option>
+								))}
+							</select>
+						</div>
+					</div>
+
 					<div>
 						<label
-							htmlFor="task-priority"
+							htmlFor="task-due-date"
 							className="block text-sm font-medium text-foreground mb-1"
 						>
-							Priority
+							Due Date (Optional)
 						</label>
-						<select
-							id="task-priority"
-							value={priority}
-							onChange={(e) => setPriority(e.target.value)}
+						<input
+							id="task-due-date"
+							type="date"
+							value={dueDate}
+							onChange={(e) => setDueDate(e.target.value)}
 							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+						/>
+					</div>
+
+					<div>
+						<label
+							htmlFor="task-labels"
+							className="block text-sm font-medium text-foreground mb-1"
 						>
-							<option value="low">Low</option>
-							<option value="medium">Medium</option>
-							<option value="high">High</option>
-						</select>
+							Labels (Optional, comma-separated)
+						</label>
+						<input
+							id="task-labels"
+							type="text"
+							value={labels}
+							onChange={(e) => setLabels(e.target.value)}
+							placeholder="e.g. bug, high priority, frontend"
+							className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+						/>
 					</div>
 
 					<div className="flex justify-end gap-3 mt-6">

@@ -1,10 +1,19 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { queries } from "@/lib/db";
+import { createListSchema, updateListSchema } from "@/lib/validations";
+
+async function requireAuth() {
+	const { userId } = await auth();
+	if (!userId) throw new Error("Unauthorized");
+	return userId;
+}
 
 export async function getListsAction(projectId: string) {
 	try {
+		await requireAuth();
 		const lists = await queries.lists.getByProject(projectId);
 		return { success: true, data: lists };
 	} catch (error) {
@@ -13,12 +22,14 @@ export async function getListsAction(projectId: string) {
 	}
 }
 
-export async function createListAction(data: {
+export async function createListAction(rawData: {
 	name: string;
 	projectId: string;
 	position: number;
 }) {
 	try {
+		await requireAuth();
+		const data = createListSchema.parse(rawData);
 		const newList = await queries.lists.create({
 			name: data.name,
 			projectId: data.projectId,
@@ -34,6 +45,7 @@ export async function createListAction(data: {
 
 export async function generateDefaultListsAction(projectId: string) {
 	try {
+		await requireAuth();
 		await queries.lists.create({ name: "To Do", projectId, position: 1000 });
 		await queries.lists.create({
 			name: "In Progress",
@@ -51,10 +63,12 @@ export async function generateDefaultListsAction(projectId: string) {
 
 export async function updateListAction(
 	listId: string,
-	data: { name?: string; position?: number },
-	projectId: string,
+	rawData: { name?: string; position?: number },
+	_projectId: string,
 ) {
 	try {
+		await requireAuth();
+		const data = updateListSchema.parse(rawData);
 		const updatedList = await queries.lists.update(listId, data);
 		revalidatePath(`/dashboard`, "layout");
 		return { success: true, data: updatedList[0] };
@@ -66,6 +80,7 @@ export async function updateListAction(
 
 export async function deleteListAction(listId: string, _projectId: string) {
 	try {
+		await requireAuth();
 		await queries.lists.delete(listId);
 		revalidatePath(`/dashboard`, "layout");
 		return { success: true };

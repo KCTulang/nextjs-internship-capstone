@@ -1,7 +1,7 @@
 "use client";
 
 import {
-	closestCorners,
+	closestCenter,
 	DndContext,
 	type DragEndEvent,
 	DragOverlay,
@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { AnimatePresence, motion } from "framer-motion";
-import { LayoutList, Settings2 } from "lucide-react";
+import { LayoutList } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type Task, useTasksStore } from "@/hooks/use-tasks";
 import { KanbanColumn } from "./kanban-column";
@@ -33,17 +33,15 @@ const swipePower = (offset: number, velocity: number) => {
 export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 	const { lists, fetchBoard, isLoading, error, moveTask } = useTasksStore();
 	const [activeListIndex, setActiveListIndex] = useState(0);
-	const [tuple, setTuple] = useState([0, 0]); // [page, direction]
+	const [tuple, setTuple] = useState([0, 0]);
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-	// Sheets state
 	const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
 	const [isManageColumnsOpen, setIsManageColumnsOpen] = useState(false);
 	const [taskToMove, setTaskToMove] = useState<Task | null>(null);
 
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-	// Auto-scroll active tab into view
 	useEffect(() => {
 		const activeTab = tabRefs.current[activeListIndex];
 		if (activeTab) {
@@ -66,7 +64,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 		useSensor(PointerSensor, {
 			activationConstraint: {
 				distance: 5,
-				delay: 250, // Long press to drag on mobile to avoid swipe conflict
+				delay: 250,
 				tolerance: 5,
 			},
 		}),
@@ -83,8 +81,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 		);
 	}
 
-	if (error || !lists.length) return null; // Desktop view handles empty state and errors
-
+	if (error || !lists.length) return null;
 	const activeList = lists[activeListIndex] || lists[0];
 	const [page, direction] = tuple;
 
@@ -134,7 +131,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 		if (isActiveTask) {
 			const task = active.data.current?.task as Task;
 			const sourceListId = task.listId;
-			let destListId = sourceListId; // Mobile drag is only within same column
+			let destListId = sourceListId;
 			let destIndex = 0;
 
 			if (isOverTask) {
@@ -167,10 +164,8 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 
 	return (
 		<div className="flex flex-col h-[calc(100vh-140px)] w-full overflow-hidden bg-background">
-			{/* Tab Bar Container */}
-			<div className="flex items-center justify-between border-b border-border bg-card sticky top-0 z-10 shadow-sm relative">
-				{/* Left Edge Fade */}
-				<div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-card to-transparent pointer-events-none z-10" />
+			<div className="flex items-center justify-between border-b border-border bg-card sticky top-0 z-10 shadow-sm ">
+				<div className="absolute left-0 top-0 bottom-0 w-4 bg-linear-to-r from-card to-transparent pointer-events-none z-10" />
 
 				<div className="flex-1 overflow-x-auto scrollbar-none flex items-center space-x-2 py-2 px-4 snap-x relative scroll-smooth">
 					{lists.map((list, idx) => {
@@ -206,8 +201,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 					})}
 				</div>
 
-				{/* Right Edge Fade */}
-				<div className="absolute right-10 top-0 bottom-0 w-10 bg-gradient-to-l from-card to-transparent pointer-events-none z-10" />
+				<div className="absolute right-10 top-0 bottom-0 w-10 bg-linear-to-l from-card to-transparent pointer-events-none z-10" />
 
 				<div className="px-2 border-l border-border/50 bg-card z-10 shrink-0 flex items-center justify-center">
 					<button
@@ -221,11 +215,10 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 				</div>
 			</div>
 
-			{/* Swipeable Single Column */}
 			<div className="flex-1 relative overflow-hidden bg-background">
 				<DndContext
 					sensors={sensors}
-					collisionDetection={closestCorners}
+					collisionDetection={closestCenter}
 					onDragStart={handleDragStart}
 					onDragEnd={handleDragEnd}
 				>
@@ -282,7 +275,6 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 				</DndContext>
 			</div>
 
-			{/* Bottom Sheets */}
 			{taskToMove && (
 				<StatusPickerSheet
 					isOpen={isStatusPickerOpen}
@@ -301,7 +293,6 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 							projectId,
 						);
 
-						// Optionally switch to the destination tab immediately
 						const destIndex = lists.findIndex((l) => l.id === destListId);
 						if (destIndex >= 0 && destIndex !== activeListIndex) {
 							setTuple([

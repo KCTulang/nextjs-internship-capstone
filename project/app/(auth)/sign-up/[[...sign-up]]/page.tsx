@@ -48,6 +48,8 @@ export default function SignUpPage() {
 	const { theme, setTheme } = useTheme();
 
 	const [stage, setStage] = useState<Stage>("register");
+	const [firstName, setFirstName] = useState("");
+	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
@@ -68,6 +70,8 @@ export default function SignUpPage() {
 			await signUp.create({
 				emailAddress: email.trim(),
 				password,
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
 			});
 
 			await signUp.prepareEmailAddressVerification({
@@ -173,7 +177,7 @@ export default function SignUpPage() {
 				</button>
 			</div>
 
-			<div className="w-full max-w-[380px] z-10 flex flex-col items-center">
+			<div className="w-full max-w-95 z-10 flex flex-col items-center">
 				<div className="mb-8">
 					<Image
 						src="/LockInLogo.svg"
@@ -248,6 +252,45 @@ export default function SignUpPage() {
 									<span>{error}</span>
 								</div>
 							)}
+
+							<div className="flex gap-4">
+								<div className="space-y-2 flex-1">
+									<label
+										htmlFor="sign-up-first-name"
+										className="block text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400"
+									>
+										First Name
+									</label>
+									<input
+										id="sign-up-first-name"
+										type="text"
+										autoComplete="given-name"
+										required
+										value={firstName}
+										onChange={(e) => setFirstName(e.target.value)}
+										placeholder="John"
+										className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+									/>
+								</div>
+								<div className="space-y-2 flex-1">
+									<label
+										htmlFor="sign-up-last-name"
+										className="block text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400"
+									>
+										Last Name
+									</label>
+									<input
+										id="sign-up-last-name"
+										type="text"
+										autoComplete="family-name"
+										required
+										value={lastName}
+										onChange={(e) => setLastName(e.target.value)}
+										placeholder="Doe"
+										className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+									/>
+								</div>
+							</div>
 
 							<div className="space-y-2">
 								<label

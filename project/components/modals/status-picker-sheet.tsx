@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { Drawer } from "vaul";
 import type { List } from "@/hooks/use-tasks";
 
@@ -27,8 +27,7 @@ export function StatusPickerSheet({
 				<Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 transition-opacity" />
 				<Drawer.Content className="bg-card border-t border-border flex flex-col rounded-t-[20px] fixed bottom-0 left-0 right-0 z-50 focus:outline-none outline-none">
 					<div className="p-4 flex-1 flex flex-col w-full max-w-md mx-auto">
-						{/* Drag handle */}
-						<div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-border mb-6" />
+						<div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-border mb-6" />
 
 						<Drawer.Title className="text-lg font-bold text-foreground mb-1 text-center">
 							Move Task

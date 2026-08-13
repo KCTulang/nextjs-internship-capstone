@@ -17,7 +17,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripHorizontal, X } from "lucide-react";
+import { GripHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 import { type List, useTasksStore } from "@/hooks/use-tasks";
@@ -71,7 +71,6 @@ export function ManageColumnsSheet({
 	const { lists, moveList } = useTasksStore();
 	const [localLists, setLocalLists] = useState(lists);
 
-	// Sync local lists when drawer opens
 	useEffect(() => {
 		if (isOpen) {
 			setLocalLists(lists);
@@ -96,10 +95,8 @@ export function ManageColumnsSheet({
 			const oldIndex = localLists.findIndex((l) => l.id === active.id);
 			const newIndex = localLists.findIndex((l) => l.id === over.id);
 
-			// Optimistic local update
 			setLocalLists((items) => arrayMove(items, oldIndex, newIndex));
 
-			// Fire the actual move
 			moveList(active.id as string, newIndex, projectId);
 		}
 	}
@@ -110,8 +107,7 @@ export function ManageColumnsSheet({
 				<Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 transition-opacity" />
 				<Drawer.Content className="bg-muted border-t border-border flex flex-col rounded-t-[20px] fixed bottom-0 left-0 right-0 z-50 focus:outline-none outline-none mt-24">
 					<div className="p-4 flex-1 flex flex-col w-full max-w-md mx-auto max-h-[80vh]">
-						{/* Drag handle */}
-						<div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-border mb-6" />
+						<div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-border mb-6" />
 
 						<Drawer.Title className="text-xl font-bold text-foreground mb-1">
 							Manage Columns

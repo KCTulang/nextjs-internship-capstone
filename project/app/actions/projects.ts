@@ -1,14 +1,41 @@
 "use server";
 
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { queries } from "@/lib/db";
+import { createProjectSchema, updateProjectSchema } from "@/lib/validations";
+
+async function requireAuth() {
+	const { userId } = await auth();
+	if (!userId) throw new Error("Unauthorized");
+
+	let user = await queries.users.getByClerkId(userId);
+	if (!user) {
+		const clerkUser = await currentUser();
+		if (!clerkUser) throw new Error("Unauthorized");
+
+		const primaryEmail =
+			clerkUser.emailAddresses[0]?.emailAddress || "no-email@example.com";
+		const name =
+			`${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
+			"User";
+		const [newUser] = await queries.users.create({
+			clerkId: clerkUser.id,
+			email: primaryEmail,
+			name: name,
+		});
+		user = newUser;
+	}
+	return user;
+}
 
 export async function getProjectsAction(
 	limit: number = 10,
 	offset: number = 0,
 ) {
 	try {
-		const projects = await queries.projects.getAll(limit, offset);
+		const user = await requireAuth();
+		const projects = await queries.projects.getAll(user.id, limit, offset);
 		return { success: true, data: projects };
 	} catch (error) {
 		console.error("Failed to fetch projects:", error);
@@ -16,41 +43,15 @@ export async function getProjectsAction(
 	}
 }
 
-export async function createProjectAction(data: {
+export async function createProjectAction(rawData: {
 	name: string;
 	description?: string;
+	dueDate?: Date | null;
 	ownerId: string;
 }) {
 	try {
-		let user = await queries.users.getByClerkId(data.ownerId);
-
-		// If user signed up before the webhook was ready, auto-sync them now
-		if (!user) {
-			console.log("User not found locally, syncing from Clerk...");
-			const { currentUser } = await import("@clerk/nextjs/server");
-			const clerkUser = await currentUser();
-
-			if (!clerkUser) {
-				return { success: false, error: "Unauthorized" };
-			}
-
-			const primaryEmail =
-				clerkUser.emailAddresses[0]?.emailAddress || "no-email@example.com";
-			const name =
-				`${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
-				"User";
-
-			const [newUser] = await queries.users.create({
-				clerkId: clerkUser.id,
-				email: primaryEmail,
-				name: name,
-			});
-			user = newUser;
-		}
-
-		if (!user) {
-			return { success: false, error: "User could not be resolved" };
-		}
+		const user = await requireAuth();
+		const data = createProjectSchema.parse(rawData);
 
 		const baseSlug = data.name
 			.toLowerCase()
@@ -63,6 +64,7 @@ export async function createProjectAction(data: {
 			name: data.name,
 			slug,
 			description: data.description || null,
+			dueDate: data.dueDate || null,
 			ownerId: user.id,
 		});
 
@@ -86,6 +88,7 @@ export async function createProjectAction(data: {
 
 export async function deleteProjectAction(projectId: string) {
 	try {
+		await requireAuth();
 		await queries.projects.delete(projectId);
 		revalidatePath("/dashboard");
 		return { success: true };
@@ -97,9 +100,11 @@ export async function deleteProjectAction(projectId: string) {
 
 export async function updateProjectAction(
 	id: string,
-	data: { name?: string; description?: string },
+	rawData: { name?: string; description?: string; dueDate?: Date | null },
 ) {
 	try {
+		await requireAuth();
+		const data = updateProjectSchema.parse(rawData);
 		const updatedProject = await queries.projects.update(id, data);
 		revalidatePath("/dashboard");
 		return { success: true, data: updatedProject[0] };
@@ -111,7 +116,13 @@ export async function updateProjectAction(
 
 export async function getProjectBySlugAction(slug: string) {
 	try {
-		const project = await queries.projects.getBySlug(slug);
+		const user = await requireAuth();
+		const project = await queries.projects.getBySlug(slug, user.id);
+
+		if (!project) {
+			return { success: false, error: "Unauthorized or project not found" };
+		}
+
 		return { success: true, data: project };
 	} catch (error) {
 		console.error("Failed to fetch project by slug:", error);

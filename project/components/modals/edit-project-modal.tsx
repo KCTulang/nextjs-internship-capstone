@@ -16,12 +16,18 @@ export function EditProjectModal() {
 
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
+	const [dueDate, setDueDate] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	useEffect(() => {
 		if (selectedProjectForEdit) {
 			setName(selectedProjectForEdit.name);
 			setDescription(selectedProjectForEdit.description || "");
+			setDueDate(
+				selectedProjectForEdit.dueDate
+					? new Date(selectedProjectForEdit.dueDate).toISOString().split("T")[0]
+					: "",
+			);
 		}
 	}, [selectedProjectForEdit]);
 
@@ -40,8 +46,11 @@ export function EditProjectModal() {
 		e.preventDefault();
 		if (!name.trim()) return;
 
-		// Validate with Zod before sending to server
-		const parsed = updateProjectSchema.safeParse({ name, description });
+		const parsed = updateProjectSchema.safeParse({
+			name,
+			description,
+			dueDate: dueDate ? new Date(dueDate) : undefined,
+		});
 		if (!parsed.success) {
 			const first = parsed.error.issues[0];
 			useUIStore.getState().addToast({
@@ -57,10 +66,10 @@ export function EditProjectModal() {
 			await updateProject(selectedProjectForEdit.id, {
 				name: parsed.data.name,
 				description: parsed.data.description,
+				dueDate: parsed.data.dueDate,
 			});
 			closeEditProjectModal();
 		} catch {
-			// Error is already handled globally by useProjectStore
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -72,7 +81,11 @@ export function EditProjectModal() {
 
 	const hasChanges =
 		name.trim() !== selectedProjectForEdit.name ||
-		(description.trim() || "") !== (selectedProjectForEdit.description || "");
+		(description.trim() || "") !== (selectedProjectForEdit.description || "") ||
+		dueDate !==
+			(selectedProjectForEdit.dueDate
+				? new Date(selectedProjectForEdit.dueDate).toISOString().split("T")[0]
+				: "");
 
 	return (
 		<div
@@ -112,7 +125,6 @@ export function EditProjectModal() {
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{/* Project Name */}
 					<div>
 						<label
 							htmlFor="edit-project-name"
@@ -138,7 +150,6 @@ export function EditProjectModal() {
 						</div>
 					</div>
 
-					{/* Description */}
 					<div>
 						<label
 							htmlFor="edit-project-description"
@@ -165,7 +176,25 @@ export function EditProjectModal() {
 						</div>
 					</div>
 
-					{/* Actions */}
+					<div>
+						<label
+							htmlFor="edit-project-due-date"
+							className="block text-sm font-medium text-foreground mb-1.5"
+						>
+							Target Date{" "}
+							<span className="text-muted-foreground font-normal">
+								(optional)
+							</span>
+						</label>
+						<input
+							id="edit-project-due-date"
+							type="date"
+							value={dueDate}
+							onChange={(e) => setDueDate(e.target.value)}
+							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground dark:[scheme:dark]"
+						/>
+					</div>
+
 					<div className="flex justify-end gap-3 pt-2">
 						<button
 							type="button"
@@ -177,7 +206,7 @@ export function EditProjectModal() {
 						<button
 							type="submit"
 							disabled={isSubmitting || !name.trim() || !hasChanges}
-							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[120px]"
+							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-30"
 						>
 							{isSubmitting ? (
 								<span className="flex items-center gap-2 justify-center">

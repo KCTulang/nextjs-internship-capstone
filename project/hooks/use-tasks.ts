@@ -22,8 +22,15 @@ export interface Task {
 	priority: string;
 	dueDate: Date | null;
 	position: number;
+	labels: string[] | null;
 	createdAt: Date | null;
 	updatedAt: Date | null;
+	assignee?: {
+		id: string;
+		name: string;
+		email: string;
+	} | null;
+	comments?: { id: string }[];
 }
 
 export interface List {
@@ -36,11 +43,19 @@ export interface List {
 	tasks: Task[];
 }
 
+export interface Member {
+	id: string;
+	name: string;
+	email: string;
+}
+
 export interface TasksState {
 	lists: List[];
+	members: Member[];
 	isLoading: boolean;
 	error: string | null;
 
+	setMembers: (members: Member[]) => void;
 	fetchBoard: (projectId: string) => Promise<void>;
 	generateDefaultLists: (projectId: string) => Promise<void>;
 
@@ -53,6 +68,7 @@ export interface TasksState {
 		data: Partial<Task>,
 		projectId: string,
 	) => Promise<void>;
+	updateTaskComments: (taskId: string, comments: { id: string }[]) => void;
 	moveTask: (
 		taskId: string,
 		sourceListId: string,
@@ -82,12 +98,106 @@ export interface TasksState {
 		destIndex: number,
 	) => number;
 	optimisticMoveList: (listId: string, destIndex: number) => number;
+	selectedTaskIds: string[];
+	toggleTaskSelection: (taskId: string, force?: boolean) => void;
+	clearSelection: () => void;
+	deleteSelectedTasks: (projectId: string) => Promise<void>;
+	moveSelectedTasks: (destListId: string, projectId: string) => Promise<void>;
 }
 
 export const useTasksStore = create<TasksState>((set, get) => ({
 	lists: [],
+	members: [],
 	isLoading: false,
 	error: null,
+	selectedTaskIds: [],
+
+	setMembers: (members) => set({ members }),
+
+	toggleTaskSelection: (taskId, force) =>
+		set((state) => {
+			const isSelected = state.selectedTaskIds.includes(taskId);
+			if (force === true && !isSelected)
+				return { selectedTaskIds: [...state.selectedTaskIds, taskId] };
+			if (force === false && isSelected)
+				return {
+					selectedTaskIds: state.selectedTaskIds.filter((id) => id !== taskId),
+				};
+			if (force !== undefined) return state;
+
+			return {
+				selectedTaskIds: isSelected
+					? state.selectedTaskIds.filter((id) => id !== taskId)
+					: [...state.selectedTaskIds, taskId],
+			};
+		}),
+
+	clearSelection: () => set({ selectedTaskIds: [] }),
+
+	deleteSelectedTasks: async (projectId) => {
+		const { selectedTaskIds } = get();
+		if (selectedTaskIds.length === 0) return;
+
+		set((state) => ({
+			lists: state.lists.map((list) => ({
+				...list,
+				tasks: list.tasks.filter((t) => !selectedTaskIds.includes(t.id)),
+			})),
+			selectedTaskIds: [],
+		}));
+
+		for (const id of selectedTaskIds) {
+			await deleteTaskAction(id, projectId);
+		}
+		useUIStore.getState().addToast({
+			type: "success",
+			message: `Deleted ${selectedTaskIds.length} tasks`,
+		});
+	},
+
+	moveSelectedTasks: async (destListId, projectId) => {
+		const { selectedTaskIds, lists } = get();
+		if (selectedTaskIds.length === 0) return;
+
+		const tasksToMove = lists
+			.flatMap((l) => l.tasks)
+			.filter((t) => selectedTaskIds.includes(t.id));
+
+		set((state) => {
+			return {
+				lists: state.lists.map((list) => {
+					if (list.id === destListId) {
+						return {
+							...list,
+							tasks: [
+								...list.tasks,
+								...tasksToMove
+									.filter((t) => t.listId !== destListId)
+									.map((t) => ({ ...t, listId: destListId })),
+							],
+						};
+					}
+					return {
+						...list,
+						tasks: list.tasks.filter(
+							(t) => !selectedTaskIds.includes(t.id) || t.listId === destListId,
+						),
+					};
+				}),
+				selectedTaskIds: [],
+			};
+		});
+
+		for (const task of tasksToMove) {
+			if (task.listId !== destListId) {
+				await updateTaskAction(task.id, { listId: destListId }, projectId);
+			}
+		}
+		useUIStore.getState().addToast({
+			type: "success",
+			message: `Moved ${selectedTaskIds.length} tasks`,
+		});
+	},
 
 	fetchBoard: async (projectId: string) => {
 		set({ isLoading: true, error: null });
@@ -165,6 +275,23 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 		}
 	},
 
+	updateTaskComments: (taskId, comments) => {
+		set((state) => {
+			const newLists = state.lists.map((list) => {
+				const hasTask = list.tasks.some((t) => t.id === taskId);
+				if (!hasTask) return list;
+
+				return {
+					...list,
+					tasks: list.tasks.map((t) =>
+						t.id === taskId ? { ...t, comments } : t,
+					),
+				};
+			});
+			return { lists: newLists };
+		});
+	},
+
 	optimisticMoveTask: (taskId, sourceListId, destListId, destIndex) => {
 		let newPosition = 0;
 		set((state) => {
@@ -189,11 +316,16 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			const taskIndex = sourceList.tasks.findIndex((t) => t.id === taskId);
 			if (taskIndex === -1) return state;
 
-			const [task] = sourceList.tasks.splice(taskIndex, 1);
+			let actualDestIndex = destIndex;
+			if (sourceListId === destListId && taskIndex < destIndex) {
+				actualDestIndex--;
+			}
+
+			const task = { ...sourceList.tasks.splice(taskIndex, 1)[0] };
 			task.listId = destListId;
 
-			const prevTask = destList.tasks[destIndex - 1];
-			const nextTask = destList.tasks[destIndex];
+			const prevTask = destList.tasks[actualDestIndex - 1];
+			const nextTask = destList.tasks[actualDestIndex];
 
 			if (!prevTask && !nextTask) {
 				newPosition = 65536;
@@ -208,7 +340,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			newPosition = Math.round(newPosition);
 			task.position = newPosition;
 
-			destList.tasks.splice(destIndex, 0, task);
+			destList.tasks.splice(actualDestIndex, 0, task);
 
 			lists[sourceListIndex] = sourceList;
 			lists[destListIndex] = destList;
@@ -325,10 +457,15 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			const sourceIndex = lists.findIndex((l) => l.id === listId);
 			if (sourceIndex === -1) return state;
 
+			let actualDestIndex = destIndex;
+			if (sourceIndex < destIndex) {
+				actualDestIndex--;
+			}
+
 			const [list] = lists.splice(sourceIndex, 1);
 
-			const prevList = lists[destIndex - 1];
-			const nextList = lists[destIndex];
+			const prevList = lists[actualDestIndex - 1];
+			const nextList = lists[actualDestIndex];
 
 			if (!prevList && !nextList) {
 				newPosition = 65536;
@@ -343,7 +480,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			newPosition = Math.round(newPosition);
 			list.position = newPosition;
 
-			lists.splice(destIndex, 0, list);
+			lists.splice(actualDestIndex, 0, list);
 			return { lists };
 		});
 		return newPosition;

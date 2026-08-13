@@ -1,10 +1,4 @@
-import {
-	ArrowLeft,
-	Calendar,
-	MoreHorizontal,
-	Settings,
-	Users,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectBySlugAction } from "@/app/actions/projects";
@@ -47,8 +41,21 @@ export default async function ProjectPage({
 				<ProjectHeaderActions project={project} />
 			</div>
 
-			<div className="flex-1 bg-card rounded-lg border border-border p-3 sm:p-4 lg:p-6 min-h-[500px] sm:min-h-[600px] overflow-hidden flex flex-col">
-				<KanbanBoard projectId={project.id} />
+			<div className="flex-1 bg-card rounded-lg border border-border p-3 sm:p-4 lg:p-6 min-h-125 sm:min-h-150 overflow-hidden flex flex-col">
+				<KanbanBoard
+					projectId={project.id}
+					members={Array.from(
+						new Map(
+							[
+								project.owner,
+								...project.members.map(
+									(m: { user: { id: string; name: string; email: string } }) =>
+										m.user,
+								),
+							].map((user) => [user.id, user]),
+						).values(),
+					)}
+				/>
 			</div>
 		</div>
 	);

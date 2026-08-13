@@ -2,14 +2,10 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-	Calendar,
-	CheckCircle2,
-	GripVertical,
-	MessageSquare,
-} from "lucide-react";
+import { Calendar, GripVertical, MessageSquare } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Task } from "@/hooks/use-tasks";
+import { useTasksStore } from "@/hooks/use-tasks";
 
 interface TaskCardProps {
 	task: Task;
@@ -27,9 +23,19 @@ export function TaskCard({
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
+	const { selectedTaskIds, toggleTaskSelection } = useTasksStore();
 
-	const handleCardClick = () => {
+	const isSelected = selectedTaskIds.includes(task.id);
+	const hasSelection = selectedTaskIds.length > 0;
+
+	const handleCardClick = (e: React.MouseEvent | React.KeyboardEvent) => {
 		if (isOverlay) return;
+		if (hasSelection) {
+			e.preventDefault();
+			e.stopPropagation();
+			toggleTaskSelection(task.id);
+			return;
+		}
 		const params = new URLSearchParams(searchParams.toString());
 		params.set("taskId", task.id);
 		router.push(`${pathname}?${params.toString()}`, { scroll: false });
@@ -74,7 +80,7 @@ export function TaskCard({
 			<div
 				ref={setNodeRef}
 				style={style}
-				className="bg-card/40 border-2 border-dashed border-border/60 rounded-xl p-4 h-[110px] opacity-40 backdrop-blur-sm z-50"
+				className="bg-card/40 border-2 border-dashed border-border/60 rounded-xl p-4 h-27.5 opacity-40 backdrop-blur-sm z-50"
 			/>
 		);
 	}
@@ -82,17 +88,50 @@ export function TaskCard({
 	return (
 		<button
 			type="button"
-			ref={setNodeRef}
+			ref={setNodeRef as unknown as React.Ref<HTMLButtonElement>}
 			style={style}
 			{...(isMobileView ? { ...attributes, ...listeners } : {})}
 			onClick={handleCardClick}
-			className="text-left w-full group relative bg-card dark:bg-white/[0.02] border border-border/60 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-border transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+			className={`text-left w-full group relative bg-card dark:bg-white/2border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+				isSelected
+					? "border-primary ring-1 ring-primary"
+					: "border-border/60 hover:border-border"
+			}`}
 		>
 			<div
-				className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${pColor.split(" ")[1].replace("text-", "bg-")}`}
+				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${pColor.split(" ")[1].replace("text-", "bg-")}`}
 			/>
 
-			<div className="flex items-start justify-between gap-3 pl-2">
+			<div
+				className={`absolute top-2 left-2 z-20 ${isSelected || hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
+			>
+				<button
+					type="button"
+					onClick={(e) => {
+						e.stopPropagation();
+						e.preventDefault();
+						toggleTaskSelection(task.id);
+					}}
+					className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 hover:border-foreground bg-background"}`}
+				>
+					{isSelected && (
+						<svg
+							aria-hidden="true"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="3"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							className="w-3 h-3"
+						>
+							<polyline points="20 6 9 17 4 12"></polyline>
+						</svg>
+					)}
+				</button>
+			</div>
+
+			<div className="flex items-start justify-between gap-3 pl-6">
 				<div className="flex-1 min-w-0 space-y-1">
 					<h4 className="font-medium text-foreground text-[13px] leading-snug line-clamp-2">
 						{task.title}
@@ -102,6 +141,24 @@ export function TaskCard({
 						<p className="text-xs text-muted-foreground line-clamp-2 pr-4 leading-relaxed">
 							{task.description}
 						</p>
+					)}
+					{task.labels && task.labels.length > 0 && (
+						<div className="flex flex-wrap gap-1 mt-1.5">
+							{task.labels.slice(0, 3).map((label) => (
+								<span
+									key={label}
+									className="text-[9px] px-1.5 py-0.5 bg-muted/60 text-muted-foreground rounded border border-border/50 truncate max-w-20"
+									title={label}
+								>
+									{label}
+								</span>
+							))}
+							{task.labels.length > 3 && (
+								<span className="text-[9px] px-1.5 py-0.5 bg-muted/30 text-muted-foreground rounded border border-border/30">
+									+{task.labels.length - 3}
+								</span>
+							)}
+						</div>
 					)}
 				</div>
 
@@ -128,7 +185,6 @@ export function TaskCard({
 					title="Move Task"
 				>
 					<MessageSquare className="hidden" />{" "}
-					{/* keeping import valid, but using better icon below */}
 					<svg
 						width="16"
 						height="16"
@@ -155,14 +211,6 @@ export function TaskCard({
 					>
 						{task.priority || "Medium"}
 					</span>
-
-					<div
-						className="flex items-center gap-1 text-[11px] text-muted-foreground font-medium"
-						title="Checklist items"
-					>
-						<CheckCircle2 size={12} className="opacity-70" />
-						0/3
-					</div>
 				</div>
 
 				<div className="flex items-center gap-2.5 text-[11px] text-muted-foreground font-medium">
@@ -170,7 +218,8 @@ export function TaskCard({
 						className="flex items-center gap-1 hover:text-foreground transition-colors"
 						title="Comments"
 					>
-						<MessageSquare size={12} className="opacity-70" />2
+						<MessageSquare size={12} className="opacity-70" />
+						{task.comments?.length || 0}
 					</div>
 
 					{task.dueDate && (
@@ -183,12 +232,23 @@ export function TaskCard({
 						</div>
 					)}
 
-					<div
-						className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-background ml-1"
-						title="Assigned to you"
-					>
-						KC
-					</div>
+					{task.assignee ? (
+						<div
+							className="w-5 h-5 rounded-full bg-linear-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-background ml-1"
+							title={`Assigned to ${task.assignee.name || task.assignee.email}`}
+						>
+							{(task.assignee.name || task.assignee.email || "U")
+								.substring(0, 2)
+								.toUpperCase()}
+						</div>
+					) : (
+						<div
+							className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-500 dark:text-slate-400 shadow-sm ring-2 ring-background ml-1"
+							title="Unassigned"
+						>
+							?
+						</div>
+					)}
 				</div>
 			</div>
 		</button>

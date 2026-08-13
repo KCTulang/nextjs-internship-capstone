@@ -14,6 +14,7 @@ export function CreateProjectModal() {
 
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
+	const [dueDate, setDueDate] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,8 +31,11 @@ export function CreateProjectModal() {
 		e.preventDefault();
 		if (!name.trim() || !userId) return;
 
-		// Validate with Zod before sending to server
-		const parsed = createProjectSchema.safeParse({ name, description });
+		const parsed = createProjectSchema.safeParse({
+			name,
+			description,
+			dueDate: dueDate ? new Date(dueDate) : undefined,
+		});
 		if (!parsed.success) {
 			const first = parsed.error.issues[0];
 			useUIStore.getState().addToast({
@@ -47,13 +51,14 @@ export function CreateProjectModal() {
 			await createProject({
 				name: parsed.data.name,
 				description: parsed.data.description,
+				dueDate: parsed.data.dueDate,
 				ownerId: userId,
 			});
 			setName("");
 			setDescription("");
+			setDueDate("");
 			closeCreateProjectModal();
 		} catch {
-			// Error is already handled globally by useProjectStore
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -77,7 +82,6 @@ export function CreateProjectModal() {
 			}}
 		>
 			<div className="bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
-				{/* Header */}
 				<div className="flex items-center justify-between mb-6">
 					<div>
 						<h3
@@ -101,7 +105,6 @@ export function CreateProjectModal() {
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{/* Project Name */}
 					<div>
 						<label
 							htmlFor="project-name"
@@ -127,7 +130,6 @@ export function CreateProjectModal() {
 						</div>
 					</div>
 
-					{/* Description */}
 					<div>
 						<label
 							htmlFor="project-description"
@@ -154,7 +156,25 @@ export function CreateProjectModal() {
 						</div>
 					</div>
 
-					{/* Actions */}
+					<div>
+						<label
+							htmlFor="project-due-date"
+							className="block text-sm font-medium text-foreground mb-1.5"
+						>
+							Target Date{" "}
+							<span className="text-muted-foreground font-normal">
+								(optional)
+							</span>
+						</label>
+						<input
+							id="project-due-date"
+							type="date"
+							value={dueDate}
+							onChange={(e) => setDueDate(e.target.value)}
+							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground dark:[scheme:dark]"
+						/>
+					</div>
+
 					<div className="flex justify-end gap-3 pt-2">
 						<button
 							type="button"
@@ -166,7 +186,7 @@ export function CreateProjectModal() {
 						<button
 							type="submit"
 							disabled={isSubmitting || !name.trim()}
-							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[120px]"
+							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-30"
 						>
 							{isSubmitting ? (
 								<span className="flex items-center gap-2 justify-center">

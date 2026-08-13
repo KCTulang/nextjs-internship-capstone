@@ -8,13 +8,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-	Check,
 	GripHorizontal,
 	MoreHorizontal,
 	Pencil,
 	Plus,
 	Trash2,
-	X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { List, Task } from "@/hooks/use-tasks";
@@ -111,7 +109,7 @@ export function KanbanColumn({
 	const { openCreateTaskModal } = useUIStore();
 
 	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
-		id: list.id,
+		id: `drop-${list.id}`,
 		data: { type: "Column", list },
 	});
 
@@ -195,7 +193,7 @@ export function KanbanColumn({
 			<div
 				ref={setSortableNodeRef}
 				style={style}
-				className="flex flex-col rounded-2xl shrink-0 w-[300px] h-[500px] bg-card/40 border-2 border-dashed border-primary/50 opacity-40 backdrop-blur-sm"
+				className="flex flex-col rounded-2xl shrink-0 w-75 h-125 bg-card/40 border-2 border-dashed border-primary/50 opacity-40 backdrop-blur-sm"
 			/>
 		);
 	}
@@ -205,22 +203,19 @@ export function KanbanColumn({
 			ref={setSortableNodeRef}
 			style={style}
 			className={`flex flex-col shrink-0 max-h-full transition-colors duration-200
-				bg-card dark:bg-white/[0.03] border
+				bg-card dark:bg-white/3 border
 				${isOver ? "border-primary/50 shadow-lg shadow-primary/10" : "border-border/60"}
 				backdrop-blur-sm group/column
-				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-[275px] sm:w-[300px] rounded-2xl"}
+				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-68.75 sm:w-75 rounded-2xl"}
 			`}
 		>
-			{/* Colored top accent bar */}
 			<div
 				className="h-1 rounded-t-2xl w-full"
 				style={{ background: color.accent }}
 			/>
 
-			{/* Column header */}
 			<div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
-					{/* Drag handle */}
 					{!isMobileView && (
 						<div
 							{...attributes}
@@ -231,7 +226,6 @@ export function KanbanColumn({
 						</div>
 					)}
 
-					{/* Status dot */}
 					<span className={`w-2 h-2 rounded-full shrink-0 ${color.dot}`} />
 
 					{isRenaming ? (
@@ -263,7 +257,6 @@ export function KanbanColumn({
 						</h3>
 					)}
 
-					{/* Task count badge */}
 					<span
 						className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${color.bg} ${color.text}`}
 					>
@@ -272,7 +265,6 @@ export function KanbanColumn({
 				</div>
 
 				<div className="flex items-center gap-1 shrink-0">
-					{/* Add task button */}
 					<button
 						type="button"
 						onClick={() => openCreateTaskModal(list.id, projectId)}
@@ -282,7 +274,6 @@ export function KanbanColumn({
 						<Plus size={15} />
 					</button>
 
-					{/* More menu */}
 					<div ref={menuRef} className="relative">
 						<button
 							type="button"
@@ -348,11 +339,10 @@ export function KanbanColumn({
 				</div>
 			</div>
 
-			{/* Task list drop zone */}
 			<div
 				ref={setDroppableNodeRef}
-				className={`flex-1 overflow-y-auto px-3 pb-3 space-y-2.5 min-h-[120px] transition-colors duration-150 ${
-					isOver ? "bg-primary/[0.03] rounded-b-2xl" : ""
+				className={`flex-1 overflow-y-auto px-3 pb-3 space-y-2.5 min-h-30 transition-colors duration-150 ${
+					isOver ? "bg-primary/3 rounded-b-2xl" : ""
 				}`}
 			>
 				<SortableContext
@@ -369,7 +359,6 @@ export function KanbanColumn({
 					))}
 				</SortableContext>
 
-				{/* Empty drop hint */}
 				{(list.tasks?.length || 0) === 0 && (
 					<div
 						className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
@@ -381,7 +370,6 @@ export function KanbanColumn({
 				)}
 			</div>
 
-			{/* Add task footer */}
 			<button
 				type="button"
 				onClick={() => openCreateTaskModal(list.id, projectId)}

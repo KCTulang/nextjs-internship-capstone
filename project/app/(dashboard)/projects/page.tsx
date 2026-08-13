@@ -47,7 +47,7 @@ export default function ProjectsPage() {
 			result = result.filter(
 				(p) =>
 					p.name.toLowerCase().includes(q) ||
-					(p.description && p.description.toLowerCase().includes(q)),
+					p.description?.toLowerCase().includes(q),
 			);
 		}
 

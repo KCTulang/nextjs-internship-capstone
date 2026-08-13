@@ -1,7 +1,7 @@
 "use client";
 
 import {
-	closestCorners,
+	closestCenter,
 	DndContext,
 	type DragEndEvent,
 	DragOverlay,
@@ -16,11 +16,17 @@ import {
 	SortableContext,
 	sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Check, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { type List, type Task, useTasksStore } from "@/hooks/use-tasks";
+import {
+	type List,
+	type Member,
+	type Task,
+	useTasksStore,
+} from "@/hooks/use-tasks";
+import { useUIStore } from "@/stores/ui-store";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";
 import { TaskCard } from "./task-card";
@@ -28,13 +34,18 @@ import { TaskDetailPanel } from "./task-detail-panel";
 
 interface KanbanBoardProps {
 	projectId: string;
+	members?: Member[];
 }
 
-export function KanbanBoard({ projectId }: KanbanBoardProps) {
-	// 768px is the 'md' breakpoint in Tailwind
+export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const searchParams = useSearchParams();
 	const taskId = searchParams.get("taskId");
+
+	const { setMembers } = useTasksStore();
+	useEffect(() => {
+		if (members) setMembers(members);
+	}, [members, setMembers]);
 
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
@@ -51,8 +62,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
 			) : (
 				<MobileKanbanBoard projectId={projectId} />
 			)}
-			{/* Task Detail Slide-over Panel */}
-			<TaskDetailPanel key={taskId || "empty"} taskId={taskId} projectId={projectId} />
+			<TaskDetailPanel taskId={taskId} projectId={projectId} />
 		</>
 	);
 }
@@ -71,10 +81,18 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 	const [activeColumn, setActiveColumn] = useState<List | null>(null);
 
-	// Add list state
 	const [isAddingList, setIsAddingList] = useState(false);
 	const [newListTitle, setNewListTitle] = useState("");
 	const addListInputRef = useRef<HTMLInputElement>(null);
+
+	const {
+		selectedTaskIds,
+		clearSelection,
+		deleteSelectedTasks,
+		moveSelectedTasks,
+	} = useTasksStore();
+	const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
+	const { openCreateTaskModal } = useUIStore();
 
 	useEffect(() => {
 		fetchBoard(projectId);
@@ -85,6 +103,46 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 			addListInputRef.current?.focus();
 		}
 	}, [isAddingList]);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (
+				document.activeElement?.tagName === "INPUT" ||
+				document.activeElement?.tagName === "TEXTAREA" ||
+				document.activeElement?.tagName === "SELECT"
+			) {
+				return;
+			}
+
+			if (e.key === "Escape" && selectedTaskIds.length > 0) {
+				clearSelection();
+				setIsBulkMoveOpen(false);
+			} else if (
+				(e.key === "Delete" || e.key === "Backspace") &&
+				selectedTaskIds.length > 0
+			) {
+				if (
+					window.confirm(`Delete ${selectedTaskIds.length} selected task(s)?`)
+				) {
+					deleteSelectedTasks(projectId);
+				}
+			} else if (e.key.toLowerCase() === "n") {
+				if (lists.length > 0) {
+					e.preventDefault();
+					openCreateTaskModal(lists[0].id, projectId);
+				}
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [
+		selectedTaskIds,
+		lists,
+		projectId,
+		clearSelection,
+		deleteSelectedTasks,
+		openCreateTaskModal,
+	]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
@@ -100,11 +158,11 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 	if (isLoading) {
 		return (
 			<div className="flex-1 flex items-center justify-center p-8 h-full">
-				<div className="animate-pulse flex gap-6 overflow-x-auto w-full h-[600px]">
+				<div className="animate-pulse flex gap-6 overflow-x-auto w-full h-150">
 					{[1, 2, 3].map((i) => (
 						<div
 							key={i}
-							className="w-[300px] bg-card border border-border/50 rounded-2xl shrink-0"
+							className="w-75 bg-card border border-border/50 rounded-2xl shrink-0"
 						/>
 					))}
 				</div>
@@ -118,7 +176,7 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 
 	if (!lists.length) {
 		return (
-			<div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px]">
+			<div className="flex-1 flex flex-col items-center justify-center p-8 min-h-100">
 				<div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 text-primary">
 					<svg
 						width="32"
@@ -189,8 +247,11 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 
 		if (isActiveColumn && isOverColumn) {
 			const activeIndex = lists.findIndex((l) => l.id === activeId);
-			const overIndex = lists.findIndex((l) => l.id === overId);
-			if (activeIndex !== overIndex) {
+			const normalizedOverId = (overId as string).startsWith("drop-")
+				? (overId as string).slice(5)
+				: (overId as string);
+			const overIndex = lists.findIndex((l) => l.id === normalizedOverId);
+			if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
 				moveList(activeId as string, overIndex, projectId);
 			}
 			return;
@@ -209,17 +270,20 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 					lists.find((l) => l.id === destListId)?.tasks || [];
 				destIndex = destListTasks.findIndex((t) => t.id === overId);
 
-				// Adjust insertion index depending on direction
+				const activeRect = active.rect.current.translated;
+				const overRect = over.rect;
 				const isBelowOverItem =
-					over &&
-					active.rect.current.translated &&
-					active.rect.current.translated.top > over.rect.top + over.rect.height;
+					activeRect && overRect
+						? activeRect.top + activeRect.height / 2 >
+							overRect.top + overRect.height / 2
+						: false;
 
 				const modifier = isBelowOverItem ? 1 : 0;
 				destIndex =
 					destIndex >= 0 ? destIndex + modifier : destListTasks.length + 1;
 			} else if (isOverColumn) {
-				destListId = overId as string;
+				const overColumnList = over.data.current?.list as List;
+				destListId = overColumnList.id;
 				const destListTasks =
 					lists.find((l) => l.id === destListId)?.tasks || [];
 				destIndex = destListTasks.length;
@@ -241,85 +305,156 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 	};
 
 	return (
-		<DndContext
-			sensors={sensors}
-			collisionDetection={closestCorners}
-			onDragStart={handleDragStart}
-			onDragEnd={handleDragEnd}
-		>
-			<div className="flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin">
-				<SortableContext
-					items={lists.map((l) => l.id)}
-					strategy={horizontalListSortingStrategy}
-				>
-					{lists.map((list) => (
-						<KanbanColumn key={list.id} list={list} projectId={projectId} />
-					))}
-				</SortableContext>
+		<>
+			{selectedTaskIds.length > 0 && (
+				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5">
+					<div className="flex items-center gap-2 px-2 border-r border-background/20 font-medium">
+						<span className="bg-background text-foreground w-6 h-6 flex items-center justify-center rounded-full text-xs">
+							{selectedTaskIds.length}
+						</span>
+						<span className="text-sm">selected</span>
+					</div>
 
-				{/* Add Column Button */}
-				<div className="shrink-0 w-[275px] sm:w-[300px]">
-					{isAddingList ? (
-						<div className="bg-card dark:bg-white/[0.03] border border-border/60 rounded-2xl p-3 shadow-sm">
-							<input
-								ref={addListInputRef}
-								type="text"
-								placeholder="Enter list title..."
-								value={newListTitle}
-								onChange={(e) => setNewListTitle(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") commitAddList();
-									if (e.key === "Escape") {
-										setNewListTitle("");
-										setIsAddingList(false);
-									}
-								}}
-								className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
-							/>
-							<div className="flex items-center gap-2 mt-3">
-								<button
-									type="button"
-									onClick={commitAddList}
-									className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
-								>
-									Add List
-								</button>
-								<button
-									type="button"
-									onClick={() => {
-										setNewListTitle("");
-										setIsAddingList(false);
-									}}
-									className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
-								>
-									<X size={16} />
-								</button>
-							</div>
+					<div className="flex items-center gap-2">
+						<div className="relative">
+							<button
+								type="button"
+								onClick={() => setIsBulkMoveOpen(!isBulkMoveOpen)}
+								className="text-sm px-3 py-1.5 hover:bg-background/20 rounded-lg transition-colors flex items-center gap-2"
+							>
+								Move to...
+							</button>
+							{isBulkMoveOpen && (
+								<div className="absolute bottom-full left-0 mb-2 w-48 bg-card text-foreground border border-border rounded-xl shadow-xl overflow-hidden py-1">
+									{lists.map((list) => (
+										<button
+											type="button"
+											key={list.id}
+											onClick={() => {
+												moveSelectedTasks(list.id, projectId);
+												setIsBulkMoveOpen(false);
+											}}
+											className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+										>
+											{list.name}
+										</button>
+									))}
+								</div>
+							)}
 						</div>
-					) : (
+
 						<button
 							type="button"
-							onClick={() => setIsAddingList(true)}
-							className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
+							onClick={() => {
+								if (
+									window.confirm(
+										`Delete ${selectedTaskIds.length} selected task(s)?`,
+									)
+								) {
+									deleteSelectedTasks(projectId);
+								}
+							}}
+							className="text-sm px-3 py-1.5 hover:bg-destructive hover:text-destructive-foreground text-destructive/90 rounded-lg transition-colors"
 						>
-							<Plus size={18} />
-							<span className="font-medium text-sm">Add Status</span>
+							Delete
 						</button>
-					)}
-				</div>
-			</div>
 
-			<DragOverlay>
-				{activeColumn ? (
-					<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
-						<KanbanColumn list={activeColumn} projectId={projectId} isOverlay />
+						<button
+							type="button"
+							onClick={() => {
+								clearSelection();
+								setIsBulkMoveOpen(false);
+							}}
+							className="text-sm p-1.5 hover:bg-background/20 rounded-lg transition-colors ml-2"
+						>
+							<X size={16} />
+						</button>
 					</div>
-				) : activeTask ? (
-					<div className="rotate-3 scale-105 shadow-2xl cursor-grabbing pointer-events-none">
-						<TaskCard task={activeTask} isOverlay />
+				</div>
+			)}
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragStart={handleDragStart}
+				onDragEnd={handleDragEnd}
+			>
+				<div className="flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin">
+					<SortableContext
+						items={lists.map((l) => l.id)}
+						strategy={horizontalListSortingStrategy}
+					>
+						{lists.map((list) => (
+							<KanbanColumn key={list.id} list={list} projectId={projectId} />
+						))}
+					</SortableContext>
+
+					<div className="shrink-0 w-68.75 sm:w-75">
+						{isAddingList ? (
+							<div className="bg-card dark:bg-white/3 border border-border/60 rounded-2xl p-3 shadow-sm">
+								<input
+									ref={addListInputRef}
+									type="text"
+									placeholder="Enter list title..."
+									value={newListTitle}
+									onChange={(e) => setNewListTitle(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") commitAddList();
+										if (e.key === "Escape") {
+											setNewListTitle("");
+											setIsAddingList(false);
+										}
+									}}
+									className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+								/>
+								<div className="flex items-center gap-2 mt-3">
+									<button
+										type="button"
+										onClick={commitAddList}
+										className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
+									>
+										Add List
+									</button>
+									<button
+										type="button"
+										onClick={() => {
+											setNewListTitle("");
+											setIsAddingList(false);
+										}}
+										className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+									>
+										<X size={16} />
+									</button>
+								</div>
+							</div>
+						) : (
+							<button
+								type="button"
+								onClick={() => setIsAddingList(true)}
+								className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
+							>
+								<Plus size={18} />
+								<span className="font-medium text-sm">Add Status</span>
+							</button>
+						)}
 					</div>
-				) : null}
-			</DragOverlay>
-		</DndContext>
+				</div>
+
+				<DragOverlay>
+					{activeColumn ? (
+						<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
+							<KanbanColumn
+								list={activeColumn}
+								projectId={projectId}
+								isOverlay
+							/>
+						</div>
+					) : activeTask ? (
+						<div className="rotate-3 scale-105 shadow-2xl cursor-grabbing pointer-events-none">
+							<TaskCard task={activeTask} isOverlay />
+						</div>
+					) : null}
+				</DragOverlay>
+			</DndContext>
+		</>
 	);
 }

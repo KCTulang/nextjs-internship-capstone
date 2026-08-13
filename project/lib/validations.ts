@@ -11,6 +11,7 @@ export const createProjectSchema = z.object({
 		.max(500, "Description must be 500 characters or fewer")
 		.trim()
 		.optional(),
+	dueDate: z.coerce.date().optional(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial();
@@ -35,7 +36,9 @@ export const createTaskSchema = z.object({
 	listId: z.string().uuid("Invalid list ID"),
 	priority: z.enum(TASK_PRIORITIES).default("medium"),
 	dueDate: z.coerce.date().optional(),
+	assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
 	position: z.number().int().nonnegative().default(1000),
+	labels: z.array(z.string()).optional(),
 });
 
 export const updateTaskSchema = createTaskSchema
@@ -44,6 +47,7 @@ export const updateTaskSchema = createTaskSchema
 	.extend({
 		listId: z.string().uuid("Invalid list ID").optional(),
 		position: z.number().int().nonnegative().optional(),
+		assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
 	});
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
@@ -69,7 +73,6 @@ export const updateListSchema = createListSchema
 export type CreateListInput = z.infer<typeof createListSchema>;
 export type UpdateListInput = z.infer<typeof updateListSchema>;
 
-
 export const createCommentSchema = z.object({
 	content: z
 		.string()
@@ -81,7 +84,6 @@ export const createCommentSchema = z.object({
 
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 
-
 export const userProfileSchema = z.object({
 	name: z
 		.string()
@@ -92,6 +94,55 @@ export const userProfileSchema = z.object({
 });
 
 export type UserProfileInput = z.infer<typeof userProfileSchema>;
+
+export const updateNameSchema = z.object({
+	firstName: z
+		.string()
+		.min(1, "First name is required")
+		.max(50, "First name must be 50 characters or fewer")
+		.trim(),
+	lastName: z
+		.string()
+		.max(50, "Last name must be 50 characters or fewer")
+		.trim()
+		.optional(),
+});
+
+export type UpdateNameInput = z.infer<typeof updateNameSchema>;
+
+export const updateUsernameSchema = z.object({
+	username: z
+		.string()
+		.min(4, "Username must be at least 4 characters")
+		.max(50, "Username must be 50 characters or fewer")
+		.regex(
+			/^[a-zA-Z0-9_]+$/,
+			"Username can only contain letters, numbers, and underscores",
+		)
+		.trim(),
+});
+
+export type UpdateUsernameInput = z.infer<typeof updateUsernameSchema>;
+
+export const updatePasswordSchema = z
+	.object({
+		currentPassword: z.string().min(1, "Current password is required"),
+		newPassword: z
+			.string()
+			.min(8, "Password must be at least 8 characters")
+			.max(100, "Password is too long"),
+		confirmPassword: z.string().min(1, "Please confirm your new password"),
+	})
+	.refine((data) => data.newPassword === data.confirmPassword, {
+		message: "Passwords do not match",
+		path: ["confirmPassword"],
+	})
+	.refine((data) => data.newPassword !== data.currentPassword, {
+		message: "New password must be different from current password",
+		path: ["newPassword"],
+	});
+
+export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 
 export function validate<T>(
 	schema: z.ZodSchema<T>,

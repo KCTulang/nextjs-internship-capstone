@@ -1,69 +1,3 @@
-// TODO: Task 5.3 - Set up client-side state management with Zustand
-
-/*
-TODO: Implementation Notes for Interns:
-
-UI state management store for:
-- Modal states (create project, create task, etc.)
-- Sidebar state
-- Theme preferences
-- Loading states
-- Error states
-- Notifications/toasts
-
-Install: pnpm add zustand
-
-Example structure:
-import { create } from 'zustand'
-
-interface UIState {
-  // Modal states
-  isCreateProjectModalOpen: boolean
-  isCreateTaskModalOpen: boolean
-  isTaskDetailModalOpen: boolean
-  selectedTaskId: string | null
-
-  // UI states
-  sidebarOpen: boolean
-  theme: 'light' | 'dark'
-
-  // Loading states
-  isLoading: boolean
-  loadingMessage: string
-
-  // Actions
-  openCreateProjectModal: () => void
-  closeCreateProjectModal: () => void
-  openCreateTaskModal: () => void
-  closeCreateTaskModal: () => void
-  openTaskDetailModal: (taskId: string) => void
-  closeTaskDetailModal: () => void
-  toggleSidebar: () => void
-  setTheme: (theme: 'light' | 'dark') => void
-  setLoading: (loading: boolean, message?: string) => void
-}
-
-export const useUIStore = create<UIState>((set) => ({
-  // ... implementation
-}))
-*/
-
-// TODO: Task 5.3 - Set up client-side state management with Zustand
-
-/*
-TODO: Implementation Notes for Interns:
-
-UI state management store for:
-- Modal states (create project, create task, etc.)
-- Sidebar state
-- Theme preferences
-- Loading states
-- Error states
-- Notifications/toasts
-
-Install: pnpm add zustand
-*/
-
 import { create } from "zustand";
 import type { Project } from "@/hooks/use-projects";
 
@@ -98,8 +32,11 @@ interface UIState {
 
 	openCreateProjectModal: () => void;
 	closeCreateProjectModal: () => void;
-	openCreateTaskModal: (listId: string, projectId: string) => void;
+	openCreateTaskModal: (listId?: string, projectId?: string) => void;
 	closeCreateTaskModal: () => void;
+	isInviteMemberModalOpen: boolean;
+	openInviteMemberModal: () => void;
+	closeInviteMemberModal: () => void;
 	openTaskDetailModal: (taskId: string) => void;
 	closeTaskDetailModal: () => void;
 	toggleSidebar: () => void;
@@ -136,6 +73,9 @@ export const useUIStore = create<UIState>((set) => ({
 		set({ isEditProjectModalOpen: true, selectedProjectForEdit: project }),
 	closeEditProjectModal: () =>
 		set({ isEditProjectModalOpen: false, selectedProjectForEdit: null }),
+	isInviteMemberModalOpen: false,
+	openInviteMemberModal: () => set({ isInviteMemberModalOpen: true }),
+	closeInviteMemberModal: () => set({ isInviteMemberModalOpen: false }),
 	openCreateTaskModal: (listId, projectId) =>
 		set({
 			isCreateTaskModalOpen: true,

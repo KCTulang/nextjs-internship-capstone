@@ -66,7 +66,7 @@ Each intern will work through all tasks below for their individual implementatio
   - [x] 3.3 Set up Drizzle ORM with type-safe schema definitions
   - [x] 3.4 Create database migration system
   - [x] 3.5 Implement database connection and query utilities
-  - [ ] 3.6 Set up data validation with Zod schemas
+  - [x] 3.6 Set up data validation with Zod schemas
 
 ### Phase 4: Core Features (Weeks 4-6)
 
