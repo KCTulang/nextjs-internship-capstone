@@ -43,6 +43,7 @@ export interface Task {
 	createdAt: Date;
 	updatedAt: Date;
 	comments: Comment[];
+	labels?: string[] | null;
 }
 
 export interface Comment {

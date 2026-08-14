@@ -4,10 +4,12 @@ import {
 	closestCenter,
 	DndContext,
 	type DragEndEvent,
+	type DragMoveEvent,
 	DragOverlay,
 	type DragStartEvent,
 	KeyboardSensor,
 	PointerSensor,
+	TouchSensor,
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
@@ -15,7 +17,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { AnimatePresence, motion } from "framer-motion";
 import { LayoutList } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type Task, useTasksStore } from "@/hooks/use-tasks";
+import { type List, type Task, useTasksStore } from "@/hooks/use-tasks";
 import { KanbanColumn } from "./kanban-column";
 import { ManageColumnsSheet } from "./modals/manage-columns-sheet";
 import { StatusPickerSheet } from "./modals/status-picker-sheet";
@@ -41,6 +43,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 	const [taskToMove, setTaskToMove] = useState<Task | null>(null);
 
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+	const autoPageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	useEffect(() => {
 		const activeTab = tabRefs.current[activeListIndex];
@@ -61,11 +64,16 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 	}, [fetchBoard, projectId]);
 
 	const sensors = useSensors(
+		// MouseSensor for desktop browsers / dev tools mobile emulation
 		useSensor(PointerSensor, {
+			activationConstraint: { distance: 8 },
+		}),
+		// TouchSensor for real touch devices — long press (500ms) activates drag
+		// This prevents conflict with Framer Motion's horizontal swipe (< 500ms)
+		useSensor(TouchSensor, {
 			activationConstraint: {
-				distance: 5,
-				delay: 250,
-				tolerance: 5,
+				delay: 500,
+				tolerance: 8,
 			},
 		}),
 		useSensor(KeyboardSensor, {
@@ -117,7 +125,42 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 		}
 	}
 
+	function handleDragMove(event: DragMoveEvent) {
+		const { active } = event;
+		const rect = active.rect.current.translated;
+		if (!rect) return;
+
+		const edgeThreshold = 40;
+		const screenWidth = window.innerWidth;
+
+		if (rect.left < edgeThreshold) {
+			if (!autoPageTimeoutRef.current) {
+				autoPageTimeoutRef.current = setTimeout(() => {
+					paginate(-1);
+					autoPageTimeoutRef.current = null;
+				}, 600);
+			}
+		} else if (rect.right > screenWidth - edgeThreshold) {
+			if (!autoPageTimeoutRef.current) {
+				autoPageTimeoutRef.current = setTimeout(() => {
+					paginate(1);
+					autoPageTimeoutRef.current = null;
+				}, 600);
+			}
+		} else {
+			if (autoPageTimeoutRef.current) {
+				clearTimeout(autoPageTimeoutRef.current);
+				autoPageTimeoutRef.current = null;
+			}
+		}
+	}
+
 	function handleDragEnd(event: DragEndEvent) {
+		if (autoPageTimeoutRef.current) {
+			clearTimeout(autoPageTimeoutRef.current);
+			autoPageTimeoutRef.current = null;
+		}
+
 		const { active, over } = event;
 		setActiveTask(null);
 
@@ -140,23 +183,15 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 				const destListTasks =
 					lists.find((l) => l.id === destListId)?.tasks || [];
 				destIndex = destListTasks.findIndex((t) => t.id === over.id);
-
-				const isBelowOverItem =
-					over &&
-					active.rect.current.translated &&
-					active.rect.current.translated.top > over.rect.top + over.rect.height;
-
-				const modifier = isBelowOverItem ? 1 : 0;
-				destIndex =
-					destIndex >= 0 ? destIndex + modifier : destListTasks.length + 1;
 			} else if (isOverColumn) {
-				destListId = over.id as string;
+				const overColumnList = over.data.current?.list as List;
+				destListId = overColumnList.id;
 				const destListTasks =
 					lists.find((l) => l.id === destListId)?.tasks || [];
 				destIndex = destListTasks.length;
 			}
 
-			if (destListId === activeList.id) {
+			if (destListId) {
 				moveTask(task.id, sourceListId, destListId, destIndex, projectId);
 			}
 		}
@@ -220,6 +255,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 					sensors={sensors}
 					collisionDetection={closestCenter}
 					onDragStart={handleDragStart}
+					onDragMove={handleDragMove}
 					onDragEnd={handleDragEnd}
 				>
 					<AnimatePresence initial={false} custom={direction} mode="popLayout">
@@ -263,7 +299,7 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 
 					<DragOverlay>
 						{activeTask ? (
-							<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
+							<div className="opacity-90 cursor-grabbing pointer-events-none">
 								<TaskCard
 									task={activeTask}
 									isMobileView={true}

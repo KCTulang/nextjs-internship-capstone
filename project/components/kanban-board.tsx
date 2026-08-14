@@ -62,7 +62,11 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 			) : (
 				<MobileKanbanBoard projectId={projectId} />
 			)}
-			<TaskDetailPanel taskId={taskId} projectId={projectId} />
+			<TaskDetailPanel
+				key={taskId ?? "empty"}
+				taskId={taskId}
+				projectId={projectId}
+			/>
 		</>
 	);
 }
@@ -269,18 +273,6 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 				const destListTasks =
 					lists.find((l) => l.id === destListId)?.tasks || [];
 				destIndex = destListTasks.findIndex((t) => t.id === overId);
-
-				const activeRect = active.rect.current.translated;
-				const overRect = over.rect;
-				const isBelowOverItem =
-					activeRect && overRect
-						? activeRect.top + activeRect.height / 2 >
-							overRect.top + overRect.height / 2
-						: false;
-
-				const modifier = isBelowOverItem ? 1 : 0;
-				destIndex =
-					destIndex >= 0 ? destIndex + modifier : destListTasks.length + 1;
 			} else if (isOverColumn) {
 				const overColumnList = over.data.current?.list as List;
 				destListId = overColumnList.id;
@@ -449,7 +441,7 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 							/>
 						</div>
 					) : activeTask ? (
-						<div className="rotate-3 scale-105 shadow-2xl cursor-grabbing pointer-events-none">
+						<div className="cursor-grabbing pointer-events-none">
 							<TaskCard task={activeTask} isOverlay />
 						</div>
 					) : null}
