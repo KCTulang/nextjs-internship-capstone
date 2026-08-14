@@ -76,17 +76,18 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 	projectIdRef.current = projectId;
 
 	useEffect(() => {
-		if (task) {
-			setTitle(task.title);
-			setDescription(task.description || "");
-			setLabelsString(task.labels?.join(", ") || "");
+		const currentTask = taskRef.current;
+		if (currentTask && currentTask.id === taskId) {
+			setTitle(currentTask.title);
+			setDescription(currentTask.description || "");
+			setLabelsString(currentTask.labels?.join(", ") || "");
 
 			setIsCommentsLoading(true);
-			getCommentsAction(task.id).then((res) => {
+			getCommentsAction(currentTask.id).then((res) => {
 				if (res.success && res.data) {
 					setComments(res.data);
 					useTasksStore.getState().updateTaskComments(
-						task.id,
+						currentTask.id,
 						res.data.map((c) => ({ id: c.id })),
 					);
 				}
@@ -95,7 +96,7 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 
 			setIsActivityLoading(true);
 			import("@/app/actions/activity").then(({ getActivityByTaskAction }) => {
-				getActivityByTaskAction(task.id).then((res) => {
+				getActivityByTaskAction(currentTask.id).then((res) => {
 					if (res.success && res.data) {
 						setActivities(res.data);
 					}
@@ -110,7 +111,7 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 				}
 			}, 0);
 		}
-	}, [task]);
+	}, [taskId]);
 
 	useEffect(() => {
 		if (!taskId) return;
