@@ -1,16 +1,26 @@
 import { getAllUserTasksAction } from "@/app/actions/tasks";
-
-type Task = {
-	id: string | number;
-	title: string;
-	projectName?: string;
-	priority?: string;
-	dueDate?: string | null;
-};
+import {
+	CalendarGrid,
+	type CalendarTask,
+} from "@/components/calendar/calendar-grid";
+import { UpcomingDeadlines } from "@/components/calendar/upcoming-deadlines";
 
 export default async function CalendarPage() {
 	const res = await getAllUserTasksAction();
-	const tasks: Task[] = res.success ? (res.data as Task[]) : [];
+
+	const allTasks: CalendarTask[] =
+		res.success && res.data
+			? (res.data as CalendarTask[]).map((t) => ({
+					...t,
+
+					dueDate: t.dueDate ? new Date(t.dueDate) : null,
+				}))
+			: [];
+
+	const tasksWithDates = allTasks.filter(
+		(t): t is CalendarTask & { dueDate: Date } =>
+			t.dueDate instanceof Date && !Number.isNaN(t.dueDate.getTime()),
+	);
 
 	return (
 		<div className="space-y-6">
@@ -23,48 +33,13 @@ export default async function CalendarPage() {
 				</div>
 			</div>
 
+			<CalendarGrid tasksWithDates={tasksWithDates} />
+
 			<div className="bg-card rounded-lg border border-border p-6">
 				<h3 className="text-lg font-semibold text-foreground mb-4">
 					Upcoming Deadlines
 				</h3>
-				<div className="space-y-3">
-					{tasks && tasks.length > 0 ? (
-						tasks.map((task: Task) => (
-							<div
-								key={task.id}
-								className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border"
-							>
-								<div>
-									<h4 className="font-medium text-foreground">{task.title}</h4>
-									<div className="flex items-center gap-2 mt-1">
-										<p className="text-sm text-muted-foreground">
-											{task.projectName}
-										</p>
-										<span className="text-[10px] uppercase font-bold text-muted-foreground bg-border px-1.5 py-0.5 rounded">
-											{task.priority}
-										</span>
-									</div>
-								</div>
-								<div className="flex flex-col items-end">
-									<p className="text-sm font-medium text-foreground">
-										{task.dueDate
-											? new Date(task.dueDate).toLocaleDateString(undefined, {
-													month: "short",
-													day: "numeric",
-													year: "numeric",
-												})
-											: "No date"}
-									</p>
-									<p className="text-xs text-muted-foreground mt-1">Deadline</p>
-								</div>
-							</div>
-						))
-					) : (
-						<div className="text-center py-8 text-muted-foreground">
-							<p>No upcoming deadlines found.</p>
-						</div>
-					)}
-				</div>
+				<UpcomingDeadlines tasksWithDates={tasksWithDates} />
 			</div>
 		</div>
 	);

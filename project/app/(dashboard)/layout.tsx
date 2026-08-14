@@ -5,6 +5,7 @@ import type React from "react";
 import { Suspense, useState } from "react";
 import { CustomUserButton } from "@/components/custom-user-button";
 import { GlobalSearch } from "@/components/global-search";
+import { ConfirmModal } from "@/components/modals/confirm-modal";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
 import { EditProjectModal } from "@/components/modals/edit-project-modal";
@@ -71,6 +72,7 @@ export default function DashboardLayout({
 			<CreateTaskModal />
 			<SetPasswordModal />
 			<InviteMemberModal />
+			<ConfirmModal />
 		</div>
 	);
 }

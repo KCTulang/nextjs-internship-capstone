@@ -46,6 +46,17 @@ interface UIState {
 	clearError: () => void;
 	addToast: (toast: Omit<Toast, "id">) => void;
 	removeToast: (id: string) => void;
+
+	isConfirmModalOpen: boolean;
+	confirmModalProps: {
+		title: string;
+		description: string;
+		confirmText?: string;
+		cancelText?: string;
+		onConfirm: () => void | Promise<void>;
+	} | null;
+	openConfirmModal: (props: NonNullable<UIState["confirmModalProps"]>) => void;
+	closeConfirmModal: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -108,4 +119,11 @@ export const useUIStore = create<UIState>((set) => ({
 		set((state) => ({
 			toasts: state.toasts.filter((t) => t.id !== id),
 		})),
+
+	isConfirmModalOpen: false,
+	confirmModalProps: null,
+	openConfirmModal: (props) =>
+		set({ isConfirmModalOpen: true, confirmModalProps: props }),
+	closeConfirmModal: () =>
+		set({ isConfirmModalOpen: false, confirmModalProps: null }),
 }));

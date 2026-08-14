@@ -99,6 +99,7 @@ export interface TasksState {
 	) => number;
 	optimisticMoveList: (listId: string, destIndex: number) => number;
 	selectedTaskIds: string[];
+	setSelectedTaskIds: (ids: string[]) => void;
 	toggleTaskSelection: (taskId: string, force?: boolean) => void;
 	clearSelection: () => void;
 	deleteSelectedTasks: (projectId: string) => Promise<void>;
@@ -111,6 +112,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	isLoading: false,
 	error: null,
 	selectedTaskIds: [],
+	setSelectedTaskIds: (ids) => set({ selectedTaskIds: ids }),
 
 	setMembers: (members) => set({ members }),
 

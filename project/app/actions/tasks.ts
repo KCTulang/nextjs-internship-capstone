@@ -178,6 +178,8 @@ export async function getAllUserTasksAction() {
 				dueDate: tasks.dueDate,
 				priority: tasks.priority,
 				projectName: projects.name,
+				labels: tasks.labels,
+				listName: lists.name,
 			})
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -285,5 +287,169 @@ export async function getAnalyticsAction() {
 	} catch (error) {
 		console.error("Failed to fetch analytics:", error);
 		return { success: false, error: "Failed to fetch analytics" };
+	}
+}
+
+export async function bulkDeleteTasksAction(taskIds: string[]) {
+	try {
+		const clerkId = await requireAuth();
+		const user = await queries.users.getByClerkId(clerkId);
+		if (!user) throw new Error("Unauthorized");
+		if (taskIds.length === 0) return { success: true };
+
+		await db.transaction(async (tx) => {
+			const validTasks = await tx
+				.select({ id: tasks.id })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.innerJoin(projects, eq(lists.projectId, projects.id))
+				.where(
+					and(
+						inArray(tasks.id, taskIds),
+						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					),
+				);
+
+			const validTaskIds = validTasks.map((t) => t.id);
+			if (validTaskIds.length === 0) return;
+
+			await tx.delete(tasks).where(inArray(tasks.id, validTaskIds));
+		});
+
+		revalidatePath("/", "layout");
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to bulk delete tasks:", error);
+		return { success: false, error: "Failed to bulk delete tasks" };
+	}
+}
+
+export async function bulkUpdateTasksPriorityAction(
+	taskIds: string[],
+	priority: string,
+) {
+	try {
+		const clerkId = await requireAuth();
+		const user = await queries.users.getByClerkId(clerkId);
+		if (!user) throw new Error("Unauthorized");
+		if (taskIds.length === 0) return { success: true };
+
+		await db.transaction(async (tx) => {
+			const validTasks = await tx
+				.select({ id: tasks.id, priority: tasks.priority })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.innerJoin(projects, eq(lists.projectId, projects.id))
+				.where(
+					and(
+						inArray(tasks.id, taskIds),
+						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					),
+				);
+
+			const validTaskIds = validTasks.map((t) => t.id);
+			if (validTaskIds.length === 0) return;
+
+			await tx
+				.update(tasks)
+				.set({ priority })
+				.where(inArray(tasks.id, validTaskIds));
+
+			const logPromises = validTasks
+				.filter((t) => t.priority !== priority)
+				.map((t) =>
+					logActivity(
+						t.id,
+						"priority_changed",
+						t.priority || "medium",
+						priority,
+					),
+				);
+			await Promise.all(logPromises);
+		});
+
+		revalidatePath("/", "layout");
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to bulk update tasks priority:", error);
+		return { success: false, error: "Failed to bulk update tasks priority" };
+	}
+}
+
+export async function bulkMarkCompleteAction(taskIds: string[]) {
+	try {
+		const clerkId = await requireAuth();
+		const user = await queries.users.getByClerkId(clerkId);
+		if (!user) throw new Error("Unauthorized");
+		if (taskIds.length === 0) return { success: true };
+
+		await db.transaction(async (tx) => {
+			const validTasks = await tx
+				.select({ id: tasks.id, projectId: lists.projectId })
+				.from(tasks)
+				.innerJoin(lists, eq(tasks.listId, lists.id))
+				.innerJoin(projects, eq(lists.projectId, projects.id))
+				.where(
+					and(
+						inArray(tasks.id, taskIds),
+						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					),
+				);
+
+			if (validTasks.length === 0) return;
+
+			const tasksByProject = new Map<string, string[]>();
+			for (const task of validTasks) {
+				if (!tasksByProject.has(task.projectId)) {
+					tasksByProject.set(task.projectId, []);
+				}
+				tasksByProject.get(task.projectId)?.push(task.id);
+			}
+
+			const projectIds = Array.from(tasksByProject.keys());
+
+			const projectLists = await tx
+				.select({
+					id: lists.id,
+					projectId: lists.projectId,
+					position: lists.position,
+				})
+				.from(lists)
+				.where(inArray(lists.projectId, projectIds));
+
+			for (const [projectId, pTasks] of tasksByProject.entries()) {
+				const pLists = projectLists.filter((l) => l.projectId === projectId);
+				if (pLists.length === 0) continue;
+
+				const maxList = pLists.reduce((prev, current) =>
+					prev.position > current.position ? prev : current,
+				);
+
+				const tasksInMaxList = await tx
+					.select({ position: tasks.position })
+					.from(tasks)
+					.where(eq(tasks.listId, maxList.id));
+
+				let maxPos = 0;
+				if (tasksInMaxList.length > 0) {
+					maxPos = Math.max(...tasksInMaxList.map((t) => t.position));
+				}
+
+				for (let i = 0; i < pTasks.length; i++) {
+					const taskId = pTasks[i];
+					await tx
+						.update(tasks)
+						.set({ listId: maxList.id, position: maxPos + 1000 * (i + 1) })
+						.where(eq(tasks.id, taskId));
+					await logActivity(taskId, "status_changed");
+				}
+			}
+		});
+
+		revalidatePath("/", "layout");
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to bulk mark complete:", error);
+		return { success: false, error: "Failed to bulk mark complete" };
 	}
 }
