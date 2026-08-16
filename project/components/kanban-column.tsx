@@ -7,6 +7,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { AnimatePresence } from "framer-motion";
 import {
 	GripHorizontal,
 	MoreHorizontal,
@@ -267,7 +268,7 @@ export function KanbanColumn({
 				<div className="flex items-center gap-1 shrink-0">
 					<button
 						type="button"
-						onClick={() => openCreateTaskModal(list.id, projectId)}
+						onClick={() => openCreateTaskModal({ listId: list.id, projectId })}
 						title="Add task"
 						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
 					>
@@ -349,14 +350,16 @@ export function KanbanColumn({
 					items={list.tasks?.map((t) => t.id) || []}
 					strategy={verticalListSortingStrategy}
 				>
-					{list.tasks?.map((task) => (
-						<TaskCard
-							key={task.id}
-							task={task}
-							isMobileView={isMobileView}
-							onMoveClick={onMoveTaskClick}
-						/>
-					))}
+					<AnimatePresence mode="popLayout">
+						{list.tasks?.map((task) => (
+							<TaskCard
+								key={task.id}
+								task={task}
+								isMobileView={isMobileView}
+								onMoveClick={onMoveTaskClick}
+							/>
+						))}
+					</AnimatePresence>
 				</SortableContext>
 
 				{(list.tasks?.length || 0) === 0 && (
@@ -372,7 +375,7 @@ export function KanbanColumn({
 
 			<button
 				type="button"
-				onClick={() => openCreateTaskModal(list.id, projectId)}
+				onClick={() => openCreateTaskModal({ listId: list.id, projectId })}
 				className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
 			>
 				<Plus size={14} />

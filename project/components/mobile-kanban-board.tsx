@@ -64,12 +64,9 @@ export function MobileKanbanBoard({ projectId }: MobileKanbanBoardProps) {
 	}, [fetchBoard, projectId]);
 
 	const sensors = useSensors(
-		// MouseSensor for desktop browsers / dev tools mobile emulation
 		useSensor(PointerSensor, {
 			activationConstraint: { distance: 8 },
 		}),
-		// TouchSensor for real touch devices — long press (500ms) activates drag
-		// This prevents conflict with Framer Motion's horizontal swipe (< 500ms)
 		useSensor(TouchSensor, {
 			activationConstraint: {
 				delay: 500,

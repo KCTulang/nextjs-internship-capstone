@@ -12,7 +12,7 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import {
-	horizontalListSortingStrategy,
+	rectSortingStrategy,
 	SortableContext,
 	sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
@@ -81,6 +81,7 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 		generateDefaultLists,
 		isLoading,
 		error,
+		isSyncing,
 	} = useTasksStore();
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 	const [activeColumn, setActiveColumn] = useState<List | null>(null);
@@ -133,7 +134,7 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 			} else if (e.key.toLowerCase() === "n") {
 				if (lists.length > 0) {
 					e.preventDefault();
-					openCreateTaskModal(lists[0].id, projectId);
+					openCreateTaskModal({ listId: lists[0].id, projectId });
 				}
 			}
 		};
@@ -370,10 +371,12 @@ function DesktopKanbanBoard({ projectId }: KanbanBoardProps) {
 				onDragStart={handleDragStart}
 				onDragEnd={handleDragEnd}
 			>
-				<div className="flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin">
+				<div
+					className={`flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin ${isSyncing ? "pointer-events-none opacity-80" : ""}`}
+				>
 					<SortableContext
 						items={lists.map((l) => l.id)}
-						strategy={horizontalListSortingStrategy}
+						strategy={rectSortingStrategy}
 					>
 						{lists.map((list) => (
 							<KanbanColumn key={list.id} list={list} projectId={projectId} />
