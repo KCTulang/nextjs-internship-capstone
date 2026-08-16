@@ -6,8 +6,8 @@ import type React from "react";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AmbientGlow } from "@/components/ambient-glow";
+import { LockInOverlay } from "@/components/lock-in-overlay";
 import { ThemeProvider } from "@/components/theme-provider";
-
 import { Toaster } from "@/components/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -46,6 +46,7 @@ export default function RootLayout({
 				data-scroll-behavior="smooth"
 			>
 				<body className={`${inter.className} min-h-full flex flex-col`}>
+					<LockInOverlay />
 					<ThemeProvider>
 						<AmbientGlow />
 						<Toaster />
