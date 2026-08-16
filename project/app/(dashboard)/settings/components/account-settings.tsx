@@ -5,6 +5,7 @@ import { Loader2, Mail, Plus, Shield } from "lucide-react";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
+import { updateUserProfileAction } from "@/lib/actions/user.actions";
 import {
 	updateNameSchema,
 	updateUsernameSchema,
@@ -66,7 +67,11 @@ export function AccountSettings() {
 
 		setIsSavingName(true);
 		try {
-			await user.update({ firstName, lastName });
+			const res = await updateUserProfileAction(firstName, lastName);
+			if (!res.success) {
+				throw new Error(res.error);
+			}
+			await user.reload();
 			setIsEditingName(false);
 			addToast({ type: "success", message: "Profile updated successfully." });
 		} catch (err) {
@@ -236,7 +241,6 @@ export function AccountSettings() {
 		}
 	};
 
-	// OAuth Handlers
 	const handleConnectOAuth = async (
 		strategy: "oauth_google" | "oauth_github" | "oauth_microsoft",
 	) => {

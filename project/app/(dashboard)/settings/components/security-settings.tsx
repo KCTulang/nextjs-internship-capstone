@@ -14,7 +14,7 @@ import {
 	Smartphone,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { updatePasswordSchema, validate } from "@/lib/validations";
 import { useUIStore } from "@/stores/ui-store";
 import { Modal } from "./../../../../components/ui/modal";
@@ -81,7 +81,7 @@ export function SecuritySettings() {
 		},
 	);
 
-	const loadSessions = async () => {
+	const loadSessions = useCallback(async () => {
 		setIsLoadingSessions(true);
 		try {
 			const activeSessions = await user?.getSessions();
@@ -100,7 +100,13 @@ export function SecuritySettings() {
 		} finally {
 			setIsLoadingSessions(false);
 		}
-	};
+	}, [user]);
+
+	useEffect(() => {
+		if (isLoaded && user) {
+			loadSessions();
+		}
+	}, [isLoaded, user, loadSessions]);
 
 	if (!isLoaded || !user) {
 		return (
@@ -110,7 +116,6 @@ export function SecuritySettings() {
 		);
 	}
 
-	// Password Handlers
 	const handleOpenPasswordModal = () => {
 		setCurrentPassword("");
 		setNewPassword("");
@@ -247,20 +252,37 @@ export function SecuritySettings() {
 				</div>
 				<div className="border border-border bg-card shadow-sm rounded-xl p-6">
 					<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-						<div>
-							<p className="text-sm font-medium text-foreground">
-								Current Password
-							</p>
-							<p className="text-sm text-muted-foreground mt-1 tracking-widest">
-								••••••••••••
-							</p>
+						<div className="space-y-1.5">
+							<div className="flex items-center gap-2">
+								<p className="text-sm font-medium text-foreground">
+									Password Authentication
+								</p>
+								{user.passwordEnabled ? (
+									<span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+										Enabled
+									</span>
+								) : (
+									<span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-muted-foreground uppercase tracking-wider">
+										Not Set
+									</span>
+								)}
+							</div>
+							{user.passwordEnabled ? (
+								<p className="text-sm text-muted-foreground">
+									Your password is securely managed and cannot be displayed.
+								</p>
+							) : (
+								<p className="text-sm text-muted-foreground">
+									You have not set a password for this account.
+								</p>
+							)}
 						</div>
 						<button
 							type="button"
 							onClick={handleOpenPasswordModal}
 							className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-3 py-1.5 bg-primary/10 rounded-md whitespace-nowrap"
 						>
-							Update password
+							{user.passwordEnabled ? "Update password" : "Set password"}
 						</button>
 					</div>
 				</div>
@@ -279,6 +301,16 @@ export function SecuritySettings() {
 					{isLoadingSessions ? (
 						<div className="p-6 flex justify-center">
 							<Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+						</div>
+					) : sessions.length === 0 ? (
+						<div className="p-6 flex flex-col items-center justify-center text-center">
+							<Monitor className="w-10 h-10 text-muted-foreground/30 mb-3" />
+							<p className="text-sm font-medium text-foreground">
+								No active devices found
+							</p>
+							<p className="text-xs text-muted-foreground mt-1">
+								It looks like you don't have any active sessions right now.
+							</p>
 						</div>
 					) : (
 						sessions.map((s) => {
