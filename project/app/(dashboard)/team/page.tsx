@@ -7,6 +7,9 @@ import {
 import { queries } from "@/lib/db";
 import { TeamPageClient } from "./team-page-client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function TeamPage() {
 	const { userId: clerkId } = await auth();
 	let currentUserId = "";

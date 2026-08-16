@@ -18,7 +18,7 @@ import {
 	X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	cancelInvitationAction,
 	resendInvitationAction,
@@ -478,6 +478,10 @@ export function TeamPageClient({
 	const { openInviteMemberModal } = useUIStore();
 	const [members, setMembers] = useState<TeamMember[]>(initialMembers);
 	const router = useRouter();
+
+	useEffect(() => {
+		setMembers(initialMembers);
+	}, [initialMembers]);
 
 	const [activeTab, setActiveTab] = useState<Tab>("members");
 	const [viewMode, setViewMode] = useState<ViewMode>("card");

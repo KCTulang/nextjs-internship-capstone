@@ -137,7 +137,6 @@ export async function respondToInvitationAction(
 			};
 		}
 
-		// Check if already a member
 		const existingMembership = await db.query.projectMembers.findFirst({
 			where: and(
 				eq(projectMembers.projectId, invitation.projectId),
@@ -156,7 +155,6 @@ export async function respondToInvitationAction(
 			};
 		}
 
-		// We will use db.batch to guarantee atomicity since neon-http does not support interactive transactions
 		if (accept) {
 			await db.batch([
 				db.insert(projectMembers).values({
@@ -471,7 +469,6 @@ export async function getSentInvitationsAction() {
 		const user = await queries.users.getByClerkId(clerkId);
 		if (!user) return { success: false, error: "Unauthorized" };
 
-		// Get projects where user is owner or admin
 		const callerMemberships = await db.query.projectMembers.findMany({
 			where: and(
 				eq(projectMembers.userId, user.id),
@@ -587,7 +584,6 @@ export async function resendInvitationAction(invitationId: string) {
 			};
 		}
 
-		// Update the updatedAt timestamp to mark it as "resent"
 		await db
 			.update(projectInvitations)
 			.set({ updatedAt: new Date() })
@@ -628,7 +624,6 @@ export async function updateProjectMemberAction(
 			};
 		}
 
-		// Prevent demoting the owner
 		const targetMembership = await db.query.projectMembers.findFirst({
 			where: and(
 				eq(projectMembers.projectId, projectId),

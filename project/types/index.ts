@@ -6,6 +6,7 @@ export interface User {
 	clerkId: string;
 	email: string;
 	name: string;
+	imageUrl?: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -34,15 +35,15 @@ export interface List {
 export interface Task {
 	id: string;
 	title: string;
-	description?: string;
+	description?: string | null;
 	listId: string;
-	assigneeId?: string;
+	assigneeId?: string | null;
 	priority: "low" | "medium" | "high";
-	dueDate?: Date;
+	dueDate?: Date | null;
 	position: number;
-	createdAt: Date;
-	updatedAt: Date;
-	comments: Comment[];
+	createdAt?: Date | null;
+	updatedAt?: Date | null;
+	comments?: { id: string }[];
 	labels?: string[] | null;
 }
 
