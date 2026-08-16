@@ -2,6 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { motion } from "framer-motion";
 import { Calendar, GripVertical, MessageSquare } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -88,7 +89,11 @@ export function TaskCard({
 	}
 
 	return (
-		<div
+		<motion.div
+			initial={{ opacity: 0, y: 10 }}
+			animate={{ opacity: 1, y: 0 }}
+			exit={{ opacity: 0, scale: 0.9 }}
+			transition={{ duration: 0.2 }}
 			ref={setNodeRef}
 			style={style}
 			className={`relative w-full group transition-all duration-200 ease-out z-0 ${stateClasses}`}
@@ -257,6 +262,6 @@ export function TaskCard({
 					</svg>
 				</button>
 			)}
-		</div>
+		</motion.div>
 	);
 }

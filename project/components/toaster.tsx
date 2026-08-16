@@ -31,7 +31,6 @@ function ToastItem({
 	toast: Toast;
 	onDismiss: () => void;
 }) {
-	// Auto-dismiss after 3s
 	useEffect(() => {
 		const timer = setTimeout(onDismiss, 3000);
 		return () => clearTimeout(timer);
