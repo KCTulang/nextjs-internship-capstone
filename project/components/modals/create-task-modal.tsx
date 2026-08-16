@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { format } from "date-fns";
+import { useEffect, useState } from "react";
+import { useProjectStore } from "@/hooks/use-projects";
 import { useTasksStore } from "@/hooks/use-tasks";
 import { useUIStore } from "@/stores/ui-store";
 
@@ -11,24 +13,48 @@ export function CreateTaskModal() {
 		closeCreateTaskModal,
 		selectedListIdForNewTask,
 		activeProjectId,
+		initialDueDate,
 	} = useUIStore();
+	const { projects } = useProjectStore();
 
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
-	const [priority, setPriority] = useState("medium");
+	const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
 	const [assigneeId, setAssigneeId] = useState("unassigned");
 	const [dueDate, setDueDate] = useState("");
 	const [labels, setLabels] = useState("");
+	const [selectedProjectId, setSelectedProjectId] = useState<string | "">("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	if (!isCreateTaskModalOpen || !selectedListIdForNewTask || !activeProjectId)
-		return null;
+	useEffect(() => {
+		if (isCreateTaskModalOpen) {
+			if (initialDueDate) {
+				setDueDate(format(initialDueDate, "yyyy-MM-dd'T'HH:mm"));
+			} else {
+				setDueDate("");
+			}
+			setSelectedProjectId(activeProjectId || "");
+		}
+	}, [isCreateTaskModalOpen, initialDueDate, activeProjectId]);
+
+	if (!isCreateTaskModalOpen) return null;
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!title.trim()) return;
 
 		setIsSubmitting(true);
+
+		let targetListId = selectedListIdForNewTask;
+		let targetProjectId = activeProjectId;
+
+		if (!activeProjectId && selectedProjectId) {
+			targetProjectId = selectedProjectId;
+			const p = projects.find((proj) => proj.id === selectedProjectId);
+			if (p?.lists && p.lists.length > 0) {
+				targetListId = p.lists[0].id;
+			}
+		}
 
 		await createTask(
 			{
@@ -43,10 +69,10 @@ export function CreateTaskModal() {
 							.map((l) => l.trim())
 							.filter(Boolean)
 					: null,
-				listId: selectedListIdForNewTask,
+				listId: targetListId || undefined,
 				position: 1000,
 			},
-			activeProjectId,
+			targetProjectId || "",
 		);
 
 		setIsSubmitting(false);
@@ -67,6 +93,29 @@ export function CreateTaskModal() {
 				</h3>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
+					{!activeProjectId && (
+						<div>
+							<label
+								htmlFor="task-project"
+								className="block text-sm font-medium text-foreground mb-1"
+							>
+								Project (Optional)
+							</label>
+							<select
+								id="task-project"
+								value={selectedProjectId}
+								onChange={(e) => setSelectedProjectId(e.target.value)}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+							>
+								<option value="">No Project (Standalone Task)</option>
+								{projects.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+						</div>
+					)}
 					<div>
 						<label
 							htmlFor="task-title"
@@ -113,7 +162,9 @@ export function CreateTaskModal() {
 							<select
 								id="task-priority"
 								value={priority}
-								onChange={(e) => setPriority(e.target.value)}
+								onChange={(e) =>
+									setPriority(e.target.value as "low" | "medium" | "high")
+								}
 								className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
 							>
 								<option value="low">Low</option>

@@ -50,7 +50,8 @@ export const users = pgTable("users", {
 	clerkId: text("clerk_id").notNull().unique(),
 	email: text("email").notNull(),
 	name: text("name").notNull(),
-	role: text("role").notNull().default("user"), // global role: "user", "admin"
+	imageUrl: text("image_url"),
+	role: text("role").notNull().default("user"),
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at")
 		.defaultNow()
@@ -99,9 +100,10 @@ export const tasks = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		title: text("title").notNull(),
 		description: text("description"),
-		listId: uuid("list_id")
-			.notNull()
-			.references(() => lists.id, { onDelete: "cascade" }),
+		listId: uuid("list_id").references(() => lists.id, {
+			onDelete: "cascade",
+		}),
+		status: text("status").default("todo"),
 		assigneeId: uuid("assignee_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
@@ -188,7 +190,37 @@ export const projectInvitations = pgTable(
 	],
 );
 
+export const focusSessions = pgTable(
+	"focus_sessions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		taskId: uuid("task_id")
+			.notNull()
+			.references(() => tasks.id, { onDelete: "cascade" }),
+		startTime: timestamp("start_time").notNull().defaultNow(),
+		endTime: timestamp("end_time"),
+		duration: integer("duration"),
+		status: text("status").notNull().default("active"),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at")
+			.defaultNow()
+			.$onUpdate(() => new Date()),
+	},
+	(table) => [
+		index("focus_session_task_idx").on(table.taskId),
+		index("focus_session_user_idx").on(table.userId),
+	],
+);
+
 // Relations
+
+export const focusSessionsRelations = relations(focusSessions, ({ one }) => ({
+	user: one(users, { fields: [focusSessions.userId], references: [users.id] }),
+	task: one(tasks, { fields: [focusSessions.taskId], references: [tasks.id] }),
+}));
 
 export const usersRelations = relations(users, ({ many }) => ({
 	projects: many(projects),
@@ -196,6 +228,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 	comments: many(comments),
 	projectMembers: many(projectMembers),
 	sentInvitations: many(projectInvitations),
+	focusSessions: many(focusSessions),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -237,7 +270,7 @@ export const activityLogs = pgTable(
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		type: text("type").notNull(), // "status_changed" | "assigned" | "unassigned" | "priority_changed" | "due_date_changed" | "title_changed" | "description_changed" | "label_added" | "label_removed" | "comment_added"
+		type: text("type").notNull(),
 		fromValue: text("from_value"),
 		toValue: text("to_value"),
 		createdAt: timestamp("created_at").defaultNow(),
@@ -260,6 +293,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	assignee: one(users, { fields: [tasks.assigneeId], references: [users.id] }),
 	comments: many(comments),
 	activityLogs: many(activityLogs),
+	focusSessions: many(focusSessions),
 }));
 
 export const commentsRelations = relations(comments, ({ one }) => ({

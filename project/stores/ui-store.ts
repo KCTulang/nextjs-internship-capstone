@@ -12,6 +12,7 @@ interface UIState {
 	isCreateTaskModalOpen: boolean;
 	selectedListIdForNewTask: string | null;
 	activeProjectId: string | null;
+	initialDueDate: Date | null;
 	isEditProjectModalOpen: boolean;
 	selectedProjectForEdit: Project | null;
 	openEditProjectModal: (project: Project) => void;
@@ -32,7 +33,11 @@ interface UIState {
 
 	openCreateProjectModal: () => void;
 	closeCreateProjectModal: () => void;
-	openCreateTaskModal: (listId?: string, projectId?: string) => void;
+	openCreateTaskModal: (options?: {
+		listId?: string;
+		projectId?: string;
+		initialDueDate?: Date;
+	}) => void;
 	closeCreateTaskModal: () => void;
 	isInviteMemberModalOpen: boolean;
 	openInviteMemberModal: () => void;
@@ -64,6 +69,7 @@ export const useUIStore = create<UIState>((set) => ({
 	isCreateTaskModalOpen: false,
 	selectedListIdForNewTask: null,
 	activeProjectId: null,
+	initialDueDate: null,
 	isEditProjectModalOpen: false,
 	selectedProjectForEdit: null,
 	isTaskDetailModalOpen: false,
@@ -87,17 +93,19 @@ export const useUIStore = create<UIState>((set) => ({
 	isInviteMemberModalOpen: false,
 	openInviteMemberModal: () => set({ isInviteMemberModalOpen: true }),
 	closeInviteMemberModal: () => set({ isInviteMemberModalOpen: false }),
-	openCreateTaskModal: (listId, projectId) =>
+	openCreateTaskModal: (options) =>
 		set({
 			isCreateTaskModalOpen: true,
-			selectedListIdForNewTask: listId,
-			activeProjectId: projectId,
+			selectedListIdForNewTask: options?.listId || null,
+			activeProjectId: options?.projectId || null,
+			initialDueDate: options?.initialDueDate || null,
 		}),
 	closeCreateTaskModal: () =>
 		set({
 			isCreateTaskModalOpen: false,
 			selectedListIdForNewTask: null,
 			activeProjectId: null,
+			initialDueDate: null,
 		}),
 	openTaskDetailModal: (taskId) =>
 		set({ isTaskDetailModalOpen: true, selectedTaskId: taskId }),

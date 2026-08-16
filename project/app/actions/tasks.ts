@@ -16,14 +16,15 @@ export async function createTaskAction(
 	rawData: {
 		title: string;
 		description?: string | null;
-		listId: string;
+		listId?: string | null;
 		priority?: string;
 		dueDate?: Date | null;
 		assigneeId?: string | null;
 		position: number;
 		labels?: string[] | null;
+		status?: string;
 	},
-	_projectId: string,
+	_projectId?: string | null,
 ) {
 	try {
 		await requireAuth();
@@ -31,12 +32,13 @@ export async function createTaskAction(
 		const newTask = await queries.tasks.create({
 			title: data.title,
 			description: data.description || null,
-			listId: data.listId,
+			listId: data.listId || null,
 			priority: data.priority || "medium",
 			dueDate: data.dueDate || null,
 			assigneeId: data.assigneeId || null,
 			position: data.position,
 			labels: data.labels || null,
+			status: data.status || "todo",
 		});
 		revalidatePath(`/`, "layout");
 		return { success: true, data: newTask[0] };
@@ -51,14 +53,15 @@ export async function updateTaskAction(
 	rawData: {
 		title?: string;
 		description?: string | null;
-		listId?: string;
+		listId?: string | null;
 		priority?: string;
 		dueDate?: Date | null;
 		assigneeId?: string | null;
 		position?: number;
 		labels?: string[] | null;
+		status?: string;
 	},
-	_projectId: string,
+	_projectId?: string | null,
 ) {
 	try {
 		await requireAuth();
@@ -71,6 +74,10 @@ export async function updateTaskAction(
 
 		if (!currentTask) {
 			return { success: false, error: "Task not found" };
+		}
+
+		if (data.listId === null && currentTask.listId !== null) {
+			data.status = data.status || "todo";
 		}
 
 		const updatedTask = await queries.tasks.update(taskId, data);
@@ -149,7 +156,10 @@ export async function updateTaskAction(
 	}
 }
 
-export async function deleteTaskAction(taskId: string, _projectId: string) {
+export async function deleteTaskAction(
+	taskId: string,
+	_projectId?: string | null,
+) {
 	try {
 		await requireAuth();
 		await queries.tasks.delete(taskId);
@@ -178,12 +188,14 @@ export async function getAllUserTasksAction() {
 				dueDate: tasks.dueDate,
 				priority: tasks.priority,
 				projectName: projects.name,
+				projectSlug: projects.slug,
 				labels: tasks.labels,
 				listName: lists.name,
+				taskStatus: tasks.status,
 			})
 			.from(tasks)
-			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
+			.leftJoin(lists, eq(tasks.listId, lists.id))
+			.leftJoin(projects, eq(lists.projectId, projects.id))
 			.where(
 				and(
 					isNotNull(tasks.dueDate),
@@ -192,7 +204,19 @@ export async function getAllUserTasksAction() {
 			)
 			.orderBy(asc(tasks.dueDate));
 
-		return { success: true, data: userTasks };
+		const mappedTasks = userTasks.map((t) => ({
+			id: t.id,
+			title: t.title,
+			dueDate: t.dueDate,
+			priority: t.priority,
+			projectName: t.projectName,
+			projectSlug: t.projectSlug,
+			labels: t.labels,
+			listName: t.listName,
+			status: t.listName || t.taskStatus,
+		}));
+
+		return { success: true, data: mappedTasks };
 	} catch (error) {
 		console.error("Failed to fetch user tasks:", error);
 		return { success: false, error: "Failed to fetch user tasks" };
@@ -269,8 +293,8 @@ export async function getAnalyticsAction() {
 		}
 
 		const totalTasks = allTasks.length;
-		const completedTasks = allTasks.filter((t) =>
-			maxPositionListIds.has(t.listId),
+		const completedTasks = allTasks.filter(
+			(t) => t.listId && maxPositionListIds.has(t.listId),
 		).length;
 		const completionRate =
 			totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -297,24 +321,22 @@ export async function bulkDeleteTasksAction(taskIds: string[]) {
 		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
-		await db.transaction(async (tx) => {
-			const validTasks = await tx
-				.select({ id: tasks.id })
-				.from(tasks)
-				.innerJoin(lists, eq(tasks.listId, lists.id))
-				.innerJoin(projects, eq(lists.projectId, projects.id))
-				.where(
-					and(
-						inArray(tasks.id, taskIds),
-						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
-					),
-				);
+		const validTasks = await db
+			.select({ id: tasks.id })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.innerJoin(projects, eq(lists.projectId, projects.id))
+			.where(
+				and(
+					inArray(tasks.id, taskIds),
+					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+				),
+			);
 
-			const validTaskIds = validTasks.map((t) => t.id);
-			if (validTaskIds.length === 0) return;
-
-			await tx.delete(tasks).where(inArray(tasks.id, validTaskIds));
-		});
+		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length > 0) {
+			await db.delete(tasks).where(inArray(tasks.id, validTaskIds));
+		}
 
 		revalidatePath("/", "layout");
 		return { success: true };
@@ -334,23 +356,21 @@ export async function bulkUpdateTasksPriorityAction(
 		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
-		await db.transaction(async (tx) => {
-			const validTasks = await tx
-				.select({ id: tasks.id, priority: tasks.priority })
-				.from(tasks)
-				.innerJoin(lists, eq(tasks.listId, lists.id))
-				.innerJoin(projects, eq(lists.projectId, projects.id))
-				.where(
-					and(
-						inArray(tasks.id, taskIds),
-						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
-					),
-				);
+		const validTasks = await db
+			.select({ id: tasks.id, priority: tasks.priority })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.innerJoin(projects, eq(lists.projectId, projects.id))
+			.where(
+				and(
+					inArray(tasks.id, taskIds),
+					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+				),
+			);
 
-			const validTaskIds = validTasks.map((t) => t.id);
-			if (validTaskIds.length === 0) return;
-
-			await tx
+		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length > 0) {
+			await db
 				.update(tasks)
 				.set({ priority })
 				.where(inArray(tasks.id, validTaskIds));
@@ -366,7 +386,7 @@ export async function bulkUpdateTasksPriorityAction(
 					),
 				);
 			await Promise.all(logPromises);
-		});
+		}
 
 		revalidatePath("/", "layout");
 		return { success: true };
@@ -383,21 +403,19 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
-		await db.transaction(async (tx) => {
-			const validTasks = await tx
-				.select({ id: tasks.id, projectId: lists.projectId })
-				.from(tasks)
-				.innerJoin(lists, eq(tasks.listId, lists.id))
-				.innerJoin(projects, eq(lists.projectId, projects.id))
-				.where(
-					and(
-						inArray(tasks.id, taskIds),
-						or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
-					),
-				);
+		const validTasks = await db
+			.select({ id: tasks.id, projectId: lists.projectId })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.innerJoin(projects, eq(lists.projectId, projects.id))
+			.where(
+				and(
+					inArray(tasks.id, taskIds),
+					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+				),
+			);
 
-			if (validTasks.length === 0) return;
-
+		if (validTasks.length > 0) {
 			const tasksByProject = new Map<string, string[]>();
 			for (const task of validTasks) {
 				if (!tasksByProject.has(task.projectId)) {
@@ -408,7 +426,7 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 
 			const projectIds = Array.from(tasksByProject.keys());
 
-			const projectLists = await tx
+			const projectLists = await db
 				.select({
 					id: lists.id,
 					projectId: lists.projectId,
@@ -416,6 +434,9 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 				})
 				.from(lists)
 				.where(inArray(lists.projectId, projectIds));
+
+			const queriesToRun: Parameters<typeof db.batch>[0][0][] = [];
+			const logs: ReturnType<typeof logActivity>[] = [];
 
 			for (const [projectId, pTasks] of tasksByProject.entries()) {
 				const pLists = projectLists.filter((l) => l.projectId === projectId);
@@ -425,7 +446,7 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 					prev.position > current.position ? prev : current,
 				);
 
-				const tasksInMaxList = await tx
+				const tasksInMaxList = await db
 					.select({ position: tasks.position })
 					.from(tasks)
 					.where(eq(tasks.listId, maxList.id));
@@ -437,19 +458,55 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 
 				for (let i = 0; i < pTasks.length; i++) {
 					const taskId = pTasks[i];
-					await tx
-						.update(tasks)
-						.set({ listId: maxList.id, position: maxPos + 1000 * (i + 1) })
-						.where(eq(tasks.id, taskId));
-					await logActivity(taskId, "status_changed");
+					queriesToRun.push(
+						db
+							.update(tasks)
+							.set({ listId: maxList.id, position: maxPos + 1000 * (i + 1) })
+							.where(eq(tasks.id, taskId)),
+					);
+					logs.push(logActivity(taskId, "status_changed"));
 				}
 			}
-		});
+
+			if (queriesToRun.length > 0) {
+				await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
+			}
+			await Promise.all(logs);
+		}
 
 		revalidatePath("/", "layout");
 		return { success: true };
 	} catch (error) {
 		console.error("Failed to bulk mark complete:", error);
 		return { success: false, error: "Failed to bulk mark complete" };
+	}
+}
+
+export async function bulkUpdateTaskOrderAction(
+	updates: { id: string; listId: string; position: number }[],
+	_projectId: string,
+) {
+	try {
+		const clerkId = await requireAuth();
+		const user = await queries.users.getByClerkId(clerkId);
+		if (!user) throw new Error("Unauthorized");
+		if (updates.length === 0) return { success: true };
+
+		const queriesToRun = updates.map((update) =>
+			db
+				.update(tasks)
+				.set({ position: update.position, listId: update.listId })
+				.where(eq(tasks.id, update.id)),
+		);
+
+		if (queriesToRun.length > 0) {
+			await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
+		}
+
+		revalidatePath(`/dashboard`, "layout");
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to bulk update tasks:", error);
+		return { success: false, error: "Failed to bulk update tasks" };
 	}
 }

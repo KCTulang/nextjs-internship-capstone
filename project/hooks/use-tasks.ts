@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+	bulkUpdateListOrderAction,
 	createListAction,
 	deleteListAction,
 	generateDefaultListsAction,
@@ -7,6 +8,7 @@ import {
 	updateListAction,
 } from "@/app/actions/lists";
 import {
+	bulkUpdateTaskOrderAction,
 	createTaskAction,
 	deleteTaskAction,
 	updateTaskAction,
@@ -19,7 +21,7 @@ export interface Task {
 	description: string | null;
 	listId: string;
 	assigneeId: string | null;
-	priority: string;
+	priority: "low" | "medium" | "high";
 	dueDate: Date | null;
 	position: number;
 	labels: string[] | null;
@@ -53,6 +55,7 @@ export interface TasksState {
 	lists: List[];
 	members: Member[];
 	isLoading: boolean;
+	isSyncing: boolean;
 	error: string | null;
 
 	setMembers: (members: Member[]) => void;
@@ -60,23 +63,27 @@ export interface TasksState {
 	generateDefaultLists: (projectId: string) => Promise<void>;
 
 	createTask: (
-		data: Partial<Task> & { title: string; listId: string; position: number },
-		projectId: string,
+		data: Partial<Task> & {
+			title: string;
+			listId?: string | null;
+			position: number;
+		},
+		projectId?: string | null,
 	) => Promise<void>;
 	updateTaskDetails: (
 		taskId: string,
 		data: Partial<Task>,
-		projectId: string,
+		projectId?: string | null,
 	) => Promise<void>;
 	updateTaskComments: (taskId: string, comments: { id: string }[]) => void;
 	moveTask: (
 		taskId: string,
 		sourceListId: string,
 		destListId: string,
-		newPosition: number,
+		destIndex: number,
 		projectId: string,
 	) => Promise<void>;
-	deleteTask: (taskId: string, projectId: string) => Promise<void>;
+	deleteTask: (taskId: string, projectId?: string | null) => Promise<void>;
 
 	addList: (name: string, projectId: string) => Promise<void>;
 	renameList: (
@@ -91,13 +98,6 @@ export interface TasksState {
 		projectId: string,
 	) => Promise<void>;
 
-	optimisticMoveTask: (
-		taskId: string,
-		sourceListId: string,
-		destListId: string,
-		destIndex: number,
-	) => number;
-	optimisticMoveList: (listId: string, destIndex: number) => number;
 	selectedTaskIds: string[];
 	setSelectedTaskIds: (ids: string[]) => void;
 	toggleTaskSelection: (taskId: string, force?: boolean) => void;
@@ -110,6 +110,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	lists: [],
 	members: [],
 	isLoading: false,
+	isSyncing: false,
 	error: null,
 	selectedTaskIds: [],
 	setSelectedTaskIds: (ids) => set({ selectedTaskIds: ids }),
@@ -294,82 +295,95 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 		});
 	},
 
-	optimisticMoveTask: (taskId, sourceListId, destListId, destIndex) => {
-		let newPosition = 0;
+	moveTask: async (taskId, sourceListId, destListId, destIndex, projectId) => {
+		const snapshot = JSON.stringify(get().lists);
+		const updates: { id: string; listId: string; position: number }[] = [];
+		let derivedProjectId = projectId;
+
 		set((state) => {
-			const lists = [...state.lists];
-			const sourceListIndex = lists.findIndex((l) => l.id === sourceListId);
-			const destListIndex = lists.findIndex((l) => l.id === destListId);
+			const lists = JSON.parse(JSON.stringify(state.lists)) as List[];
+			const sourceList = lists.find((l) => l.id === sourceListId);
+			const destList = lists.find((l) => l.id === destListId);
 
-			if (sourceListIndex === -1 || destListIndex === -1) return state;
-
-			const sourceList = {
-				...lists[sourceListIndex],
-				tasks: [...(lists[sourceListIndex].tasks || [])],
-			};
-			const destList =
-				sourceListId === destListId
-					? sourceList
-					: {
-							...lists[destListIndex],
-							tasks: [...(lists[destListIndex].tasks || [])],
-						};
+			if (!sourceList || !destList) return state;
+			derivedProjectId = sourceList.projectId || projectId;
 
 			const taskIndex = sourceList.tasks.findIndex((t) => t.id === taskId);
 			if (taskIndex === -1) return state;
 
-			let actualDestIndex = destIndex;
-			if (sourceListId === destListId && taskIndex < destIndex) {
-				actualDestIndex--;
-			}
+			if (sourceListId === destListId) {
+				const newTasks = [...sourceList.tasks];
+				const [movedTask] = newTasks.splice(taskIndex, 1);
+				newTasks.splice(destIndex, 0, movedTask);
 
-			const task = { ...sourceList.tasks.splice(taskIndex, 1)[0] };
-			task.listId = destListId;
+				newTasks.forEach((t, i) => {
+					t.position = (i + 1) * 1024;
+				});
+				sourceList.tasks = newTasks;
 
-			const prevTask = destList.tasks[actualDestIndex - 1];
-			const nextTask = destList.tasks[actualDestIndex];
-
-			if (!prevTask && !nextTask) {
-				newPosition = 65536;
-			} else if (!prevTask) {
-				newPosition = nextTask.position / 2;
-			} else if (!nextTask) {
-				newPosition = prevTask.position + 65536;
+				const originalSourceList = state.lists.find(
+					(l) => l.id === sourceListId,
+				);
+				newTasks.forEach((t) => {
+					const origTask = originalSourceList?.tasks.find(
+						(ot) => ot.id === t.id,
+					);
+					if (!origTask || origTask.position !== t.position) {
+						updates.push({ id: t.id, listId: t.listId, position: t.position });
+					}
+				});
 			} else {
-				newPosition =
-					prevTask.position + (nextTask.position - prevTask.position) / 2;
+				const [movedTask] = sourceList.tasks.splice(taskIndex, 1);
+				movedTask.listId = destListId;
+
+				destList.tasks.splice(destIndex, 0, movedTask);
+
+				sourceList.tasks.forEach((t, i) => {
+					t.position = (i + 1) * 1024;
+				});
+				destList.tasks.forEach((t, i) => {
+					t.position = (i + 1) * 1024;
+				});
+
+				const originalSourceList = state.lists.find(
+					(l) => l.id === sourceListId,
+				);
+				const originalDestList = state.lists.find((l) => l.id === destListId);
+
+				sourceList.tasks.forEach((t) => {
+					const origTask = originalSourceList?.tasks.find(
+						(ot) => ot.id === t.id,
+					);
+					if (!origTask || origTask.position !== t.position) {
+						updates.push({ id: t.id, listId: t.listId, position: t.position });
+					}
+				});
+				destList.tasks.forEach((t) => {
+					const origTask = originalDestList?.tasks.find((ot) => ot.id === t.id);
+					if (
+						!origTask ||
+						origTask.position !== t.position ||
+						origTask.listId !== t.listId
+					) {
+						updates.push({ id: t.id, listId: t.listId, position: t.position });
+					}
+				});
 			}
-			newPosition = Math.round(newPosition);
-			task.position = newPosition;
 
-			destList.tasks.splice(actualDestIndex, 0, task);
-
-			lists[sourceListIndex] = sourceList;
-			lists[destListIndex] = destList;
-
-			return { lists };
+			return { lists, isSyncing: true };
 		});
-		return newPosition;
-	},
 
-	moveTask: async (taskId, sourceListId, destListId, destIndex, projectId) => {
-		const newPos = get().optimisticMoveTask(
-			taskId,
-			sourceListId,
-			destListId,
-			destIndex,
-		);
-		const res = await updateTaskAction(
-			taskId,
-			{ listId: destListId, position: newPos },
-			projectId,
-		);
-		if (!res.success) {
-			useUIStore.getState().addToast({
-				type: "error",
-				message: res.error || "Failed to move task.",
-			});
+		if (updates.length > 0) {
+			const res = await bulkUpdateTaskOrderAction(updates, derivedProjectId);
+			if (!res.success) {
+				useUIStore.getState().addToast({
+					type: "error",
+					message: res.error || "Failed to move task. Reverting.",
+				});
+				set({ lists: JSON.parse(snapshot) });
+			}
 		}
+		set({ isSyncing: false });
 	},
 
 	deleteTask: async (taskId, projectId) => {
@@ -452,50 +466,42 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 		}
 	},
 
-	optimisticMoveList: (listId, destIndex) => {
-		let newPosition = 0;
+	moveList: async (listId, destIndex, projectId) => {
+		const snapshot = JSON.stringify(get().lists);
+		const updates: { id: string; position: number }[] = [];
+
 		set((state) => {
-			const lists = [...state.lists];
+			const lists = JSON.parse(JSON.stringify(state.lists)) as List[];
 			const sourceIndex = lists.findIndex((l) => l.id === listId);
 			if (sourceIndex === -1) return state;
 
-			let actualDestIndex = destIndex;
-			if (sourceIndex < destIndex) {
-				actualDestIndex--;
-			}
-
 			const [list] = lists.splice(sourceIndex, 1);
+			lists.splice(destIndex, 0, list);
 
-			const prevList = lists[actualDestIndex - 1];
-			const nextList = lists[actualDestIndex];
-
-			if (!prevList && !nextList) {
-				newPosition = 65536;
-			} else if (!prevList) {
-				newPosition = nextList.position / 2;
-			} else if (!nextList) {
-				newPosition = prevList.position + 65536;
-			} else {
-				newPosition =
-					prevList.position + (nextList.position - prevList.position) / 2;
-			}
-			newPosition = Math.round(newPosition);
-			list.position = newPosition;
-
-			lists.splice(actualDestIndex, 0, list);
-			return { lists };
-		});
-		return newPosition;
-	},
-
-	moveList: async (listId, destIndex, projectId) => {
-		const newPos = get().optimisticMoveList(listId, destIndex);
-		const res = await updateListAction(listId, { position: newPos }, projectId);
-		if (!res.success) {
-			useUIStore.getState().addToast({
-				type: "error",
-				message: res.error || "Failed to move list.",
+			lists.forEach((l, i) => {
+				l.position = (i + 1) * 1024;
 			});
+
+			lists.forEach((l) => {
+				const origList = state.lists.find((ol) => ol.id === l.id);
+				if (!origList || origList.position !== l.position) {
+					updates.push({ id: l.id, position: l.position });
+				}
+			});
+
+			return { lists, isSyncing: true };
+		});
+
+		if (updates.length > 0) {
+			const res = await bulkUpdateListOrderAction(updates, projectId);
+			if (!res.success) {
+				useUIStore.getState().addToast({
+					type: "error",
+					message: res.error || "Failed to move list. Reverting.",
+				});
+				set({ lists: JSON.parse(snapshot) });
+			}
 		}
+		set({ isSyncing: false });
 	},
 }));

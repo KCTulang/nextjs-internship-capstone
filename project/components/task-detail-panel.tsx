@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Calendar, Circle, Flag, Trash2, X } from "lucide-react";
+import { Calendar, Circle, Flag, Target, Trash2, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -9,24 +9,38 @@ import {
 	deleteCommentAction,
 	getCommentsAction,
 } from "@/app/actions/comments";
+import type { CalendarTask } from "@/components/calendar/calendar-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { type Task, useTasksStore } from "@/hooks/use-tasks";
+import { useFocusStore } from "@/stores/focus-store";
 
 interface TaskDetailPanelProps {
 	taskId: string | null;
-	projectId: string;
+	projectId?: string | null;
+	initialTask?: Task | CalendarTask | null;
+	onClose?: () => void;
+	onUpdate?: () => void;
 }
 
-export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
+export function TaskDetailPanel({
+	taskId,
+	projectId,
+	initialTask,
+	onClose,
+	onUpdate,
+}: TaskDetailPanelProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
+	const { startLockIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 
-	const task = taskId
-		? lists.flatMap((l) => l.tasks).find((t) => t.id === taskId)
-		: null;
+	const storeTask =
+		taskId && projectId
+			? lists.flatMap((l) => l.tasks).find((t) => t.id === taskId)
+			: null;
+	const task = (storeTask as Task) || (initialTask as Task) || null;
 
 	const [title, setTitle] = useState(task?.title || "");
 	const [description, setDescription] = useState(task?.description || "");
@@ -158,10 +172,14 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 	}, [title, description, labelsString, taskId]);
 
 	const handleClose = useCallback(() => {
-		const params = new URLSearchParams(searchParams.toString());
-		params.delete("taskId");
-		router.push(`${pathname}?${params.toString()}`, { scroll: false });
-	}, [router, pathname, searchParams]);
+		if (onClose) {
+			onClose();
+		} else {
+			const params = new URLSearchParams(searchParams.toString());
+			params.delete("taskId");
+			router.push(`${pathname}?${params.toString()}`, { scroll: false });
+		}
+	}, [router, pathname, searchParams, onClose]);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -189,7 +207,11 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 
 	const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		if (!task) return;
-		updateTaskDetails(task.id, { priority: e.target.value }, projectId);
+		updateTaskDetails(
+			task.id,
+			{ priority: e.target.value as "low" | "medium" | "high" },
+			projectId,
+		);
 		setTimeout(() => {
 			import("@/app/actions/activity").then(({ getActivityByTaskAction }) => {
 				getActivityByTaskAction(task.id).then((res) => {
@@ -235,7 +257,8 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 
 	const confirmDelete = async () => {
 		if (!task) return;
-		await deleteTask(task.id, projectId);
+		await deleteTask(task.id);
+		if (onUpdate) onUpdate();
 		handleClose();
 	};
 
@@ -327,9 +350,9 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 			{taskId && task && (
 				<motion.div
 					key="panel"
-					initial={isDesktop ? { x: "100%" } : { y: "100%" }}
-					animate={isDesktop ? { x: 0 } : { y: 0 }}
-					exit={isDesktop ? { x: "100%" } : { y: "100%" }}
+					initial={isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 }}
+					animate={{ x: 0, y: 0 }}
+					exit={isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 }}
 					transition={{ type: "spring", damping: 30, stiffness: 300 }}
 					className={`fixed z-50 bg-background shadow-2xl overflow-y-auto ${
 						isDesktop
@@ -382,6 +405,19 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 								<span>{lists.find((l) => l.id === task.listId)?.name}</span>
 							</div>
 							<div className="flex items-center gap-1">
+								<button
+									type="button"
+									onClick={() => {
+										if (task) {
+											startLockIn(task);
+											window.dispatchEvent(new Event("prime-audio"));
+										}
+									}}
+									className="p-2 text-primary hover:text-primary-foreground hover:bg-primary rounded-xl transition-all"
+									title="Lock In"
+								>
+									<Target size={18} />
+								</button>
 								<button
 									type="button"
 									onClick={handleDelete}
@@ -522,7 +558,7 @@ export function TaskDetailPanel({ taskId, projectId }: TaskDetailPanelProps) {
 											const date = e.target.value
 												? new Date(e.target.value)
 												: null;
-											updateTaskDetails(task.id, { dueDate: date }, projectId);
+											updateTaskDetails(task.id, { dueDate: date });
 											setTimeout(() => {
 												import("@/app/actions/activity").then(
 													({ getActivityByTaskAction }) => {
