@@ -46,7 +46,6 @@ export function CreateTaskModal() {
 		selectedListIdForNewTask,
 	]);
 
-	// When the user changes the project in the dropdown, reset the list ID
 	useEffect(() => {
 		if (!isCreateTaskModalOpen) return;
 		if (!selectedProjectId) {
@@ -56,10 +55,8 @@ export function CreateTaskModal() {
 
 		const project = projects.find((p) => p.id === selectedProjectId);
 		if (project && project.lists && project.lists.length > 0) {
-			// Check if currently selected list belongs to the new project
 			const listExists = project.lists.some((l) => l.id === selectedListId);
 			if (!listExists) {
-				// If not, default to the first list
 				setSelectedListId(project.lists[0].id);
 			}
 		} else {

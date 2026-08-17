@@ -406,7 +406,6 @@ export function SecuritySettings() {
 				</div>
 			</section>
 
-			{/* Password Modal */}
 			<Modal
 				isOpen={isPasswordModalOpen}
 				onClose={() => !isSavingPassword && setIsPasswordModalOpen(false)}

@@ -298,7 +298,7 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 						data-task-id={task.id}
 						className={containerClasses}
 					>
-						{/* Checkbox is rendered first via rowContent's first element (handled below) */}
+				
 						<button
 							type="button"
 							className="task-checkbox hidden sm:flex pt-1 cursor-pointer shrink-0 mt-0.5"

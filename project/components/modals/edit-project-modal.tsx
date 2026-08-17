@@ -101,7 +101,6 @@ export function EditProjectModal() {
 			}}
 		>
 			<div className="bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
-				{/* Header */}
 				<div className="flex items-center justify-between mb-6">
 					<div>
 						<h3

@@ -213,7 +213,6 @@ export function LockInOverlay() {
 						transition={{ duration: 0.5, ease: "easeInOut" }}
 						className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-black text-white"
 					>
-						{/* Ambient Visuals */}
 						<div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
 							{audioMode === "silence" ? (
 								<motion.div

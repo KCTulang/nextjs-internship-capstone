@@ -655,7 +655,10 @@ export function TaskDetailPanel({
 																	comment.author?.email ||
 																	"Unknown User"}
 															</span>
-															<span className="text-xs text-muted-foreground">
+															<span
+																className="text-xs text-muted-foreground"
+																suppressHydrationWarning
+															>
 																{comment.createdAt
 																	? new Date(
 																			comment.createdAt,
@@ -736,7 +739,10 @@ export function TaskDetailPanel({
 															</span>
 															{formatActivityMessage(activity)}
 														</p>
-														<p className="text-xs text-muted-foreground mt-0.5">
+														<p
+															className="text-xs text-muted-foreground mt-0.5"
+															suppressHydrationWarning
+														>
 															{activity.createdAt &&
 																new Date(activity.createdAt).toLocaleString(
 																	undefined,
