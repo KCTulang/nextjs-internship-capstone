@@ -13,7 +13,7 @@ export function InviteMemberModal() {
 
 	const [email, setEmail] = useState("");
 	const [projectId, setProjectId] = useState("");
-	const [role, setRole] = useState("member");
+	const [role, setRole] = useState<"admin" | "member">("member");
 	const [projectRole, setProjectRole] = useState(PROJECT_ROLES[0].toString());
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -153,7 +153,7 @@ export function InviteMemberModal() {
 						<select
 							id="role"
 							value={role}
-							onChange={(e) => setRole(e.target.value)}
+							onChange={(e) => setRole(e.target.value as "admin" | "member")}
 							className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
 						>
 							<option value="member">Member</option>

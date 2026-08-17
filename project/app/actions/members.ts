@@ -28,7 +28,7 @@ const inviteMemberSchema = z.object({
 export async function inviteMemberAction(rawData: {
 	projectId: string;
 	email: string;
-	role?: string;
+	role?: "admin" | "member";
 	projectRole?: string;
 }) {
 	try {
@@ -44,10 +44,7 @@ export async function inviteMemberAction(rawData: {
 				eq(projectMembers.userId, caller.id),
 			),
 		});
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can invite members",
@@ -93,7 +90,7 @@ export async function inviteMemberAction(rawData: {
 			.values({
 				projectId: data.projectId,
 				email: data.email,
-				role: data.role,
+				role: data.role as "admin" | "member",
 				projectRole: data.projectRole,
 				status: "pending",
 				inviterId: caller.id,
@@ -160,7 +157,7 @@ export async function respondToInvitationAction(
 				db.insert(projectMembers).values({
 					projectId: invitation.projectId,
 					userId: user.id,
-					role: invitation.role,
+					role: invitation.role as "admin" | "member",
 					projectRole: invitation.projectRole,
 				}),
 				db
@@ -202,10 +199,7 @@ export async function revokeInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can revoke invitations",
@@ -270,10 +264,7 @@ export async function getPendingInvitationsByProjectAction(projectId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can view invitations",
@@ -318,10 +309,7 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		});
 
 		if (caller.id !== userId) {
-			if (
-				!callerMembership ||
-				(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-			) {
+			if (!callerMembership || callerMembership.role !== "admin") {
 				return {
 					success: false,
 					error: "Only project owners or admins can remove members",
@@ -356,17 +344,16 @@ export async function updateMemberRoleAction(
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can change roles",
 			};
 		}
 
-		const updateData: { role: string; projectRole?: string } = { role };
+		const updateData: { role?: "admin" | "member"; projectRole?: string } = {
+			role: role as "admin" | "member",
+		};
 		if (projectRole) {
 			updateData.projectRole = projectRole;
 		}
@@ -472,7 +459,7 @@ export async function getSentInvitationsAction() {
 		const callerMemberships = await db.query.projectMembers.findMany({
 			where: and(
 				eq(projectMembers.userId, user.id),
-				inArray(projectMembers.role, ["owner", "admin"]),
+				eq(projectMembers.role, "admin"),
 			),
 		});
 
@@ -528,10 +515,7 @@ export async function cancelInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can cancel invitations",
@@ -574,10 +558,7 @@ export async function resendInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can resend invitations",
@@ -600,7 +581,7 @@ export async function resendInvitationAction(invitationId: string) {
 export async function updateProjectMemberAction(
 	projectId: string,
 	userId: string,
-	data: { role?: string; projectRole?: string },
+	data: { role?: "admin" | "member"; projectRole?: string },
 ) {
 	try {
 		const clerkId = await requireAuth();
@@ -614,10 +595,7 @@ export async function updateProjectMemberAction(
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (!callerMembership || callerMembership.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can update member details",
@@ -631,14 +609,18 @@ export async function updateProjectMemberAction(
 			),
 		});
 
-		if (targetMembership?.role === "owner") {
+		const project = await db.query.projects.findFirst({
+			where: eq(projects.id, projectId),
+		});
+
+		if (targetMembership?.userId === project?.ownerId) {
 			return {
 				success: false,
 				error: "Cannot change the project owner's permission level",
 			};
 		}
 
-		const updateData: Record<string, string> = {};
+		const updateData: { role?: "admin" | "member"; projectRole?: string } = {};
 		if (data.role) updateData.role = data.role;
 		if (data.projectRole) updateData.projectRole = data.projectRole;
 
