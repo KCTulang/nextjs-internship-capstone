@@ -25,7 +25,19 @@ export async function getActivityByTaskAction(taskId: string) {
 
 export async function logActivity(
 	taskId: string,
-	type: string,
+	type:
+		| "task_created"
+		| "task_updated"
+		| "task_deleted"
+		| "task_moved"
+		| "task_reordered"
+		| "task_assigned"
+		| "task_unassigned"
+		| "task_priority_changed"
+		| "task_due_date_changed"
+		| "comment_added"
+		| "comment_updated"
+		| "comment_deleted",
 	fromValue?: string | null,
 	toValue?: string | null,
 ) {

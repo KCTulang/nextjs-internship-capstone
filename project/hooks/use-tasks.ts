@@ -65,7 +65,7 @@ export interface TasksState {
 	createTask: (
 		data: Partial<Task> & {
 			title: string;
-			listId?: string | null;
+			listId: string;
 			position: number;
 		},
 		projectId?: string | null,

@@ -16,13 +16,12 @@ export async function createTaskAction(
 	rawData: {
 		title: string;
 		description?: string | null;
-		listId?: string | null;
+		listId: string;
 		priority?: string;
 		dueDate?: Date | null;
 		assigneeId?: string | null;
 		position: number;
 		labels?: string[] | null;
-		status?: string;
 	},
 	_projectId?: string | null,
 ) {
@@ -32,13 +31,12 @@ export async function createTaskAction(
 		const newTask = await queries.tasks.create({
 			title: data.title,
 			description: data.description || null,
-			listId: data.listId || null,
+			listId: data.listId,
 			priority: data.priority || "medium",
 			dueDate: data.dueDate || null,
 			assigneeId: data.assigneeId || null,
 			position: data.position,
 			labels: data.labels || null,
-			status: data.status || "todo",
 		});
 		revalidatePath(`/`, "layout");
 		return { success: true, data: newTask[0] };
@@ -59,7 +57,6 @@ export async function updateTaskAction(
 		assigneeId?: string | null;
 		position?: number;
 		labels?: string[] | null;
-		status?: string;
 	},
 	_projectId?: string | null,
 ) {
@@ -76,32 +73,28 @@ export async function updateTaskAction(
 			return { success: false, error: "Task not found" };
 		}
 
-		if (data.listId === null && currentTask.listId !== null) {
-			data.status = data.status || "todo";
-		}
-
 		const updatedTask = await queries.tasks.update(taskId, data);
 
 		const logPromises = [];
 		if (data.title && data.title !== currentTask.title) {
 			logPromises.push(
-				logActivity(taskId, "title_changed", currentTask.title, data.title),
+				logActivity(taskId, "task_updated", currentTask.title, data.title),
 			);
 		}
 		if (
 			data.description !== undefined &&
 			data.description !== currentTask.description
 		) {
-			logPromises.push(logActivity(taskId, "description_changed"));
+			logPromises.push(logActivity(taskId, "task_updated"));
 		}
 		if (data.listId && data.listId !== currentTask.listId) {
-			logPromises.push(logActivity(taskId, "status_changed"));
+			logPromises.push(logActivity(taskId, "task_moved"));
 		}
 		if (data.priority && data.priority !== currentTask.priority) {
 			logPromises.push(
 				logActivity(
 					taskId,
-					"priority_changed",
+					"task_priority_changed",
 					currentTask.priority || "medium",
 					data.priority,
 				),
@@ -114,7 +107,7 @@ export async function updateTaskAction(
 			const newStr = data.dueDate ? new Date(data.dueDate).toISOString() : null;
 			if (currentStr !== newStr) {
 				logPromises.push(
-					logActivity(taskId, "due_date_changed", currentStr, newStr),
+					logActivity(taskId, "task_due_date_changed", currentStr, newStr),
 				);
 			}
 		}
@@ -125,7 +118,7 @@ export async function updateTaskAction(
 			logPromises.push(
 				logActivity(
 					taskId,
-					data.assigneeId ? "assigned" : "unassigned",
+					data.assigneeId ? "task_assigned" : "task_unassigned",
 					currentTask.assigneeId,
 					data.assigneeId,
 				),
@@ -137,12 +130,12 @@ export async function updateTaskAction(
 
 			const added = newLabels.filter((l) => !oldLabels.includes(l));
 			for (const label of added) {
-				logPromises.push(logActivity(taskId, "label_added", null, label));
+				logPromises.push(logActivity(taskId, "task_updated", null, label));
 			}
 
 			const removed = oldLabels.filter((l) => !newLabels.includes(l));
 			for (const label of removed) {
-				logPromises.push(logActivity(taskId, "label_removed", label, null));
+				logPromises.push(logActivity(taskId, "task_updated", label, null));
 			}
 		}
 
@@ -171,9 +164,9 @@ export async function deleteTaskAction(
 	}
 }
 
-import { and, asc, eq, isNotNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { lists, projects, tasks } from "@/lib/db/schema";
+import { lists, projectMembers, projects, tasks, users } from "@/lib/db/schema";
 
 export async function getAllUserTasksAction() {
 	try {
@@ -181,38 +174,67 @@ export async function getAllUserTasksAction() {
 		const user = await queries.users.getByClerkId(clerkId);
 		if (!user) return { success: false, error: "User not found" };
 
+		const userProjectsQuery = await db
+			.select({ projectId: projectMembers.projectId })
+			.from(projectMembers)
+			.where(eq(projectMembers.userId, user.id));
+
+		const userOwnedProjects = await db
+			.select({ projectId: projects.id })
+			.from(projects)
+			.where(eq(projects.ownerId, user.id));
+
+		const projectIds = Array.from(
+			new Set([
+				...userProjectsQuery.map((p) => p.projectId),
+				...userOwnedProjects.map((p) => p.projectId),
+			]),
+		);
+
+		if (projectIds.length === 0) {
+			return { success: true, data: [] };
+		}
+
 		const userTasks = await db
 			.select({
 				id: tasks.id,
 				title: tasks.title,
+				description: tasks.description,
 				dueDate: tasks.dueDate,
 				priority: tasks.priority,
 				projectName: projects.name,
 				projectSlug: projects.slug,
 				labels: tasks.labels,
 				listName: lists.name,
+				assigneeId: tasks.assigneeId,
+				assigneeName: users.name,
+				assigneeEmail: users.email,
 			})
 			.from(tasks)
-			.leftJoin(lists, eq(tasks.listId, lists.id))
-			.leftJoin(projects, eq(lists.projectId, projects.id))
-			.where(
-				and(
-					isNotNull(tasks.dueDate),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
-				),
-			)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.innerJoin(projects, eq(lists.projectId, projects.id))
+			.leftJoin(users, eq(tasks.assigneeId, users.id))
+			.where(and(isNotNull(tasks.dueDate), inArray(projects.id, projectIds)))
 			.orderBy(asc(tasks.dueDate));
 
 		const mappedTasks = userTasks.map((t) => ({
 			id: t.id,
 			title: t.title,
+			description: t.description,
 			dueDate: t.dueDate,
 			priority: t.priority,
 			projectName: t.projectName,
 			projectSlug: t.projectSlug,
 			labels: t.labels,
 			listName: t.listName,
-			status: t.listName || "Todo",
+			status: t.listName,
+			assignee: t.assigneeId
+				? {
+						id: t.assigneeId,
+						name: t.assigneeName,
+						email: t.assigneeEmail,
+					}
+				: null,
 		}));
 
 		return { success: true, data: mappedTasks };
@@ -221,9 +243,6 @@ export async function getAllUserTasksAction() {
 		return { success: false, error: "Failed to fetch user tasks" };
 	}
 }
-
-import { inArray } from "drizzle-orm";
-import { projectMembers } from "@/lib/db/schema";
 
 export async function getAnalyticsAction() {
 	try {
@@ -371,7 +390,7 @@ export async function bulkUpdateTasksPriorityAction(
 		if (validTaskIds.length > 0) {
 			await db
 				.update(tasks)
-				.set({ priority })
+				.set({ priority: priority as "low" | "medium" | "high" | "urgent" })
 				.where(inArray(tasks.id, validTaskIds));
 
 			const logPromises = validTasks
@@ -379,7 +398,7 @@ export async function bulkUpdateTasksPriorityAction(
 				.map((t) =>
 					logActivity(
 						t.id,
-						"priority_changed",
+						"task_priority_changed",
 						t.priority || "medium",
 						priority,
 					),
@@ -463,7 +482,7 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 							.set({ listId: maxList.id, position: maxPos + 1000 * (i + 1) })
 							.where(eq(tasks.id, taskId)),
 					);
-					logs.push(logActivity(taskId, "status_changed"));
+					logs.push(logActivity(taskId, "task_moved"));
 				}
 			}
 
