@@ -116,7 +116,7 @@ export const queries = {
 			await db.insert(schema.projectMembers).values({
 				projectId: project.id,
 				userId: data.ownerId,
-				role: "owner",
+				role: "admin",
 			});
 			return [project];
 		},
@@ -224,7 +224,11 @@ export const queries = {
 		addMember: async (data: typeof schema.projectMembers.$inferInsert) => {
 			return await db.insert(schema.projectMembers).values(data).returning();
 		},
-		updateRole: async (projectId: string, userId: string, role: string) => {
+		updateRole: async (
+			projectId: string,
+			userId: string,
+			role: "admin" | "member",
+		) => {
 			return await db
 				.update(schema.projectMembers)
 				.set({ role })

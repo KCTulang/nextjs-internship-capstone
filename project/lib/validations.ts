@@ -33,23 +33,21 @@ export const createTaskSchema = z.object({
 		.max(2000, "Description must be 2000 characters or fewer")
 		.trim()
 		.optional(),
-	listId: z.string().uuid("Invalid list ID").nullable().optional(),
+	listId: z.string().uuid("Invalid list ID"),
 	priority: z.enum(TASK_PRIORITIES).default("medium"),
 	dueDate: z.coerce.date().optional(),
 	assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
 	position: z.number().int().nonnegative().default(1000),
 	labels: z.array(z.string()).optional(),
-	status: z.string().optional(),
 });
 
 export const updateTaskSchema = createTaskSchema
 	.omit({ listId: true, position: true })
 	.partial()
 	.extend({
-		listId: z.string().uuid("Invalid list ID").nullable().optional(),
+		listId: z.string().uuid("Invalid list ID").optional(),
 		position: z.number().int().nonnegative().optional(),
 		assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
-		status: z.string().optional(),
 	});
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

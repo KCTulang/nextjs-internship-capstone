@@ -62,6 +62,7 @@
 		"@vitejs/plugin-react": "^6.0.4",
 		"autoprefixer": "^10.5.4",
 		"postcss": "^8.5.22",
+		"postgres": "^3.4.9",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.10"
