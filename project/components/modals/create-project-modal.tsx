@@ -1,48 +1,224 @@
-// TODO: Task 4.1 - Implement project CRUD operations
-// TODO: Task 4.4 - Build task creation and editing functionality
+"use client";
 
-/*
-TODO: Implementation Notes for Interns:
-
-Modal for creating new projects with form validation.
-
-Features to implement:
-- Form with project name, description, due date
-- Zod validation
-- Error handling
-- Loading states
-- Success feedback
-- Team member assignment
-- Project template selection
-
-Form fields:
-- Name (required)
-- Description (optional)
-- Due date (optional)
-- Team members (optional)
-- Project template (optional)
-- Privacy settings
-
-Integration:
-- Use project validation schema from lib/validations.ts
-- Call project creation API
-- Update project list optimistically
-- Handle errors gracefully
-*/
+import { useAuth } from "@clerk/nextjs";
+import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useProjectStore } from "@/hooks/use-projects";
+import { createProjectSchema } from "@/lib/validations";
+import { useUIStore } from "@/stores/ui-store";
 
 export function CreateProjectModal() {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-outer_space-500 rounded-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">
-          TODO: Create Project Modal
-        </h3>
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded border border-yellow-200 dark:border-yellow-800">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            📋 Implement project creation form with validation
-          </p>
-        </div>
-      </div>
-    </div>
-  )
+	const { userId } = useAuth();
+	const { createProject } = useProjectStore();
+	const { isCreateProjectModalOpen, closeCreateProjectModal } = useUIStore();
+
+	const [name, setName] = useState("");
+	const [description, setDescription] = useState("");
+	const [dueDate, setDueDate] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const nameInputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		if (isCreateProjectModalOpen) {
+			const timer = setTimeout(() => nameInputRef.current?.focus(), 50);
+			return () => clearTimeout(timer);
+		}
+	}, [isCreateProjectModalOpen]);
+
+	if (!isCreateProjectModalOpen) return null;
+
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!name.trim() || !userId) return;
+
+		const parsed = createProjectSchema.safeParse({
+			name,
+			description,
+			dueDate: dueDate ? new Date(dueDate) : undefined,
+		});
+		if (!parsed.success) {
+			const first = parsed.error.issues[0];
+			useUIStore.getState().addToast({
+				type: "error",
+				message: first?.message ?? "Invalid input",
+			});
+			return;
+		}
+
+		setIsSubmitting(true);
+
+		try {
+			await createProject({
+				name: parsed.data.name,
+				description: parsed.data.description,
+				dueDate: parsed.data.dueDate,
+				ownerId: userId,
+			});
+			setName("");
+			setDescription("");
+			setDueDate("");
+			closeCreateProjectModal();
+		} catch {
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const handleBackdropClick = (e: React.MouseEvent) => {
+		if (e.target === e.currentTarget) closeCreateProjectModal();
+	};
+
+	return (
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="create-project-title"
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+			onClick={handleBackdropClick}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					handleBackdropClick(e as unknown as React.MouseEvent);
+				}
+			}}
+		>
+			<div className="bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
+				<div className="flex items-center justify-between mb-6">
+					<div>
+						<h3
+							id="create-project-title"
+							className="text-xl font-semibold text-foreground"
+						>
+							Create New Project
+						</h3>
+						<p className="text-sm text-muted-foreground mt-0.5">
+							Set up your project workspace
+						</p>
+					</div>
+					<button
+						type="button"
+						onClick={closeCreateProjectModal}
+						className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+						aria-label="Close modal"
+					>
+						<X size={18} />
+					</button>
+				</div>
+
+				<form onSubmit={handleSubmit} className="space-y-4">
+					<div>
+						<label
+							htmlFor="project-name"
+							className="block text-sm font-medium text-foreground mb-1.5"
+						>
+							Project Name <span className="text-destructive">*</span>
+						</label>
+						<input
+							id="project-name"
+							ref={nameInputRef}
+							type="text"
+							required
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+							maxLength={80}
+							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground"
+							placeholder="e.g., Marketing Campaign"
+						/>
+						<div className="flex justify-end mt-1">
+							<span className="text-xs text-muted-foreground">
+								{name.length}/80
+							</span>
+						</div>
+					</div>
+
+					<div>
+						<label
+							htmlFor="project-description"
+							className="block text-sm font-medium text-foreground mb-1.5"
+						>
+							Description{" "}
+							<span className="text-muted-foreground font-normal">
+								(optional)
+							</span>
+						</label>
+						<textarea
+							id="project-description"
+							rows={3}
+							value={description}
+							onChange={(e) => setDescription(e.target.value)}
+							maxLength={500}
+							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground resize-none"
+							placeholder="What is this project about?"
+						/>
+						<div className="flex justify-end mt-1">
+							<span className="text-xs text-muted-foreground">
+								{description.length}/500
+							</span>
+						</div>
+					</div>
+
+					<div>
+						<label
+							htmlFor="project-due-date"
+							className="block text-sm font-medium text-foreground mb-1.5"
+						>
+							Target Date{" "}
+							<span className="text-muted-foreground font-normal">
+								(optional)
+							</span>
+						</label>
+						<input
+							id="project-due-date"
+							type="date"
+							value={dueDate}
+							onChange={(e) => setDueDate(e.target.value)}
+							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground dark:[scheme:dark]"
+						/>
+					</div>
+
+					<div className="flex justify-end gap-3 pt-2">
+						<button
+							type="button"
+							onClick={closeCreateProjectModal}
+							className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="submit"
+							disabled={isSubmitting || !name.trim()}
+							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-30"
+						>
+							{isSubmitting ? (
+								<span className="flex items-center gap-2 justify-center">
+									<svg
+										className="animate-spin h-3.5 w-3.5"
+										viewBox="0 0 24 24"
+										fill="none"
+										aria-hidden="true"
+									>
+										<circle
+											className="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											strokeWidth="4"
+										/>
+										<path
+											className="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+										/>
+									</svg>
+									Creating...
+								</span>
+							) : (
+								"Create Project"
+							)}
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	);
 }

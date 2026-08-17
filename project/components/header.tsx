@@ -1,7 +1,10 @@
 "use client";
-import { SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/nextjs";
+
+import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import { CustomUserButton } from "@/components/custom-user-button";
 import { useTheme } from "./theme-provider";
 
 export function Header() {
@@ -9,40 +12,47 @@ export function Header() {
 	const { isSignedIn } = useAuth();
 
 	return (
-		<header className="border-b border-french_gray-300 dark:border-paynes_gray-400 bg-white/80 dark:bg-outer_space-500/80 backdrop-blur-sm">
+		<header className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/70 backdrop-blur-xl">
 			<div className="container mx-auto px-4 sm:px-6 lg:px-8">
 				<div className="flex justify-between items-center h-16">
-					<div className="flex items-center">
-						<Link href="/" className="text-2xl font-bold text-blue_munsell-500">
-							TaskFlow
-						</Link>
-					</div>
+					<Link href="/" className="flex items-center">
+						<Image
+							src="/LockLogo.svg"
+							alt="LockIn"
+							width={24}
+							height={42}
+							className="dark:invert"
+							priority
+						/>
+					</Link>
 
-					<div className="flex items-center space-x-4">
+					<div className="flex items-center gap-2 sm:gap-3">
 						<button
 							type="button"
 							onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-							className="p-2 rounded-lg bg-platinum-500 dark:bg-paynes_gray-500 text-outer_space-500 dark:text-platinum-500 hover:bg-french_gray-500 dark:hover:bg-paynes_gray-400 transition-colors"
+							className="p-2 rounded-full text-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+							aria-label="Toggle theme"
 						>
-							{theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+							{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
 						</button>
 
 						{!isSignedIn ? (
 							<>
-								<SignInButton mode="modal">
+								<SignInButton mode="redirect">
 									<button
 										type="button"
-										className="px-4 py-2 text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500 transition-colors font-medium"
+										className="hidden sm:inline-flex px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
 									>
 										Sign In
 									</button>
 								</SignInButton>
-								<SignUpButton mode="modal">
+
+								<SignUpButton mode="redirect">
 									<button
 										type="button"
-										className="px-4 py-2 bg-blue_munsell-500 text-white rounded-lg hover:bg-blue_munsell-600 transition-colors font-medium"
+										className="inline-flex items-center px-5 py-2 text-sm font-semibold rounded-full bg-foreground text-background hover:opacity-80 transition-opacity"
 									>
-										Sign Up
+										Get Started
 									</button>
 								</SignUpButton>
 							</>
@@ -50,11 +60,17 @@ export function Header() {
 							<>
 								<Link
 									href="/dashboard"
-									className="px-4 py-2 text-outer_space-500 dark:text-platinum-500 hover:text-blue_munsell-500 transition-colors font-medium mr-2"
+									className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-foreground/80 hover:text-foreground transition-colors rounded-full hover:bg-muted"
 								>
 									Dashboard
 								</Link>
-								<UserButton />
+								<Link
+									href="/projects"
+									className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-foreground/80 hover:text-foreground transition-colors rounded-full hover:bg-muted"
+								>
+									Projects
+								</Link>
+								<CustomUserButton />
 							</>
 						)}
 					</div>

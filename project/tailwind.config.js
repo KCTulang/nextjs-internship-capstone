@@ -55,7 +55,6 @@ module.exports = {
 					DEFAULT: "hsl(var(--card))",
 					foreground: "hsl(var(--card-foreground))",
 				},
-				// Custom color palette — hyphenated names (no apostrophes)
 				platinum: {
 					DEFAULT: "#dcdcdd",
 					50: "#f8f8f8",

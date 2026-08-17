@@ -1,76 +1,107 @@
-import { BarChart3, TrendingUp, Users, Clock } from "lucide-react"
+import { BarChart3, Clock, TrendingUp, Users } from "lucide-react";
+import { getTeamMembersAction } from "@/app/actions/members";
+import { getAnalyticsAction } from "@/app/actions/tasks";
 
-export default function AnalyticsPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-outer_space-500 dark:text-platinum-500">Analytics</h1>
-        <p className="text-paynes_gray-500 dark:text-french_gray-500 mt-2">
-          Track project performance and team productivity
-        </p>
-      </div>
+export default async function AnalyticsPage() {
+	const analyticsRes = await getAnalyticsAction();
+	const teamRes = await getTeamMembersAction();
+	const analytics =
+		analyticsRes.success && analyticsRes.data
+			? analyticsRes.data
+			: {
+					totalTasks: 0,
+					completedTasks: 0,
+					completionRate: 0,
+					projectCount: 0,
+				};
+	const teamSize = teamRes.success && teamRes.data ? teamRes.data.length : 0;
 
-      {/* Implementation Tasks Banner */}
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-          📊 Analytics Implementation Tasks
-        </h3>
-        <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-          <li>• Task 6.6: Optimize performance and implement loading states</li>
-          <li>• Task 8.5: Set up performance monitoring and analytics</li>
-        </ul>
-      </div>
+	return (
+		<div className="space-y-6">
+			<div>
+				<h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+				<p className="text-muted-foreground mt-2">
+					Track project performance and team productivity
+				</p>
+			</div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { title: "Project Velocity", value: "8.5", unit: "tasks/week", icon: TrendingUp, color: "blue" },
-          { title: "Team Efficiency", value: "92%", unit: "completion rate", icon: BarChart3, color: "green" },
-          { title: "Active Users", value: "24", unit: "this week", icon: Users, color: "purple" },
-          { title: "Avg. Task Time", value: "2.3", unit: "days", icon: Clock, color: "orange" },
-        ].map((metric, index) => (
-          <div
-            key={index}
-            className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className={`w-10 h-10 bg-${metric.color}-100 dark:bg-${metric.color}-900 rounded-lg flex items-center justify-center`}
-              >
-                <metric.icon className={`text-${metric.color}-500`} size={20} />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-outer_space-500 dark:text-platinum-500 mb-1">{metric.value}</div>
-            <div className="text-sm text-paynes_gray-500 dark:text-french_gray-400 mb-2">{metric.unit}</div>
-            <div className="text-xs font-medium text-outer_space-500 dark:text-platinum-500">{metric.title}</div>
-          </div>
-        ))}
-      </div>
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+				{[
+					{
+						title: "Total Tasks",
+						value: analytics.totalTasks.toString(),
+						unit: "all time",
+						icon: TrendingUp,
+						color: "blue",
+					},
+					{
+						title: "Completion Rate",
+						value: `${analytics.completionRate}%`,
+						unit: "all projects",
+						icon: BarChart3,
+						color: "green",
+					},
+					{
+						title: "Team Members",
+						value: teamSize.toString(),
+						unit: "active",
+						icon: Users,
+						color: "purple",
+					},
+					{
+						title: "Active Projects",
+						value: analytics.projectCount.toString(),
+						unit: "managing",
+						icon: Clock,
+						color: "orange",
+					},
+				].map((metric) => (
+					<div
+						key={metric.title}
+						className="bg-card rounded-lg border border-border p-6"
+					>
+						<div className="flex items-center justify-between mb-4">
+							<div
+								className={`w-10 h-10 bg-${metric.color}-100/10 rounded-lg flex items-center justify-center`}
+							>
+								<metric.icon className={`text-${metric.color}-500`} size={20} />
+							</div>
+						</div>
+						<div className="text-2xl font-bold text-foreground mb-1">
+							{metric.value}
+						</div>
+						<div className="text-sm text-muted-foreground mb-2">
+							{metric.unit}
+						</div>
+						<div className="text-xs font-medium text-foreground">
+							{metric.title}
+						</div>
+					</div>
+				))}
+			</div>
 
-      {/* Charts Placeholder */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-          <h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">Project Progress</h3>
-          <div className="h-64 bg-platinum-800 dark:bg-outer_space-400 rounded-lg flex items-center justify-center">
-            <div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
-              <BarChart3 size={48} className="mx-auto mb-2" />
-              <p>Chart Component Placeholder</p>
-              <p className="text-sm">TODO: Implement with Chart.js or Recharts</p>
-            </div>
-          </div>
-        </div>
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<div className="bg-card rounded-lg border border-border p-6 flex flex-col justify-center items-center h-64 border-dashed">
+					<BarChart3
+						size={48}
+						className="mx-auto mb-4 text-muted-foreground/30"
+					/>
+					<p className="text-foreground font-medium">Task Progress</p>
+					<p className="text-sm text-muted-foreground text-center mt-2 max-w-sm">
+						{analytics.completedTasks} out of {analytics.totalTasks} tasks
+						completed across all projects. Keep up the good work!
+					</p>
+				</div>
 
-        <div className="bg-white dark:bg-outer_space-500 rounded-lg border border-french_gray-300 dark:border-paynes_gray-400 p-6">
-          <h3 className="text-lg font-semibold text-outer_space-500 dark:text-platinum-500 mb-4">Team Activity</h3>
-          <div className="h-64 bg-platinum-800 dark:bg-outer_space-400 rounded-lg flex items-center justify-center">
-            <div className="text-center text-paynes_gray-500 dark:text-french_gray-400">
-              <TrendingUp size={48} className="mx-auto mb-2" />
-              <p>Activity Chart Placeholder</p>
-              <p className="text-sm">TODO: Implement activity timeline</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+				<div className="bg-card rounded-lg border border-border p-6 flex flex-col justify-center items-center h-64 border-dashed">
+					<Users size={48} className="mx-auto mb-4 text-muted-foreground/30" />
+					<p className="text-foreground font-medium">Team Distribution</p>
+					<p className="text-sm text-muted-foreground text-center mt-2 max-w-sm">
+						Collaborating with {teamSize} unique members across{" "}
+						{analytics.projectCount} active projects.
+					</p>
+				</div>
+			</div>
+		</div>
+	);
 }
