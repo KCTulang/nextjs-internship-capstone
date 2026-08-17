@@ -5,7 +5,15 @@ import {
 } from "@/components/calendar/calendar-grid";
 import { UpcomingDeadlines } from "@/components/calendar/upcoming-deadlines";
 
-export default async function CalendarPage() {
+import { TaskDetailPanel } from "@/components/task-detail-panel";
+
+export default async function CalendarPage(props: {
+	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+	const searchParams = await props.searchParams;
+	const taskId =
+		typeof searchParams.taskId === "string" ? searchParams.taskId : null;
+
 	const res = await getAllUserTasksAction();
 
 	const allTasks: CalendarTask[] =
@@ -41,6 +49,12 @@ export default async function CalendarPage() {
 				</h3>
 				<UpcomingDeadlines tasksWithDates={tasksWithDates} />
 			</div>
+			{taskId && (
+				<TaskDetailPanel
+					taskId={taskId}
+					initialTask={tasksWithDates.find((t) => t.id === taskId)}
+				/>
+			)}
 		</div>
 	);
 }

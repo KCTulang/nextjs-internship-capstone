@@ -5,6 +5,7 @@ import type React from "react";
 import { Suspense, useState } from "react";
 import { CustomUserButton } from "@/components/custom-user-button";
 import { GlobalSearch } from "@/components/global-search";
+import { CalendarTaskPreviewModal } from "@/components/modals/calendar-task-preview-modal";
 import { ConfirmModal } from "@/components/modals/confirm-modal";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
@@ -70,6 +71,7 @@ export default function DashboardLayout({
 			<CreateProjectModal />
 			<EditProjectModal />
 			<CreateTaskModal />
+			<CalendarTaskPreviewModal />
 			<SetPasswordModal />
 			<InviteMemberModal />
 			<ConfirmModal />

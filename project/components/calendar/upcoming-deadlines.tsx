@@ -248,37 +248,7 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 				const isSelected = selectedTaskIds.includes(task.id);
 
 				const rowContent = (
-					<div
-						key={`row-${task.id}`}
-						className="flex items-center gap-3 w-full"
-					>
-						<button
-							type="button"
-							className="task-checkbox hidden sm:flex pt-1 cursor-pointer"
-							onClick={(e) => handleCheckboxClick(task.id, index, e)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									handleCheckboxClick(
-										task.id,
-										index,
-										e as unknown as React.MouseEvent,
-									);
-								}
-							}}
-							tabIndex={-1}
-						>
-							<div
-								className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-									isSelected
-										? "bg-primary border-primary text-primary-foreground"
-										: "border-muted-foreground/30 hover:border-foreground/50"
-								}`}
-							>
-								{isSelected && <CheckCircle2 size={12} className="stroke-3" />}
-							</div>
-						</button>
-
+					<>
 						<div className="min-w-0 flex-1">
 							<h4
 								className={`font-medium truncate ${
@@ -313,47 +283,65 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 								)}
 							</div>
 						</div>
-
-						<div className="flex flex-col items-end shrink-0 ml-4">
-							<p
-								className={`text-sm font-medium flex items-center gap-1 ${overdue ? "text-destructive" : "text-foreground"}`}
-							>
-								{overdue && <AlertCircle size={14} />}
-								{formatDueDate(task.dueDate)}
-							</p>
-							<p
-								className={`text-xs mt-1 ${overdue ? "text-destructive/70" : "text-muted-foreground"}`}
-							>
-								{overdue ? "Overdue" : "Deadline"}
-							</p>
-						</div>
-					</div>
+					</>
 				);
 
-				const containerClasses = `w-full text-left p-4 rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+				const containerClasses = `relative flex items-start w-full p-4 rounded-lg border transition-all focus-within:ring-2 focus-within:ring-primary ${
 					isSelected
 						? "bg-primary/5 border-primary/20 shadow-sm"
 						: "bg-muted/50 border-border hover:bg-muted/80"
-				} ${!hasLink ? "opacity-60 cursor-default" : ""}`;
+				} ${!hasLink ? "opacity-60" : ""}`;
 
-				return hasLink ? (
-					<button
-						key={task.id}
-						type="button"
-						onClick={(e) => handleTaskClick(task, e)}
-						data-task-id={task.id}
-						className={containerClasses}
-					>
-						{rowContent}
-					</button>
-				) : (
+				return (
 					<div
 						key={task.id}
 						data-task-id={task.id}
 						className={containerClasses}
-						title="No linked project"
 					>
-						{rowContent}
+						{/* Checkbox is rendered first via rowContent's first element (handled below) */}
+						<button
+							type="button"
+							className="task-checkbox hidden sm:flex pt-1 cursor-pointer shrink-0 mt-0.5"
+							onClick={(e) => handleCheckboxClick(task.id, index, e)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									handleCheckboxClick(
+										task.id,
+										index,
+										e as unknown as React.MouseEvent,
+									);
+								}
+							}}
+							tabIndex={-1}
+						>
+							<div
+								className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+									isSelected
+										? "bg-primary border-primary text-primary-foreground"
+										: "border-muted-foreground/30 hover:border-foreground/50"
+								}`}
+							>
+								{isSelected && <CheckCircle2 size={12} className="stroke-3" />}
+							</div>
+						</button>
+
+						{hasLink ? (
+							<button
+								type="button"
+								onClick={(e) => handleTaskClick(task, e)}
+								className="flex flex-1 items-start justify-between min-w-0 ml-3 text-left focus:outline-none"
+							>
+								{rowContent}
+							</button>
+						) : (
+							<div
+								className="flex flex-1 items-start justify-between min-w-0 ml-3 text-left"
+								title="No linked project"
+							>
+								{rowContent}
+							</div>
+						)}
 					</div>
 				);
 			})}
