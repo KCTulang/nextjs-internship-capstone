@@ -191,7 +191,6 @@ export async function getAllUserTasksAction() {
 				projectSlug: projects.slug,
 				labels: tasks.labels,
 				listName: lists.name,
-				taskStatus: tasks.status,
 			})
 			.from(tasks)
 			.leftJoin(lists, eq(tasks.listId, lists.id))
@@ -213,7 +212,7 @@ export async function getAllUserTasksAction() {
 			projectSlug: t.projectSlug,
 			labels: t.labels,
 			listName: t.listName,
-			status: t.listName || t.taskStatus,
+			status: t.listName || "Todo",
 		}));
 
 		return { success: true, data: mappedTasks };

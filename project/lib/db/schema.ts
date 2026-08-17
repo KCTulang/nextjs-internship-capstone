@@ -103,7 +103,6 @@ export const tasks = pgTable(
 		listId: uuid("list_id").references(() => lists.id, {
 			onDelete: "cascade",
 		}),
-		status: text("status").default("todo"),
 		assigneeId: uuid("assignee_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
