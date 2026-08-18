@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
-import { useTasksStore } from "./use-tasks";
 
 export function useCalendarShortcuts(taskIds: string[], onDelete: () => void) {
 	const {

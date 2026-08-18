@@ -26,7 +26,7 @@ import {
 	type Member,
 	type Task,
 	useTasksStore,
-} from "@/hooks/use-tasks";
+} from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";

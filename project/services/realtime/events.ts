@@ -1,8 +1,8 @@
 import {
 	getProjectChannel,
 	getUserPrivateChannel,
-} from "@/lib/realtime/channels";
-import { pusherServer } from "@/lib/realtime/pusher";
+} from "@/services/realtime/channels";
+import { pusherServer } from "@/services/realtime/pusher";
 
 export type RealtimeEventType =
 	| "task.created"

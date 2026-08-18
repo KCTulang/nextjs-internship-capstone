@@ -321,10 +321,17 @@ export function NotificationDropdown() {
 									) : (
 										<div className="divide-y divide-border/50">
 											{notifications.map((n) => (
-												<button
-													type="button"
+												<div
 													key={n.id}
 													onClick={() => handleNotificationClick(n)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter" || e.key === " ") {
+															e.preventDefault();
+															handleNotificationClick(n);
+														}
+													}}
+													role="button"
+													tabIndex={0}
 													className={`w-full text-left p-4 hover:bg-muted/30 transition-colors flex gap-3 relative group cursor-pointer ${!n.readAt ? "bg-primary/5" : ""}`}
 												>
 													<div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -362,7 +369,7 @@ export function NotificationDropdown() {
 															<Check size={14} />
 														</button>
 													)}
-												</button>
+												</div>
 											))}
 										</div>
 									)}

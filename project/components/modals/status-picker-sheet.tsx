@@ -2,7 +2,7 @@
 
 import { Check } from "lucide-react";
 import { Drawer } from "vaul";
-import type { List } from "@/hooks/use-tasks";
+import type { List } from "@/stores/board-store";
 
 interface StatusPickerSheetProps {
 	isOpen: boolean;

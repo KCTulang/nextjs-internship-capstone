@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type {
 	CollaborationEvent,
 	RealtimeEventType,
-} from "@/lib/realtime/events";
+} from "@/services/realtime/events";
 
 let globalPusherInstance: Pusher | null = null;
 

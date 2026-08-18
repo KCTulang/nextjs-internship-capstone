@@ -16,8 +16,8 @@ import {
 	Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { List, Task } from "@/hooks/use-tasks";
-import { useTasksStore } from "@/hooks/use-tasks";
+import type { List, Task } from "@/stores/board-store";
+import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 import { TaskCard } from "./task-card";
 

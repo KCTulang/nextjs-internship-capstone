@@ -11,8 +11,8 @@ import {
 	type View,
 } from "react-big-calendar";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import { priorityClass } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
+import { priorityClass } from "@/utils";
 
 export type CalendarTask = {
 	id: string;

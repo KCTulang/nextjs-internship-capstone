@@ -5,8 +5,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, queries } from "@/lib/db";
 import { lists } from "@/lib/db/schema";
-import { publishProjectEvent } from "@/lib/realtime/events";
-import { createListSchema, updateListSchema } from "@/lib/validations";
+import { publishProjectEvent } from "@/services/realtime/events";
+import { createListSchema, updateListSchema } from "@/utils/validations";
 
 async function requireAuth() {
 	const { userId } = await auth();

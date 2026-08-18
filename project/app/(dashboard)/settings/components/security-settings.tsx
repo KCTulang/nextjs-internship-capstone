@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { updatePasswordSchema, validate } from "@/lib/validations";
 import { useUIStore } from "@/stores/ui-store";
+import { updatePasswordSchema, validate } from "@/utils/validations";
 import { Modal } from "./../../../../components/ui/modal";
 import {
 	type ReverificationHandler,

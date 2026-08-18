@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db, queries } from "@/lib/db";
 import { notifications, users } from "@/lib/db/schema";
-import { publishUserEvent } from "@/lib/realtime/events";
+import { publishUserEvent } from "@/services/realtime/events";
 
 async function requireAuth() {
 	const { userId } = await auth();

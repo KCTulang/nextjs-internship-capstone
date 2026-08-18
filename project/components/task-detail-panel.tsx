@@ -12,7 +12,7 @@ import {
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
 import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { type Task, useTasksStore } from "@/hooks/use-tasks";
+import { type Task, useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
 
 interface TaskDetailPanelProps {

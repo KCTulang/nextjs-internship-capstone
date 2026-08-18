@@ -3,7 +3,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { queries } from "@/lib/db";
-import { createProjectSchema, updateProjectSchema } from "@/lib/validations";
+import { createProjectSchema, updateProjectSchema } from "@/utils/validations";
 
 async function requireAuth() {
 	const { userId } = await auth();

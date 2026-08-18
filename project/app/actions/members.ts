@@ -11,7 +11,7 @@ import {
 	projects,
 	users,
 } from "@/lib/db/schema";
-import { publishProjectEvent } from "@/lib/realtime/events";
+import { publishProjectEvent } from "@/services/realtime/events";
 
 async function requireAuth() {
 	const { userId } = await auth();

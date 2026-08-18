@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { useProjectStore } from "@/hooks/use-projects";
-import { useTasksStore } from "@/hooks/use-tasks";
+import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 
 export function CreateTaskModal() {

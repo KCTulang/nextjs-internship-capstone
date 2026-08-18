@@ -20,7 +20,7 @@ import {
 	saveFocusSession,
 } from "@/app/actions/focus-sessions";
 import { useFocusTimer } from "@/hooks/use-focus-timer";
-import { useTasksStore } from "@/hooks/use-tasks";
+import { useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
 import { useUIStore } from "@/stores/ui-store";
 

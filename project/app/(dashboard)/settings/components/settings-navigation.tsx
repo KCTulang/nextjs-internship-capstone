@@ -3,7 +3,7 @@
 import { Bell, Palette, Shield, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 const navigation = [
 	{ name: "Account & Profile", href: "/settings", icon: User },

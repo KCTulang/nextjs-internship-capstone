@@ -7,7 +7,7 @@ import { z } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
 import { lists, projectMembers, tasks } from "@/lib/db/schema";
-import { publishProjectEvent } from "@/lib/realtime/events";
+import { publishProjectEvent } from "@/services/realtime/events";
 
 async function requireAuth() {
 	const { userId } = await auth();

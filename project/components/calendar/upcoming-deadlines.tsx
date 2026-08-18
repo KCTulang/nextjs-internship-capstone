@@ -9,9 +9,9 @@ import {
 	bulkUpdateTasksPriorityAction,
 } from "@/app/actions/tasks";
 import { useCalendarShortcuts } from "@/hooks/use-calendar-shortcuts";
-import { useTasksStore } from "@/hooks/use-tasks";
-import { priorityClass } from "@/lib/utils";
+import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
+import { priorityClass } from "@/utils";
 import type { CalendarTask } from "./calendar-grid";
 
 const DONE_LIST_NAMES = new Set([

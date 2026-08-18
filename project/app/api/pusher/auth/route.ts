@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { projectMembers, projects, users } from "@/lib/db/schema";
-import { pusherServer } from "@/lib/realtime/pusher";
+import { pusherServer } from "@/services/realtime/pusher";
 
 export async function POST(req: NextRequest) {
 	const { userId: clerkId } = await auth();

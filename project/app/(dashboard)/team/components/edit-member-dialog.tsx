@@ -4,8 +4,8 @@ import { Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateProjectMemberAction } from "@/app/actions/members";
-import { PROJECT_ROLES } from "@/lib/roles";
 import { useUIStore } from "@/stores/ui-store";
+import { PROJECT_ROLES } from "@/utils/roles";
 import type { TeamMember } from "../types";
 
 interface EditMemberDialogProps {

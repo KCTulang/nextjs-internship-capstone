@@ -3,8 +3,8 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/hooks/use-projects";
-import { updateProjectSchema } from "@/lib/validations";
 import { useUIStore } from "@/stores/ui-store";
+import { updateProjectSchema } from "@/utils/validations";
 
 export function EditProjectModal() {
 	const { updateProject } = useProjectStore();

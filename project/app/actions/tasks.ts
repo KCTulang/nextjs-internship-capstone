@@ -13,8 +13,8 @@ import {
 	tasks,
 	users,
 } from "@/lib/db/schema";
-import { publishProjectEvent } from "@/lib/realtime/events";
-import { createTaskSchema, updateTaskSchema } from "@/lib/validations";
+import { publishProjectEvent } from "@/services/realtime/events";
+import { createTaskSchema, updateTaskSchema } from "@/utils/validations";
 import { logActivity } from "./activity";
 
 async function requireAuth() {

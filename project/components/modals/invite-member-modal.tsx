@@ -4,8 +4,8 @@ import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { inviteMemberAction } from "@/app/actions/members";
 import { useProjectStore } from "@/hooks/use-projects";
-import { PROJECT_ROLES } from "@/lib/roles";
 import { useUIStore } from "@/stores/ui-store";
+import { PROJECT_ROLES } from "@/utils/roles";
 
 export function InviteMemberModal() {
 	const { isInviteMemberModalOpen, closeInviteMemberModal } = useUIStore();

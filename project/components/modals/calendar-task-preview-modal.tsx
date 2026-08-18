@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
-import { priorityClass } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
+import { priorityClass } from "@/utils";
 
 export function CalendarTaskPreviewModal() {
 	const { isPreviewTaskModalOpen, closePreviewTaskModal, selectedPreviewTask } =
