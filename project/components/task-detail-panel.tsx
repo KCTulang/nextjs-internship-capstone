@@ -10,6 +10,7 @@ import {
 	getCommentsAction,
 } from "@/app/actions/comments";
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
+import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { type Task, useTasksStore } from "@/hooks/use-tasks";
 import { useFocusStore } from "@/stores/focus-store";
@@ -33,7 +34,7 @@ export function TaskDetailPanel({
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
-	const { startLockIn } = useFocusStore();
+	const { startLockIn, isLockedIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 
 	const storeTask =
@@ -82,6 +83,37 @@ export function TaskDetailPanel({
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
 	const titleRef = useRef<HTMLTextAreaElement>(null);
 
+	type FocusSession = {
+		id: string;
+		duration: number | null;
+		startTime: Date;
+	};
+	const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+
+	const fetchFocusSessions = useCallback((id: string) => {
+		import("@/app/actions/focus-sessions").then(
+			({ getFocusSessionsByTaskAction }) => {
+				getFocusSessionsByTaskAction(id).then((res) => {
+					if (res.success && res.data) {
+						setFocusSessions(res.data as unknown as FocusSession[]);
+					}
+				});
+			},
+		);
+	}, []);
+
+	useEffect(() => {
+		if (taskId) fetchFocusSessions(taskId);
+	}, [taskId, fetchFocusSessions]);
+
+	const prevLockedInRef = useRef(isLockedIn);
+	useEffect(() => {
+		if (prevLockedInRef.current && !isLockedIn && taskId) {
+			fetchFocusSessions(taskId);
+		}
+		prevLockedInRef.current = isLockedIn;
+	}, [isLockedIn, taskId, fetchFocusSessions]);
+
 	const taskRef = useRef(task);
 	taskRef.current = task;
 	const updateTaskDetailsRef = useRef(updateTaskDetails);
@@ -126,6 +158,37 @@ export function TaskDetailPanel({
 			}, 0);
 		}
 	}, [taskId]);
+
+	const { useEvent } = useCollaboration(projectId);
+	useEvent(
+		"comment.created",
+		(event) => {
+			const commentData = event.payload?.comment as
+				| { taskId?: string }
+				| undefined;
+			if (taskId && commentData?.taskId === taskId) {
+				getCommentsAction(taskId).then((res) => {
+					if (res.success && res.data) {
+						setComments(res.data);
+						useTasksStore.getState().updateTaskComments(
+							taskId,
+							res.data.map((c) => ({ id: c.id })),
+						);
+					}
+				});
+			}
+		},
+		[taskId],
+	);
+	useEvent(
+		"comment.deleted",
+		(event) => {
+			if (taskId) {
+				setComments((prev) => prev.filter((c) => c.id !== event.entityId));
+			}
+		},
+		[taskId],
+	);
 
 	useEffect(() => {
 		if (!taskId) return;
@@ -305,6 +368,46 @@ export function TaskDetailPanel({
 	};
 
 	const priorities = ["low", "medium", "high", "urgent"];
+
+	const formatDuration = (seconds: number) => {
+		if (seconds === 0) return "0m";
+		const h = Math.floor(seconds / 3600);
+		const m = Math.floor((seconds % 3600) / 60);
+		if (h > 0 && m > 0) return `${h}h ${m}m`;
+		if (h > 0) return `${h}h`;
+		if (m === 0 && seconds > 0) return "<1m";
+		return `${m}m`;
+	};
+
+	const now = new Date();
+	const todayStart = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate(),
+	).getTime();
+	const yesterdayStart = todayStart - 86400000;
+
+	let totalDuration = 0;
+	let todayDuration = 0;
+	let yesterdayDuration = 0;
+	let todayCount = 0;
+	let yesterdayCount = 0;
+
+	for (const session of focusSessions) {
+		const duration = session.duration || 0;
+		if (duration <= 0) continue;
+
+		totalDuration += duration;
+		const startTime = new Date(session.startTime).getTime();
+
+		if (startTime >= todayStart) {
+			todayDuration += duration;
+			todayCount++;
+		} else if (startTime >= yesterdayStart && startTime < todayStart) {
+			yesterdayDuration += duration;
+			yesterdayCount++;
+		}
+	}
 
 	const formatActivityMessage = (activity: Activity) => {
 		const type = activity.type as string;
@@ -601,6 +704,56 @@ export function TaskDetailPanel({
 										placeholder="Comma-separated"
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none transition-colors relative z-10 placeholder:text-muted-foreground/40"
 									/>
+								</div>
+							</div>
+
+							<div className="mt-8 space-y-3 max-w-md">
+								<h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+									<Target size={15} className="text-primary" />
+									Focus Time
+								</h3>
+								<div className="bg-card border border-border rounded-xl p-4 flex flex-wrap gap-6 items-start">
+									{focusSessions.length === 0 ? (
+										<p className="text-sm text-muted-foreground">0m total</p>
+									) : (
+										<>
+											<div>
+												<p className="text-xl font-bold text-foreground">
+													{formatDuration(totalDuration)}{" "}
+													<span className="text-sm font-normal text-muted-foreground">
+														total
+													</span>
+												</p>
+											</div>
+											{(todayCount > 0 || yesterdayCount > 0) && (
+												<div className="flex gap-6 border-l border-border pl-6">
+													{todayCount > 0 && (
+														<div>
+															<p className="text-sm font-medium text-foreground">
+																Today
+															</p>
+															<p className="text-xs text-muted-foreground mt-0.5">
+																{formatDuration(todayDuration)} · {todayCount}{" "}
+																session{todayCount !== 1 ? "s" : ""}
+															</p>
+														</div>
+													)}
+													{yesterdayCount > 0 && (
+														<div>
+															<p className="text-sm font-medium text-foreground">
+																Yesterday
+															</p>
+															<p className="text-xs text-muted-foreground mt-0.5">
+																{formatDuration(yesterdayDuration)} ·{" "}
+																{yesterdayCount} session
+																{yesterdayCount !== 1 ? "s" : ""}
+															</p>
+														</div>
+													)}
+												</div>
+											)}
+										</>
+									)}
 								</div>
 							</div>
 

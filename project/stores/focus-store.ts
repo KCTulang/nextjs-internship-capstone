@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Task } from "@/types";
 
-export type AudioMode = "silence" | "white-noise" | "lofi";
+export type AudioMode = "silence" | "white-noise" | "focus-music";
 
 export interface FocusSessionState {
 	isLockedIn: boolean;
@@ -34,8 +34,8 @@ export const useFocusStore = create<FocusSessionState>()(
 				set((state) => {
 					const cycle: Record<AudioMode, AudioMode> = {
 						silence: "white-noise",
-						"white-noise": "lofi",
-						lofi: "silence",
+						"white-noise": "focus-music",
+						"focus-music": "silence",
 					};
 					return { audioMode: cycle[state.audioMode] };
 				}),
