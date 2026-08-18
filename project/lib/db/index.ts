@@ -297,4 +297,29 @@ export const queries = {
 			});
 		},
 	},
+	notificationPreferences: {
+		getByUserId: async (userId: string) => {
+			let prefs = await db.query.notificationPreferences.findFirst({
+				where: eq(schema.notificationPreferences.userId, userId),
+			});
+			if (!prefs) {
+				const [newPrefs] = await db
+					.insert(schema.notificationPreferences)
+					.values({ userId })
+					.returning();
+				prefs = newPrefs;
+			}
+			return prefs;
+		},
+		update: async (
+			userId: string,
+			data: Partial<typeof schema.notificationPreferences.$inferInsert>,
+		) => {
+			return await db
+				.update(schema.notificationPreferences)
+				.set(data)
+				.where(eq(schema.notificationPreferences.userId, userId))
+				.returning();
+		},
+	},
 };
