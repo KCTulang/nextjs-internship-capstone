@@ -54,7 +54,7 @@ export function CreateTaskModal() {
 		}
 
 		const project = projects.find((p) => p.id === selectedProjectId);
-		if (project && project.lists && project.lists.length > 0) {
+		if (project?.lists && project.lists.length > 0) {
 			const listExists = project.lists.some((l) => l.id === selectedListId);
 			if (!listExists) {
 				setSelectedListId(project.lists[0].id);

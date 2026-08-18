@@ -38,6 +38,8 @@ export interface Task {
 	description?: string | null;
 	listId: string;
 	assigneeId?: string | null;
+	assigneeIds?: string[];
+	assignees?: { id: string; name: string; email: string }[];
 	priority: "low" | "medium" | "high";
 	dueDate?: Date | null;
 	position: number;

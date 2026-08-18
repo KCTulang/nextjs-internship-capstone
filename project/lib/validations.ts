@@ -37,6 +37,7 @@ export const createTaskSchema = z.object({
 	priority: z.enum(TASK_PRIORITIES).default("medium"),
 	dueDate: z.coerce.date().optional(),
 	assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
+	assigneeIds: z.array(z.string().uuid("Invalid assignee ID")).optional(),
 	position: z.number().int().nonnegative().default(1000),
 	labels: z.array(z.string()).optional(),
 });
@@ -48,6 +49,7 @@ export const updateTaskSchema = createTaskSchema
 		listId: z.string().uuid("Invalid list ID").optional(),
 		position: z.number().int().nonnegative().optional(),
 		assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
+		assigneeIds: z.array(z.string().uuid("Invalid assignee ID")).optional(),
 	});
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

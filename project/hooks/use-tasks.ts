@@ -13,6 +13,7 @@ import {
 	deleteTaskAction,
 	updateTaskAction,
 } from "@/app/actions/tasks";
+import type { CollaborationEvent } from "@/lib/realtime/events";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface Task {
@@ -61,6 +62,7 @@ export interface TasksState {
 	setMembers: (members: Member[]) => void;
 	fetchBoard: (projectId: string) => Promise<void>;
 	generateDefaultLists: (projectId: string) => Promise<void>;
+	applyRealtimeEvent: (event: CollaborationEvent) => void;
 
 	createTask: (
 		data: Partial<Task> & {
@@ -116,6 +118,118 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	setSelectedTaskIds: (ids) => set({ selectedTaskIds: ids }),
 
 	setMembers: (members) => set({ members }),
+
+	applyRealtimeEvent: (event) => {
+		const _state = get();
+
+		if (event.type === "task.created" && event.payload?.task) {
+			const task = event.payload.task as Task;
+			set((state) => ({
+				lists: state.lists.map((list) =>
+					list.id === task.listId && !list.tasks.some((t) => t.id === task.id)
+						? {
+								...list,
+								tasks: [...list.tasks, task].sort(
+									(a, b) => a.position - b.position,
+								),
+							}
+						: list,
+				),
+			}));
+		} else if (event.type === "task.updated" && event.payload?.task) {
+			const task = event.payload.task as Task;
+			set((state) => ({
+				lists: state.lists.map((list) => ({
+					...list,
+					tasks: list.tasks.map((t) =>
+						t.id === task.id ? { ...t, ...task } : t,
+					),
+				})),
+			}));
+		} else if (event.type === "task.deleted") {
+			set((state) => ({
+				lists: state.lists.map((list) => ({
+					...list,
+					tasks: list.tasks.filter((t) => t.id !== event.entityId),
+				})),
+			}));
+		} else if (event.type === "task.moved" && event.payload?.task) {
+			const task = event.payload.task as Task;
+			set((state) => {
+				const newLists = state.lists.map((list) => ({
+					...list,
+					tasks: list.tasks.filter((t) => t.id !== task.id),
+				}));
+				const targetList = newLists.find((l) => l.id === task.listId);
+				if (targetList) {
+					targetList.tasks.push(task);
+					targetList.tasks.sort((a, b) => a.position - b.position);
+				}
+				return { lists: newLists };
+			});
+		} else if (event.type === "task.reordered" && event.payload) {
+			const payload = event.payload as {
+				id: string;
+				listId: string;
+				position: number;
+			};
+			const { id, listId, position } = payload;
+			set((state) => {
+				const newLists = state.lists.map((list) => ({
+					...list,
+					tasks: list.tasks.filter((t) => t.id !== id),
+				}));
+
+				const originalTask = state.lists
+					.flatMap((l) => l.tasks)
+					.find((t) => t.id === id);
+				const targetList = newLists.find((l) => l.id === listId);
+
+				if (originalTask && targetList) {
+					targetList.tasks.push({ ...originalTask, listId, position });
+					targetList.tasks.sort((a, b) => a.position - b.position);
+				}
+				return { lists: newLists };
+			});
+		} else if (event.type === "list.created" && event.payload?.list) {
+			const list = event.payload.list as List;
+			set((state) => {
+				if (state.lists.some((l) => l.id === list.id)) return state;
+				return {
+					lists: [...state.lists, { ...list, tasks: [] }].sort(
+						(a, b) => a.position - b.position,
+					),
+				};
+			});
+		} else if (event.type === "list.updated" && event.payload?.list) {
+			const listData = event.payload.list as {
+				id: string;
+				[key: string]: unknown;
+			};
+			set((state) => ({
+				lists: state.lists.map((l) =>
+					l.id === listData.id ? { ...l, ...listData } : l,
+				),
+			}));
+		} else if (event.type === "list.deleted") {
+			set((state) => ({
+				lists: state.lists.filter((l) => l.id !== event.entityId),
+			}));
+		} else if (event.type === "list.reordered" && event.payload) {
+			const payload = event.payload as { id: string; position: number };
+			const { id, position } = payload;
+			set((state) => ({
+				lists: state.lists
+					.map((l) => (l.id === id ? { ...l, position } : l))
+					.sort((a, b) => a.position - b.position),
+			}));
+		} else if (
+			event.type === "task.assigned" ||
+			event.type === "task.unassigned"
+		) {
+			get().fetchBoard(event.projectId);
+		}
+	},
 
 	toggleTaskSelection: (taskId, force) =>
 		set((state) => {
