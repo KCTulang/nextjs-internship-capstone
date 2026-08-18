@@ -323,47 +323,44 @@ export function NotificationDropdown() {
 											{notifications.map((n) => (
 												<div
 													key={n.id}
-													onClick={() => handleNotificationClick(n)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															handleNotificationClick(n);
-														}
-													}}
-													role="button"
-													tabIndex={0}
-													className={`w-full text-left p-4 hover:bg-muted/30 transition-colors flex gap-3 relative group cursor-pointer ${!n.readAt ? "bg-primary/5" : ""}`}
+													className={`w-full relative group ${!n.readAt ? "bg-primary/5" : ""}`}
 												>
-													<div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-														<span className="text-xs font-bold text-primary">
-															{n.actor?.name?.substring(0, 2).toUpperCase() ||
-																"U"}
-														</span>
-													</div>
-													<div className="flex-1 min-w-0 pr-6">
-														<p className="text-sm text-foreground/90 leading-snug">
-															<span className="font-semibold text-foreground mr-1">
-																{n.actor?.name}
-															</span>
-															{n.message}
-														</p>
-														<div className="flex items-center gap-2 mt-1">
-															{n.project && (
-																<span className="text-xs text-primary/80 font-medium truncate">
-																	{n.project.name}
-																</span>
-															)}
-															<span className="text-[10px] text-muted-foreground">
-																{formatRelativeTime(n.createdAt)}
+													<button
+														type="button"
+														onClick={() => handleNotificationClick(n)}
+														className="w-full text-left p-4 hover:bg-muted/30 transition-colors flex gap-3 outline-none focus-visible:bg-muted/30"
+													>
+														<div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+															<span className="text-xs font-bold text-primary">
+																{n.actor?.name?.substring(0, 2).toUpperCase() ||
+																	"U"}
 															</span>
 														</div>
-													</div>
+														<div className="flex-1 min-w-0 pr-6">
+															<p className="text-sm text-foreground/90 leading-snug">
+																<span className="font-semibold text-foreground mr-1">
+																	{n.actor?.name}
+																</span>
+																{n.message}
+															</p>
+															<div className="flex items-center gap-2 mt-1">
+																{n.project && (
+																	<span className="text-xs text-primary/80 font-medium truncate">
+																		{n.project.name}
+																	</span>
+																)}
+																<span className="text-[10px] text-muted-foreground">
+																	{formatRelativeTime(n.createdAt)}
+																</span>
+															</div>
+														</div>
+													</button>
 
 													{!n.readAt && (
 														<button
 															type="button"
 															onClick={(e) => handleMarkAsRead(n.id, e)}
-															className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-primary bg-primary/10 hover:bg-primary hover:text-primary-foreground rounded-full transition-colors opacity-0 group-hover:opacity-100"
+															className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-primary bg-primary/10 hover:bg-primary hover:text-primary-foreground rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10 focus-visible:opacity-100"
 															title="Mark as read"
 														>
 															<Check size={14} />
