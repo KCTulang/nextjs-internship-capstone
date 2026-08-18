@@ -58,6 +58,7 @@ export interface TasksState {
 	isLoading: boolean;
 	isSyncing: boolean;
 	error: string | null;
+	mutationVersions: Record<string, number>;
 
 	setMembers: (members: Member[]) => void;
 	fetchBoard: (projectId: string) => Promise<void>;
@@ -114,6 +115,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	isLoading: false,
 	isSyncing: false,
 	error: null,
+	mutationVersions: {},
 	selectedTaskIds: [],
 	setSelectedTaskIds: (ids) => set({ selectedTaskIds: ids }),
 
@@ -137,15 +139,34 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 				),
 			}));
 		} else if (event.type === "task.updated" && event.payload?.task) {
-			const task = event.payload.task as Task;
-			set((state) => ({
-				lists: state.lists.map((list) => ({
+			const updatedTask = event.payload.task as Task;
+			set((state) => {
+				let existingTask: Task | null = null;
+				for (const list of state.lists) {
+					const t = list.tasks.find((t) => t.id === updatedTask.id);
+					if (t) {
+						existingTask = t;
+						break;
+					}
+				}
+
+				const finalTask = existingTask
+					? { ...existingTask, ...updatedTask }
+					: updatedTask;
+
+				const newLists = state.lists.map((list) => ({
 					...list,
-					tasks: list.tasks.map((t) =>
-						t.id === task.id ? { ...t, ...task } : t,
-					),
-				})),
-			}));
+					tasks: list.tasks.filter((t) => t.id !== finalTask.id),
+				}));
+
+				const targetList = newLists.find((l) => l.id === finalTask.listId);
+				if (targetList) {
+					targetList.tasks.push(finalTask);
+					targetList.tasks.sort((a, b) => a.position - b.position);
+				}
+
+				return { lists: newLists };
+			});
 		} else if (event.type === "task.deleted") {
 			set((state) => ({
 				lists: state.lists.map((list) => ({
@@ -369,26 +390,72 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	},
 
 	updateTaskDetails: async (taskId, data, projectId) => {
-		set((state) => {
-			const newLists = state.lists.map((list) => {
-				const hasTask = list.tasks.some((t) => t.id === taskId);
-				if (!hasTask) return list;
+		const reqId = Date.now();
+		let previousTaskState: Task | null = null;
 
+		for (const list of get().lists) {
+			const t = list.tasks.find((t) => t.id === taskId);
+			if (t) {
+				previousTaskState = t;
+				break;
+			}
+		}
+
+		set((state) => {
+			if (!previousTaskState)
 				return {
-					...list,
-					tasks: list.tasks.map((t) =>
-						t.id === taskId ? { ...t, ...data } : t,
-					),
+					mutationVersions: { ...state.mutationVersions, [taskId]: reqId },
 				};
-			});
-			return { lists: newLists };
+
+			const finalTask = { ...previousTaskState, ...data };
+
+			const newLists = state.lists.map((list) => ({
+				...list,
+				tasks: list.tasks.filter((t) => t.id !== taskId),
+			}));
+
+			const targetList = newLists.find((l) => l.id === finalTask.listId);
+			if (targetList) {
+				targetList.tasks.push(finalTask);
+				targetList.tasks.sort((a, b) => a.position - b.position);
+			}
+
+			return {
+				lists: newLists,
+				mutationVersions: { ...state.mutationVersions, [taskId]: reqId },
+			};
 		});
+
 		const res = await updateTaskAction(taskId, data, projectId);
 		if (!res.success) {
 			useUIStore.getState().addToast({
 				type: "error",
 				message: res.error || "Failed to save changes.",
 			});
+
+			if (previousTaskState) {
+				const prevTask = previousTaskState;
+				set((state) => {
+					const currentVersion = state.mutationVersions[taskId];
+					if (currentVersion !== reqId) {
+						// A newer mutation has already started; don't roll back over it.
+						return state;
+					}
+
+					const newLists = state.lists.map((list) => ({
+						...list,
+						tasks: list.tasks.filter((t) => t.id !== taskId),
+					}));
+
+					const targetList = newLists.find((l) => l.id === prevTask.listId);
+					if (targetList) {
+						targetList.tasks.push(prevTask);
+						targetList.tasks.sort((a, b) => a.position - b.position);
+					}
+
+					return { lists: newLists };
+				});
+			}
 		}
 	},
 

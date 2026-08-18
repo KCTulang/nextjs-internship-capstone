@@ -14,6 +14,7 @@ import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { type Task, useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
+import { formatFocusDuration } from "@/utils";
 
 interface TaskDetailPanelProps {
 	taskId: string | null;
@@ -36,6 +37,11 @@ export function TaskDetailPanel({
 	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
 	const { startLockIn, isLockedIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
 
 	const storeTask =
 		taskId && projectId
@@ -369,23 +375,17 @@ export function TaskDetailPanel({
 
 	const priorities = ["low", "medium", "high", "urgent"];
 
-	const formatDuration = (seconds: number) => {
-		if (seconds === 0) return "0m";
-		const h = Math.floor(seconds / 3600);
-		const m = Math.floor((seconds % 3600) / 60);
-		if (h > 0 && m > 0) return `${h}h ${m}m`;
-		if (h > 0) return `${h}h`;
-		if (m === 0 && seconds > 0) return "<1m";
-		return `${m}m`;
-	};
-
 	const now = new Date();
 	const todayStart = new Date(
 		now.getFullYear(),
 		now.getMonth(),
 		now.getDate(),
 	).getTime();
-	const yesterdayStart = todayStart - 86400000;
+	const yesterdayStart = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate() - 1,
+	).getTime();
 
 	let totalDuration = 0;
 	let todayDuration = 0;
@@ -436,6 +436,8 @@ export function TaskDetailPanel({
 				return "updated the task";
 		}
 	};
+
+	if (!mounted) return null;
 
 	return (
 		<AnimatePresence>
@@ -719,7 +721,7 @@ export function TaskDetailPanel({
 										<>
 											<div>
 												<p className="text-xl font-bold text-foreground">
-													{formatDuration(totalDuration)}{" "}
+													{formatFocusDuration(totalDuration)}{" "}
 													<span className="text-sm font-normal text-muted-foreground">
 														total
 													</span>
@@ -733,8 +735,9 @@ export function TaskDetailPanel({
 																Today
 															</p>
 															<p className="text-xs text-muted-foreground mt-0.5">
-																{formatDuration(todayDuration)} · {todayCount}{" "}
-																session{todayCount !== 1 ? "s" : ""}
+																{formatFocusDuration(todayDuration)} ·{" "}
+																{todayCount} session
+																{todayCount !== 1 ? "s" : ""}
 															</p>
 														</div>
 													)}
@@ -744,7 +747,7 @@ export function TaskDetailPanel({
 																Yesterday
 															</p>
 															<p className="text-xs text-muted-foreground mt-0.5">
-																{formatDuration(yesterdayDuration)} ·{" "}
+																{formatFocusDuration(yesterdayDuration)} ·{" "}
 																{yesterdayCount} session
 																{yesterdayCount !== 1 ? "s" : ""}
 															</p>

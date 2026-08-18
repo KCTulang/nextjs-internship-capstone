@@ -23,6 +23,7 @@ import { useFocusTimer } from "@/hooks/use-focus-timer";
 import { useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
 import { useUIStore } from "@/stores/ui-store";
+import { formatFocusDuration } from "@/utils";
 
 const focusMusicTracks = [
 	"/audio/focus-music-1.mp3",
@@ -39,7 +40,7 @@ export function LockInOverlay() {
 		toggleNoise,
 		endLockIn,
 	} = useFocusStore();
-	const { timeElapsed, formattedTime } = useFocusTimer();
+	const { timeElapsed, formattedTime, pause, resume } = useFocusTimer();
 	const { addToast } = useUIStore();
 	const { lists, moveTask } = useTasksStore();
 	const holdProgress = useMotionValue(0);
@@ -56,10 +57,14 @@ export function LockInOverlay() {
 	const [completionState, setCompletionState] = useState<
 		"none" | "break" | "finish"
 	>("none");
+	const [completedDuration, setCompletedDuration] = useState<number | null>(
+		null,
+	);
 
 	useEffect(() => {
 		if (isLockedIn) {
 			setCompletionState("none");
+			setCompletedDuration(null);
 			isSavingRef.current = false;
 		}
 	}, [isLockedIn]);
@@ -217,6 +222,9 @@ export function LockInOverlay() {
 			duration: 1.5,
 			ease: "linear",
 			onComplete: () => {
+				pause();
+				audioWhiteNoiseRef.current?.pause();
+				audioFocusMusicRef.current?.pause();
 				setShowChoices(true);
 			},
 		});
@@ -278,6 +286,7 @@ export function LockInOverlay() {
 			audioWhiteNoiseRef.current?.pause();
 			audioFocusMusicRef.current?.pause();
 
+			setCompletedDuration(duration);
 			setCompletionState(action);
 		} catch (_error) {
 			addToast({
@@ -369,7 +378,7 @@ export function LockInOverlay() {
 								<p className="text-lg text-white/70 mb-10 leading-relaxed">
 									You stayed focused for{" "}
 									<strong className="text-white font-semibold">
-										{formattedTime}
+										{formatFocusDuration(completedDuration ?? 0)}
 									</strong>
 									.<br />
 									{completionState === "finish"
@@ -447,7 +456,7 @@ export function LockInOverlay() {
 										>
 											<span className="relative z-10 flex items-center gap-2 font-medium tracking-wide">
 												<Power className="h-5 w-5" />
-												Hold to Complete
+												Hold to End Session
 											</span>
 											<motion.div
 												style={{ scaleX: holdProgress }}
@@ -478,8 +487,8 @@ export function LockInOverlay() {
 									Session Complete
 								</h2>
 								<p className="mb-12 text-white/60 text-lg">
-									You locked in for {formattedTime}. What would you like to do
-									next?
+									You locked in for {formatFocusDuration(timeElapsed)}. What
+									would you like to do next?
 								</p>
 
 								<div className="flex flex-col sm:flex-row gap-6 w-full max-w-lg justify-center">
@@ -525,6 +534,18 @@ export function LockInOverlay() {
 									onClick={() => {
 										setShowChoices(false);
 										cancelHold();
+										resume();
+										if (audioMode === "white-noise") {
+											audioWhiteNoiseRef.current?.play().catch((e) => {
+												if (e instanceof Error && e.name !== "AbortError")
+													console.error(e);
+											});
+										} else if (audioMode === "focus-music") {
+											audioFocusMusicRef.current?.play().catch((e) => {
+												if (e instanceof Error && e.name !== "AbortError")
+													console.error(e);
+											});
+										}
 									}}
 									className="mt-12 flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors"
 								>
