@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, queries } from "@/lib/db";
 import { lists } from "@/lib/db/schema";
+import { publishProjectEvent } from "@/lib/realtime/events";
 import { createListSchema, updateListSchema } from "@/lib/validations";
 
 async function requireAuth() {
@@ -37,6 +38,16 @@ export async function createListAction(rawData: {
 			projectId: data.projectId,
 			position: data.position,
 		});
+
+		await publishProjectEvent({
+			type: "list.created",
+			projectId: data.projectId,
+			actorId: await auth().then((a) => a.userId as string),
+			entityId: newList[0].id,
+			timestamp: new Date().toISOString(),
+			payload: { list: newList[0] },
+		});
+
 		revalidatePath(`/`, "layout");
 		return { success: true, data: newList[0] };
 	} catch (error) {
@@ -66,12 +77,22 @@ export async function generateDefaultListsAction(projectId: string) {
 export async function updateListAction(
 	listId: string,
 	rawData: { name?: string; position?: number },
-	_projectId: string,
+	projectId: string,
 ) {
 	try {
-		await requireAuth();
+		const userId = await requireAuth();
 		const data = updateListSchema.parse(rawData);
 		const updatedList = await queries.lists.update(listId, data);
+
+		await publishProjectEvent({
+			type: "list.updated",
+			projectId,
+			actorId: userId,
+			entityId: listId,
+			timestamp: new Date().toISOString(),
+			payload: { list: updatedList[0] },
+		});
+
 		revalidatePath(`/dashboard`, "layout");
 		return { success: true, data: updatedList[0] };
 	} catch (error) {
@@ -80,10 +101,19 @@ export async function updateListAction(
 	}
 }
 
-export async function deleteListAction(listId: string, _projectId: string) {
+export async function deleteListAction(listId: string, projectId: string) {
 	try {
-		await requireAuth();
+		const userId = await requireAuth();
 		await queries.lists.delete(listId);
+
+		await publishProjectEvent({
+			type: "list.deleted",
+			projectId,
+			actorId: userId,
+			entityId: listId,
+			timestamp: new Date().toISOString(),
+		});
+
 		revalidatePath(`/dashboard`, "layout");
 		return { success: true };
 	} catch (error) {
@@ -94,7 +124,7 @@ export async function deleteListAction(listId: string, _projectId: string) {
 
 export async function bulkUpdateListOrderAction(
 	updates: { id: string; position: number }[],
-	_projectId: string,
+	projectId: string,
 ) {
 	try {
 		const clerkId = await requireAuth();
@@ -111,6 +141,17 @@ export async function bulkUpdateListOrderAction(
 
 		if (queriesToRun.length > 0) {
 			await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
+
+			for (const update of updates) {
+				await publishProjectEvent({
+					type: "list.reordered",
+					projectId,
+					actorId: user.id,
+					entityId: update.id,
+					timestamp: new Date().toISOString(),
+					payload: update,
+				});
+			}
 		}
 
 		revalidatePath(`/dashboard`, "layout");

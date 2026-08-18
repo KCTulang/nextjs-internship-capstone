@@ -11,6 +11,7 @@ import {
 	projects,
 	users,
 } from "@/lib/db/schema";
+import { publishProjectEvent } from "@/lib/realtime/events";
 
 async function requireAuth() {
 	const { userId } = await auth();
@@ -44,7 +45,7 @@ export async function inviteMemberAction(rawData: {
 				eq(projectMembers.userId, caller.id),
 			),
 		});
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can invite members",
@@ -96,6 +97,20 @@ export async function inviteMemberAction(rawData: {
 				inviterId: caller.id,
 			})
 			.returning();
+
+		if (user) {
+			const { createNotificationAction } = await import(
+				"@/app/actions/notifications"
+			);
+			await createNotificationAction({
+				userId: user.id,
+				actorId: caller.id,
+				type: "invitation",
+				taskId: newInvite[0].id,
+				projectId: data.projectId,
+				message: "invited you to a project",
+			});
+		}
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: newInvite[0] };
@@ -165,6 +180,19 @@ export async function respondToInvitationAction(
 					.set({ status: "accepted" })
 					.where(eq(projectInvitations.id, invitationId)),
 			]);
+
+			await publishProjectEvent({
+				type: "member.added",
+				projectId: invitation.projectId,
+				actorId: user.id,
+				entityId: user.id,
+				timestamp: new Date().toISOString(),
+				payload: {
+					userId: user.id,
+					role: invitation.role,
+					projectRole: invitation.projectRole,
+				},
+			});
 		} else {
 			await db
 				.update(projectInvitations)
@@ -199,7 +227,7 @@ export async function revokeInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can revoke invitations",
@@ -264,7 +292,7 @@ export async function getPendingInvitationsByProjectAction(projectId: string) {
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can view invitations",
@@ -309,7 +337,7 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		});
 
 		if (caller.id !== userId) {
-			if (!callerMembership || callerMembership.role !== "admin") {
+			if (callerMembership?.role !== "admin") {
 				return {
 					success: false,
 					error: "Only project owners or admins can remove members",
@@ -318,6 +346,15 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		}
 
 		await queries.projectMembers.removeMember(projectId, userId);
+
+		await publishProjectEvent({
+			type: "member.removed",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+		});
+
 		revalidatePath(`/`, "layout");
 		return { success: true };
 	} catch (error) {
@@ -344,7 +381,7 @@ export async function updateMemberRoleAction(
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can change roles",
@@ -368,6 +405,15 @@ export async function updateMemberRoleAction(
 				),
 			)
 			.returning();
+
+		await publishProjectEvent({
+			type: "member.updated",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+			payload: updatedMember[0],
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: updatedMember[0] };
@@ -515,7 +561,7 @@ export async function cancelInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can cancel invitations",
@@ -558,7 +604,7 @@ export async function resendInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can resend invitations",
@@ -595,7 +641,7 @@ export async function updateProjectMemberAction(
 			),
 		});
 
-		if (!callerMembership || callerMembership.role !== "admin") {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can update member details",
@@ -638,6 +684,15 @@ export async function updateProjectMemberAction(
 				),
 			)
 			.returning();
+
+		await publishProjectEvent({
+			type: "member.updated",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+			payload: updated[0],
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: updated[0] };

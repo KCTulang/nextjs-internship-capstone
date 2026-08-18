@@ -19,6 +19,7 @@ import {
 import { Plus, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import {
 	type List,
@@ -42,10 +43,28 @@ export function KanbanBoard({ projectId, members }: KanbanBoardProps) {
 	const searchParams = useSearchParams();
 	const taskId = searchParams.get("taskId");
 
-	const { setMembers } = useTasksStore();
+	const { setMembers, applyRealtimeEvent, fetchBoard } = useTasksStore();
 	useEffect(() => {
 		if (members) setMembers(members);
 	}, [members, setMembers]);
+
+	const { useEvent } = useCollaboration(projectId);
+
+	useEvent("task.created", applyRealtimeEvent);
+	useEvent("task.updated", applyRealtimeEvent);
+	useEvent("task.deleted", applyRealtimeEvent);
+	useEvent("task.moved", applyRealtimeEvent);
+	useEvent("task.reordered", applyRealtimeEvent);
+	useEvent("list.created", applyRealtimeEvent);
+	useEvent("list.updated", applyRealtimeEvent);
+	useEvent("list.deleted", applyRealtimeEvent);
+	useEvent("list.reordered", applyRealtimeEvent);
+
+	useEvent("task.assigned", () => fetchBoard(projectId));
+	useEvent("task.unassigned", () => fetchBoard(projectId));
+	useEvent("member.added", () => fetchBoard(projectId));
+	useEvent("member.removed", () => fetchBoard(projectId));
+	useEvent("member.updated", () => fetchBoard(projectId));
 
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);

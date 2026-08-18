@@ -1,8 +1,19 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { queries } from "@/lib/db";
+import { createNotificationAction } from "@/app/actions/notifications";
+import { db, queries } from "@/lib/db";
+import {
+	lists,
+	projectMembers,
+	projects,
+	taskAssignees,
+	tasks,
+	users,
+} from "@/lib/db/schema";
+import { publishProjectEvent } from "@/lib/realtime/events";
 import { createTaskSchema, updateTaskSchema } from "@/lib/validations";
 import { logActivity } from "./activity";
 
@@ -20,10 +31,11 @@ export async function createTaskAction(
 		priority?: string;
 		dueDate?: Date | null;
 		assigneeId?: string | null;
+		assigneeIds?: string[];
 		position: number;
 		labels?: string[] | null;
 	},
-	_projectId?: string | null,
+	projectId?: string | null,
 ) {
 	try {
 		await requireAuth();
@@ -38,8 +50,66 @@ export async function createTaskAction(
 			position: data.position,
 			labels: data.labels || null,
 		});
+
+		const createdTask = newTask[0];
+
+		const finalAssigneeIds =
+			data.assigneeIds || (data.assigneeId ? [data.assigneeId] : []);
+		if (finalAssigneeIds.length > 0) {
+			const assigneesToInsert = finalAssigneeIds.map((uid) => ({
+				taskId: createdTask.id,
+				userId: uid,
+			}));
+			await db.insert(taskAssignees).values(assigneesToInsert);
+
+			const clerkId = await auth().then((a) => a.userId as string);
+			const currentUser = await queries.users.getByClerkId(clerkId);
+			if (currentUser) {
+				let actualProjectId = projectId;
+				if (!actualProjectId) {
+					const list = await db.query.lists.findFirst({
+						where: eq(lists.id, data.listId),
+					});
+					actualProjectId = list?.projectId || null;
+				}
+				if (actualProjectId) {
+					for (const uid of finalAssigneeIds) {
+						if (uid !== currentUser.id) {
+							await createNotificationAction({
+								userId: uid,
+								actorId: currentUser.id,
+								type: "assignment",
+								taskId: createdTask.id,
+								projectId: actualProjectId,
+								message: "assigned you to a new task",
+							});
+						}
+					}
+				}
+			}
+		}
+
+		let actualProjectId = projectId;
+		if (!actualProjectId) {
+			const list = await db.query.lists.findFirst({
+				where: eq(lists.id, data.listId),
+			});
+			actualProjectId = list?.projectId || null;
+		}
+
+		if (actualProjectId) {
+			await publishProjectEvent({
+				type: "task.created",
+				projectId: actualProjectId,
+				actorId: await auth().then((a) => a.userId as string),
+				entityId: createdTask.id,
+				timestamp: new Date().toISOString(),
+				payload: { task: createdTask },
+			});
+		}
+
 		revalidatePath(`/`, "layout");
-		return { success: true, data: newTask[0] };
+		return { success: true, data: createdTask };
 	} catch (error) {
 		console.error("Failed to create task:", error);
 		return { success: false, error: "Failed to create task" };
@@ -55,10 +125,11 @@ export async function updateTaskAction(
 		priority?: string;
 		dueDate?: Date | null;
 		assigneeId?: string | null;
+		assigneeIds?: string[];
 		position?: number;
 		labels?: string[] | null;
 	},
-	_projectId?: string | null,
+	projectId?: string | null,
 ) {
 	try {
 		await requireAuth();
@@ -111,19 +182,80 @@ export async function updateTaskAction(
 				);
 			}
 		}
-		if (
-			data.assigneeId !== undefined &&
-			data.assigneeId !== currentTask.assigneeId
-		) {
-			logPromises.push(
-				logActivity(
-					taskId,
-					data.assigneeId ? "task_assigned" : "task_unassigned",
-					currentTask.assigneeId,
-					data.assigneeId,
-				),
+		if (data.assigneeId !== undefined || data.assigneeIds !== undefined) {
+			const finalAssigneeIds =
+				data.assigneeIds !== undefined
+					? data.assigneeIds
+					: data.assigneeId
+						? [data.assigneeId]
+						: [];
+
+			const existing = await db
+				.select()
+				.from(taskAssignees)
+				.where(eq(taskAssignees.taskId, taskId));
+			const existingIds = existing.map((a) => a.userId);
+
+			const toAdd = finalAssigneeIds.filter((id) => !existingIds.includes(id));
+			const toRemove = existingIds.filter(
+				(id) => !finalAssigneeIds.includes(id),
 			);
+
+			if (toRemove.length > 0) {
+				await db
+					.delete(taskAssignees)
+					.where(
+						and(
+							eq(taskAssignees.taskId, taskId),
+							inArray(taskAssignees.userId, toRemove),
+						),
+					);
+				toRemove.forEach((uid) => {
+					logPromises.push(logActivity(taskId, "task_unassigned", uid, null));
+				});
+			}
+
+			if (toAdd.length > 0) {
+				const addValues = toAdd.map((uid) => ({ taskId, userId: uid }));
+				await db.insert(taskAssignees).values(addValues);
+
+				const clerkId = await requireAuth();
+				const currentUser = await queries.users.getByClerkId(clerkId);
+
+				for (const uid of toAdd) {
+					logPromises.push(logActivity(taskId, "task_assigned", null, uid));
+
+					if (currentUser && uid !== currentUser.id) {
+						const notifProjectId = projectId;
+						if (!notifProjectId && currentTask.listId) {
+							const l = await db.query.lists.findFirst({
+								where: eq(lists.id, currentTask.listId),
+							});
+							if (l?.projectId) {
+								await createNotificationAction({
+									userId: uid,
+									actorId: currentUser.id,
+									type: "assignment",
+									taskId,
+									projectId: l.projectId,
+									message: "assigned you to a task",
+								});
+							}
+						} else if (notifProjectId) {
+							await createNotificationAction({
+								userId: uid,
+								actorId: currentUser.id,
+								type: "assignment",
+								taskId,
+								projectId: notifProjectId,
+								message: "assigned you to a task",
+							});
+						}
+					}
+				}
+			}
 		}
+
 		if (data.labels !== undefined) {
 			const oldLabels = currentTask.labels || [];
 			const newLabels = data.labels || [];
@@ -141,6 +273,25 @@ export async function updateTaskAction(
 
 		await Promise.all(logPromises);
 
+		let actualProjectId = projectId;
+		if (!actualProjectId && currentTask.listId) {
+			const list = await db.query.lists.findFirst({
+				where: eq(lists.id, currentTask.listId),
+			});
+			actualProjectId = list?.projectId || null;
+		}
+
+		if (actualProjectId) {
+			await publishProjectEvent({
+				type: "task.updated",
+				projectId: actualProjectId,
+				actorId: await auth().then((a) => a.userId as string),
+				entityId: taskId,
+				timestamp: new Date().toISOString(),
+				payload: { task: updatedTask[0] },
+			});
+		}
+
 		revalidatePath(`/`, "layout");
 		return { success: true, data: updatedTask[0] };
 	} catch (error) {
@@ -151,11 +302,34 @@ export async function updateTaskAction(
 
 export async function deleteTaskAction(
 	taskId: string,
-	_projectId?: string | null,
+	projectId?: string | null,
 ) {
 	try {
-		await requireAuth();
+		const userId = await requireAuth();
+
+		let actualProjectId = projectId;
+		if (!actualProjectId) {
+			const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+			if (task?.listId) {
+				const list = await db.query.lists.findFirst({
+					where: eq(lists.id, task.listId),
+				});
+				actualProjectId = list?.projectId || null;
+			}
+		}
+
 		await queries.tasks.delete(taskId);
+
+		if (actualProjectId) {
+			await publishProjectEvent({
+				type: "task.deleted",
+				projectId: actualProjectId,
+				actorId: userId,
+				entityId: taskId,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
 		revalidatePath(`/`, "layout");
 		return { success: true };
 	} catch (error) {
@@ -163,10 +337,6 @@ export async function deleteTaskAction(
 		return { success: false, error: "Failed to delete task" };
 	}
 }
-
-import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { lists, projectMembers, projects, tasks, users } from "@/lib/db/schema";
 
 export async function getAllUserTasksAction() {
 	try {
@@ -502,7 +672,7 @@ export async function bulkMarkCompleteAction(taskIds: string[]) {
 
 export async function bulkUpdateTaskOrderAction(
 	updates: { id: string; listId: string; position: number }[],
-	_projectId: string,
+	projectId: string,
 ) {
 	try {
 		const clerkId = await requireAuth();
@@ -519,6 +689,19 @@ export async function bulkUpdateTaskOrderAction(
 
 		if (queriesToRun.length > 0) {
 			await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
+
+			if (projectId) {
+				for (const update of updates) {
+					await publishProjectEvent({
+						type: "task.reordered",
+						projectId,
+						actorId: user.id,
+						entityId: update.id,
+						timestamp: new Date().toISOString(),
+						payload: update,
+					});
+				}
+			}
 		}
 
 		revalidatePath(`/dashboard`, "layout");
