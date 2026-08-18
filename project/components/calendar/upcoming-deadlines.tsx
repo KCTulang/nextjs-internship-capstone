@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Trash2, X } from "lucide-react";
+import { CheckCircle2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -24,15 +24,6 @@ const DONE_LIST_NAMES = new Set([
 
 function isCompletedList(listName?: string | null): boolean {
 	return DONE_LIST_NAMES.has((listName ?? "").toLowerCase().trim());
-}
-
-function formatDueDate(dueDate: Date | null | undefined): string {
-	if (!dueDate) return "No date";
-	return new Date(dueDate).toLocaleDateString(undefined, {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	});
 }
 
 function isOverdue(
@@ -298,7 +289,6 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 						data-task-id={task.id}
 						className={containerClasses}
 					>
-				
 						<button
 							type="button"
 							className="task-checkbox hidden sm:flex pt-1 cursor-pointer shrink-0 mt-0.5"

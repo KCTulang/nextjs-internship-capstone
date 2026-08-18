@@ -3,7 +3,6 @@
 import { format, getDay, parse, startOfWeek } from "date-fns";
 import { enUS } from "date-fns/locale/en-US";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import {
 	Calendar,
@@ -53,9 +52,6 @@ interface CalendarGridProps {
 }
 
 export function CalendarGrid({ tasksWithDates }: CalendarGridProps) {
-	const router = useRouter();
-	const pathname = usePathname();
-	const searchParams = useSearchParams();
 	const { openCreateTaskModal, openPreviewTaskModal } = useUIStore();
 
 	const [view, setView] = useState<View>("month");
