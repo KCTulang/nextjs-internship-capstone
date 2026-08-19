@@ -10,9 +10,11 @@ import {
 	getCommentsAction,
 } from "@/app/actions/comments";
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
+import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { type Task, useTasksStore } from "@/hooks/use-tasks";
+import { type Task, useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
+import { formatFocusDuration } from "@/utils";
 
 interface TaskDetailPanelProps {
 	taskId: string | null;
@@ -33,8 +35,13 @@ export function TaskDetailPanel({
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
-	const { startLockIn } = useFocusStore();
+	const { startLockIn, isLockedIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
+	const [mounted, setMounted] = useState(false);
+
+	useEffect(() => {
+		setMounted(true);
+	}, []);
 
 	const storeTask =
 		taskId && projectId
@@ -82,6 +89,37 @@ export function TaskDetailPanel({
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
 	const titleRef = useRef<HTMLTextAreaElement>(null);
 
+	type FocusSession = {
+		id: string;
+		duration: number | null;
+		startTime: Date;
+	};
+	const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+
+	const fetchFocusSessions = useCallback((id: string) => {
+		import("@/app/actions/focus-sessions").then(
+			({ getFocusSessionsByTaskAction }) => {
+				getFocusSessionsByTaskAction(id).then((res) => {
+					if (res.success && res.data) {
+						setFocusSessions(res.data as unknown as FocusSession[]);
+					}
+				});
+			},
+		);
+	}, []);
+
+	useEffect(() => {
+		if (taskId) fetchFocusSessions(taskId);
+	}, [taskId, fetchFocusSessions]);
+
+	const prevLockedInRef = useRef(isLockedIn);
+	useEffect(() => {
+		if (prevLockedInRef.current && !isLockedIn && taskId) {
+			fetchFocusSessions(taskId);
+		}
+		prevLockedInRef.current = isLockedIn;
+	}, [isLockedIn, taskId, fetchFocusSessions]);
+
 	const taskRef = useRef(task);
 	taskRef.current = task;
 	const updateTaskDetailsRef = useRef(updateTaskDetails);
@@ -126,6 +164,37 @@ export function TaskDetailPanel({
 			}, 0);
 		}
 	}, [taskId]);
+
+	const { useEvent } = useCollaboration(projectId);
+	useEvent(
+		"comment.created",
+		(event) => {
+			const commentData = event.payload?.comment as
+				| { taskId?: string }
+				| undefined;
+			if (taskId && commentData?.taskId === taskId) {
+				getCommentsAction(taskId).then((res) => {
+					if (res.success && res.data) {
+						setComments(res.data);
+						useTasksStore.getState().updateTaskComments(
+							taskId,
+							res.data.map((c) => ({ id: c.id })),
+						);
+					}
+				});
+			}
+		},
+		[taskId],
+	);
+	useEvent(
+		"comment.deleted",
+		(event) => {
+			if (taskId) {
+				setComments((prev) => prev.filter((c) => c.id !== event.entityId));
+			}
+		},
+		[taskId],
+	);
 
 	useEffect(() => {
 		if (!taskId) return;
@@ -306,6 +375,40 @@ export function TaskDetailPanel({
 
 	const priorities = ["low", "medium", "high", "urgent"];
 
+	const now = new Date();
+	const todayStart = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate(),
+	).getTime();
+	const yesterdayStart = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate() - 1,
+	).getTime();
+
+	let totalDuration = 0;
+	let todayDuration = 0;
+	let yesterdayDuration = 0;
+	let todayCount = 0;
+	let yesterdayCount = 0;
+
+	for (const session of focusSessions) {
+		const duration = session.duration || 0;
+		if (duration <= 0) continue;
+
+		totalDuration += duration;
+		const startTime = new Date(session.startTime).getTime();
+
+		if (startTime >= todayStart) {
+			todayDuration += duration;
+			todayCount++;
+		} else if (startTime >= yesterdayStart && startTime < todayStart) {
+			yesterdayDuration += duration;
+			yesterdayCount++;
+		}
+	}
+
 	const formatActivityMessage = (activity: Activity) => {
 		const type = activity.type as string;
 		switch (type) {
@@ -333,6 +436,8 @@ export function TaskDetailPanel({
 				return "updated the task";
 		}
 	};
+
+	if (!mounted) return null;
 
 	return (
 		<AnimatePresence>
@@ -604,6 +709,57 @@ export function TaskDetailPanel({
 								</div>
 							</div>
 
+							<div className="mt-8 space-y-3 max-w-md">
+								<h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+									<Target size={15} className="text-primary" />
+									Focus Time
+								</h3>
+								<div className="bg-card border border-border rounded-xl p-4 flex flex-wrap gap-6 items-start">
+									{focusSessions.length === 0 ? (
+										<p className="text-sm text-muted-foreground">0m total</p>
+									) : (
+										<>
+											<div>
+												<p className="text-xl font-bold text-foreground">
+													{formatFocusDuration(totalDuration)}{" "}
+													<span className="text-sm font-normal text-muted-foreground">
+														total
+													</span>
+												</p>
+											</div>
+											{(todayCount > 0 || yesterdayCount > 0) && (
+												<div className="flex gap-6 border-l border-border pl-6">
+													{todayCount > 0 && (
+														<div>
+															<p className="text-sm font-medium text-foreground">
+																Today
+															</p>
+															<p className="text-xs text-muted-foreground mt-0.5">
+																{formatFocusDuration(todayDuration)} ·{" "}
+																{todayCount} session
+																{todayCount !== 1 ? "s" : ""}
+															</p>
+														</div>
+													)}
+													{yesterdayCount > 0 && (
+														<div>
+															<p className="text-sm font-medium text-foreground">
+																Yesterday
+															</p>
+															<p className="text-xs text-muted-foreground mt-0.5">
+																{formatFocusDuration(yesterdayDuration)} ·{" "}
+																{yesterdayCount} session
+																{yesterdayCount !== 1 ? "s" : ""}
+															</p>
+														</div>
+													)}
+												</div>
+											)}
+										</>
+									)}
+								</div>
+							</div>
+
 							<div className="mt-10 pt-8 border-t border-primary/10 relative">
 								<div className="absolute top-0 left-0 w-24 h-px bg-linear-to-r from-primary/40 to-transparent -translate-y-px" />
 								<textarea
@@ -655,7 +811,10 @@ export function TaskDetailPanel({
 																	comment.author?.email ||
 																	"Unknown User"}
 															</span>
-															<span className="text-xs text-muted-foreground">
+															<span
+																className="text-xs text-muted-foreground"
+																suppressHydrationWarning
+															>
 																{comment.createdAt
 																	? new Date(
 																			comment.createdAt,
@@ -736,7 +895,10 @@ export function TaskDetailPanel({
 															</span>
 															{formatActivityMessage(activity)}
 														</p>
-														<p className="text-xs text-muted-foreground mt-0.5">
+														<p
+															className="text-xs text-muted-foreground mt-0.5"
+															suppressHydrationWarning
+														>
 															{activity.createdAt &&
 																new Date(activity.createdAt).toLocaleString(
 																	undefined,

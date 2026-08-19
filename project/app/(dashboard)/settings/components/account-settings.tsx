@@ -5,13 +5,13 @@ import { Loader2, Mail, Plus, Shield } from "lucide-react";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
-import { updateUserProfileAction } from "@/lib/actions/user.actions";
+import { updateUserProfileAction } from "@/app/actions/user";
+import { useUIStore } from "@/stores/ui-store";
 import {
 	updateNameSchema,
 	updateUsernameSchema,
 	validate,
-} from "@/lib/validations";
-import { useUIStore } from "@/stores/ui-store";
+} from "@/utils/validations";
 import {
 	type ReverificationHandler,
 	ReverificationModal,

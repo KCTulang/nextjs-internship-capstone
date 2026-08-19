@@ -45,7 +45,10 @@ export default function RootLayout({
 				className="h-full antialiased"
 				data-scroll-behavior="smooth"
 			>
-				<body className={`${inter.className} min-h-full flex flex-col`}>
+				<body
+					className={`${inter.className} min-h-full flex flex-col`}
+					suppressHydrationWarning
+				>
 					<LockInOverlay />
 					<ThemeProvider>
 						<AmbientGlow />

@@ -116,7 +116,7 @@ export const queries = {
 			await db.insert(schema.projectMembers).values({
 				projectId: project.id,
 				userId: data.ownerId,
-				role: "owner",
+				role: "admin",
 			});
 			return [project];
 		},
@@ -224,7 +224,11 @@ export const queries = {
 		addMember: async (data: typeof schema.projectMembers.$inferInsert) => {
 			return await db.insert(schema.projectMembers).values(data).returning();
 		},
-		updateRole: async (projectId: string, userId: string, role: string) => {
+		updateRole: async (
+			projectId: string,
+			userId: string,
+			role: "admin" | "member",
+		) => {
 			return await db
 				.update(schema.projectMembers)
 				.set({ role })
@@ -291,6 +295,31 @@ export const queries = {
 					user: true,
 				},
 			});
+		},
+	},
+	notificationPreferences: {
+		getByUserId: async (userId: string) => {
+			let prefs = await db.query.notificationPreferences.findFirst({
+				where: eq(schema.notificationPreferences.userId, userId),
+			});
+			if (!prefs) {
+				const [newPrefs] = await db
+					.insert(schema.notificationPreferences)
+					.values({ userId })
+					.returning();
+				prefs = newPrefs;
+			}
+			return prefs;
+		},
+		update: async (
+			userId: string,
+			data: Partial<typeof schema.notificationPreferences.$inferInsert>,
+		) => {
+			return await db
+				.update(schema.notificationPreferences)
+				.set(data)
+				.where(eq(schema.notificationPreferences.userId, userId))
+				.returning();
 		},
 	},
 };

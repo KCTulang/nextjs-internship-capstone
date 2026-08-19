@@ -11,6 +11,7 @@ import {
 	projects,
 	users,
 } from "@/lib/db/schema";
+import { publishProjectEvent } from "@/services/realtime/events";
 
 async function requireAuth() {
 	const { userId } = await auth();
@@ -28,7 +29,7 @@ const inviteMemberSchema = z.object({
 export async function inviteMemberAction(rawData: {
 	projectId: string;
 	email: string;
-	role?: string;
+	role?: "admin" | "member";
 	projectRole?: string;
 }) {
 	try {
@@ -44,10 +45,7 @@ export async function inviteMemberAction(rawData: {
 				eq(projectMembers.userId, caller.id),
 			),
 		});
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can invite members",
@@ -93,12 +91,26 @@ export async function inviteMemberAction(rawData: {
 			.values({
 				projectId: data.projectId,
 				email: data.email,
-				role: data.role,
+				role: data.role as "admin" | "member",
 				projectRole: data.projectRole,
 				status: "pending",
 				inviterId: caller.id,
 			})
 			.returning();
+
+		if (user) {
+			const { createNotificationAction } = await import(
+				"@/app/actions/notifications"
+			);
+			await createNotificationAction({
+				userId: user.id,
+				actorId: caller.id,
+				type: "invitation",
+				taskId: newInvite[0].id,
+				projectId: data.projectId,
+				message: "invited you to a project",
+			});
+		}
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: newInvite[0] };
@@ -160,7 +172,7 @@ export async function respondToInvitationAction(
 				db.insert(projectMembers).values({
 					projectId: invitation.projectId,
 					userId: user.id,
-					role: invitation.role,
+					role: invitation.role as "admin" | "member",
 					projectRole: invitation.projectRole,
 				}),
 				db
@@ -168,6 +180,19 @@ export async function respondToInvitationAction(
 					.set({ status: "accepted" })
 					.where(eq(projectInvitations.id, invitationId)),
 			]);
+
+			await publishProjectEvent({
+				type: "member.added",
+				projectId: invitation.projectId,
+				actorId: user.id,
+				entityId: user.id,
+				timestamp: new Date().toISOString(),
+				payload: {
+					userId: user.id,
+					role: invitation.role,
+					projectRole: invitation.projectRole,
+				},
+			});
 		} else {
 			await db
 				.update(projectInvitations)
@@ -202,10 +227,7 @@ export async function revokeInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can revoke invitations",
@@ -270,10 +292,7 @@ export async function getPendingInvitationsByProjectAction(projectId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can view invitations",
@@ -318,10 +337,7 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		});
 
 		if (caller.id !== userId) {
-			if (
-				!callerMembership ||
-				(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-			) {
+			if (callerMembership?.role !== "admin") {
 				return {
 					success: false,
 					error: "Only project owners or admins can remove members",
@@ -330,6 +346,15 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		}
 
 		await queries.projectMembers.removeMember(projectId, userId);
+
+		await publishProjectEvent({
+			type: "member.removed",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+		});
+
 		revalidatePath(`/`, "layout");
 		return { success: true };
 	} catch (error) {
@@ -356,17 +381,16 @@ export async function updateMemberRoleAction(
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can change roles",
 			};
 		}
 
-		const updateData: { role: string; projectRole?: string } = { role };
+		const updateData: { role?: "admin" | "member"; projectRole?: string } = {
+			role: role as "admin" | "member",
+		};
 		if (projectRole) {
 			updateData.projectRole = projectRole;
 		}
@@ -381,6 +405,15 @@ export async function updateMemberRoleAction(
 				),
 			)
 			.returning();
+
+		await publishProjectEvent({
+			type: "member.updated",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+			payload: updatedMember[0],
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: updatedMember[0] };
@@ -472,7 +505,7 @@ export async function getSentInvitationsAction() {
 		const callerMemberships = await db.query.projectMembers.findMany({
 			where: and(
 				eq(projectMembers.userId, user.id),
-				inArray(projectMembers.role, ["owner", "admin"]),
+				eq(projectMembers.role, "admin"),
 			),
 		});
 
@@ -528,10 +561,7 @@ export async function cancelInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can cancel invitations",
@@ -574,10 +604,7 @@ export async function resendInvitationAction(invitationId: string) {
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can resend invitations",
@@ -600,7 +627,7 @@ export async function resendInvitationAction(invitationId: string) {
 export async function updateProjectMemberAction(
 	projectId: string,
 	userId: string,
-	data: { role?: string; projectRole?: string },
+	data: { role?: "admin" | "member"; projectRole?: string },
 ) {
 	try {
 		const clerkId = await requireAuth();
@@ -614,10 +641,7 @@ export async function updateProjectMemberAction(
 			),
 		});
 
-		if (
-			!callerMembership ||
-			(callerMembership.role !== "owner" && callerMembership.role !== "admin")
-		) {
+		if (callerMembership?.role !== "admin") {
 			return {
 				success: false,
 				error: "Only project owners or admins can update member details",
@@ -631,14 +655,18 @@ export async function updateProjectMemberAction(
 			),
 		});
 
-		if (targetMembership?.role === "owner") {
+		const project = await db.query.projects.findFirst({
+			where: eq(projects.id, projectId),
+		});
+
+		if (targetMembership?.userId === project?.ownerId) {
 			return {
 				success: false,
 				error: "Cannot change the project owner's permission level",
 			};
 		}
 
-		const updateData: Record<string, string> = {};
+		const updateData: { role?: "admin" | "member"; projectRole?: string } = {};
 		if (data.role) updateData.role = data.role;
 		if (data.projectRole) updateData.projectRole = data.projectRole;
 
@@ -656,6 +684,15 @@ export async function updateProjectMemberAction(
 				),
 			)
 			.returning();
+
+		await publishProjectEvent({
+			type: "member.updated",
+			projectId,
+			actorId: caller.id,
+			entityId: userId,
+			timestamp: new Date().toISOString(),
+			payload: updated[0],
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true, data: updated[0] };

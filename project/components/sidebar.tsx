@@ -64,13 +64,12 @@ function NavItem({
 				className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring
 					${
 						isActive
-							? "bg-primary/10 text-primary shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_4px_rgba(255,255,255,0.02)]" 
-							: "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" 
+							? "bg-primary/10 text-primary shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_4px_rgba(255,255,255,0.02)]"
+							: "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
 					}
 					${collapsed ? "justify-center px-0 mx-2" : "justify-start"}
 				`}
 			>
-				{/* 1. Active Left Accent Bar */}
 				{isActive && (
 					<div className="absolute left-3 top-2 bottom-2 w-1 bg-primary rounded-r-full shadow-[0_0_8px_var(--color-primary)] opacity-80" />
 				)}
@@ -93,7 +92,6 @@ function NavItem({
 				)}
 			</Link>
 
-			{/* Tooltip for collapsed state */}
 			{collapsed && (
 				<div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-3 py-1.5 bg-popover text-popover-foreground text-xs font-semibold tracking-wide rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-200 whitespace-nowrap shadow-lg border border-border z-50 hidden lg:block translate-x-1 group-hover:translate-x-0 reveal">
 					{item.name}
@@ -124,7 +122,6 @@ export function Sidebar({
 
 	return (
 		<>
-			{/* Mobile backdrop */}
 			{mobileOpen && (
 				<button
 					type="button"
@@ -134,7 +131,6 @@ export function Sidebar({
 				/>
 			)}
 
-			{/* Sidebar shell */}
 			<div
 				className={`fixed inset-y-0 left-0 z-50 flex flex-col transform transition-all duration-300 ease-in-out lg:translate-x-0
 					${mobileOpen ? "translate-x-0" : "-translate-x-full"}
@@ -143,12 +139,10 @@ export function Sidebar({
 					shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_40px_rgba(0,0,0,0.15)]
 				`}
 			>
-				{/* Ambient Glow for Dark Mode */}
 				<div className="absolute inset-0 pointer-events-none hidden dark:block overflow-hidden rounded-r-[2rem]">
 					<div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/10 blur-[80px] rounded-full" />
 				</div>
 
-				{/* 6. Collapse toggle button - anchored deliberately with matched shadow/borders */}
 				<button
 					type="button"
 					onClick={() => setIsCollapsed(!isCollapsed)}
@@ -173,7 +167,6 @@ export function Sidebar({
 					)}
 				</button>
 
-				{/* Logo Header (Unchanged Logic as requested) */}
 				<div className="relative z-10 flex items-center justify-between lg:justify-center h-20 px-4 sm:px-6 shrink-0">
 					<Link
 						href="/"
@@ -199,7 +192,6 @@ export function Sidebar({
 					</button>
 				</div>
 
-				{/* Navigation Items */}
 				<nav className="relative z-10 flex flex-col flex-1 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 					<ul className="space-y-1">
 						{mainNav.map((item) => (
@@ -213,7 +205,6 @@ export function Sidebar({
 						))}
 					</ul>
 
-					{/* 3. WORKSPACE label with typography & hairline divider */}
 					<SectionTitle title="Workspace" isCollapsed={isCollapsed} />
 
 					<ul className="space-y-1">
@@ -228,13 +219,11 @@ export function Sidebar({
 						))}
 					</ul>
 
-					{/* 5. Vertical Rhythm / Ambient Glow in empty space */}
 					<div className="flex-1 min-h-[60px] relative pointer-events-none mt-4 flex items-end">
 						<div className="w-full h-32 bg-primary/10 dark:bg-primary/5 blur-[50px] rounded-full animate-[glow-pulse_5s_ease-in-out_infinite] opacity-60 translate-y-1/2" />
 					</div>
 				</nav>
 
-				{/* 8. Settings section with top divider */}
 				<div className="relative z-10 py-4 border-t border-border/40 bg-gradient-to-t from-sidebar-accent/30 to-transparent">
 					<ul className="space-y-1">
 						<NavItem

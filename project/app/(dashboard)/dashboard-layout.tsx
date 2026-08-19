@@ -1,16 +1,18 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import type React from "react";
 import { Suspense, useState } from "react";
 import { CustomUserButton } from "@/components/custom-user-button";
 import { GlobalSearch } from "@/components/global-search";
+import { CalendarTaskPreviewModal } from "@/components/modals/calendar-task-preview-modal";
 import { ConfirmModal } from "@/components/modals/confirm-modal";
 import { CreateProjectModal } from "@/components/modals/create-project-modal";
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
 import { EditProjectModal } from "@/components/modals/edit-project-modal";
 import { InviteMemberModal } from "@/components/modals/invite-member-modal";
 import { SetPasswordModal } from "@/components/modals/set-password-modal";
+import { NotificationDropdown } from "@/components/notification-dropdown";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -50,9 +52,7 @@ export default function DashboardLayout({
 						<div className="flex items-center gap-x-4 lg:gap-x-6">
 							<GlobalSearch />
 
-							<button type="button" className="p-2 rounded-lg hover:bg-muted">
-								<Bell size={20} />
-							</button>
+							<NotificationDropdown />
 
 							<ThemeToggle />
 
@@ -70,6 +70,7 @@ export default function DashboardLayout({
 			<CreateProjectModal />
 			<EditProjectModal />
 			<CreateTaskModal />
+			<CalendarTaskPreviewModal />
 			<SetPasswordModal />
 			<InviteMemberModal />
 			<ConfirmModal />

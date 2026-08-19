@@ -17,7 +17,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { AnimatePresence, motion } from "framer-motion";
 import { LayoutList } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type List, type Task, useTasksStore } from "@/hooks/use-tasks";
+import { type List, type Task, useTasksStore } from "@/stores/board-store";
 import { KanbanColumn } from "./kanban-column";
 import { ManageColumnsSheet } from "./modals/manage-columns-sheet";
 import { StatusPickerSheet } from "./modals/status-picker-sheet";

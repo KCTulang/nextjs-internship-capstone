@@ -5,6 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { CustomUserButton } from "@/components/custom-user-button";
+import { NotificationDropdown } from "@/components/notification-dropdown";
 import { useTheme } from "./theme-provider";
 
 export function Header() {
@@ -70,6 +71,7 @@ export function Header() {
 								>
 									Projects
 								</Link>
+								<NotificationDropdown />
 								<CustomUserButton />
 							</>
 						)}

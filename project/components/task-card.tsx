@@ -6,9 +6,9 @@ import { motion } from "framer-motion";
 import { Calendar, GripVertical, MessageSquare } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { Task } from "@/hooks/use-tasks";
-import { useTasksStore } from "@/hooks/use-tasks";
-import { priorityClass } from "@/lib/utils";
+import type { Task } from "@/stores/board-store";
+import { useTasksStore } from "@/stores/board-store";
+import { priorityClass } from "@/utils";
 
 interface TaskCardProps {
 	task: Task;

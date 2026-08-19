@@ -37,6 +37,7 @@ export const users = pgTable('users', {
 */
 import { relations } from "drizzle-orm";
 import {
+	boolean,
 	index,
 	integer,
 	pgTable,
@@ -121,6 +122,24 @@ export const tasks = pgTable(
 	],
 );
 
+export const taskAssignees = pgTable(
+	"task_assignees",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		taskId: uuid("task_id")
+			.notNull()
+			.references(() => tasks.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => [
+		index("task_assignees_task_idx").on(table.taskId),
+		index("task_assignees_user_idx").on(table.userId),
+	],
+);
+
 export const comments = pgTable(
 	"comments",
 	{
@@ -142,6 +161,70 @@ export const comments = pgTable(
 		index("comment_author_idx").on(table.authorId),
 	],
 );
+
+export const commentMentions = pgTable(
+	"comment_mentions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		commentId: uuid("comment_id")
+			.notNull()
+			.references(() => comments.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => [
+		index("mention_comment_idx").on(table.commentId),
+		index("mention_user_idx").on(table.userId),
+	],
+);
+
+export const notifications = pgTable(
+	"notifications",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		recipientId: uuid("recipient_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		projectId: uuid("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		type: text("type").notNull(),
+		actorId: uuid("actor_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		entityId: uuid("entity_id"),
+		message: text("message"),
+		readAt: timestamp("read_at"),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(table) => [
+		index("notification_recipient_idx").on(table.recipientId),
+		index("notification_project_idx").on(table.projectId),
+		index("notification_type_idx").on(table.type),
+	],
+);
+
+export const notificationPreferences = pgTable("notification_preferences", {
+	userId: uuid("user_id")
+		.notNull()
+		.primaryKey()
+		.references(() => users.id, { onDelete: "cascade" }),
+	muteAll: boolean("mute_all").notNull().default(false),
+	mutedUntil: timestamp("muted_until"),
+	muteDuringFocus: boolean("mute_during_focus").notNull().default(false),
+	taskAssignments: boolean("task_assignments").notNull().default(true),
+	mentions: boolean("mentions").notNull().default(true),
+	comments: boolean("comments").notNull().default(true),
+	invitations: boolean("invitations").notNull().default(true),
+	dueDates: boolean("due_dates").notNull().default(true),
+	projectActivity: boolean("project_activity").notNull().default(true),
+	createdAt: timestamp("created_at").defaultNow(),
+	updatedAt: timestamp("updated_at")
+		.defaultNow()
+		.$onUpdate(() => new Date()),
+});
 
 export const projectMembers = pgTable(
 	"project_members",
@@ -221,13 +304,23 @@ export const focusSessionsRelations = relations(focusSessions, ({ one }) => ({
 	task: one(tasks, { fields: [focusSessions.taskId], references: [tasks.id] }),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
 	projects: many(projects),
 	tasks: many(tasks),
 	comments: many(comments),
 	projectMembers: many(projectMembers),
 	sentInvitations: many(projectInvitations),
 	focusSessions: many(focusSessions),
+	commentMentions: many(commentMentions),
+	receivedNotifications: many(notifications, {
+		relationName: "notificationRecipient",
+	}),
+	sentNotifications: many(notifications, { relationName: "notificationActor" }),
+	assignedTasks: many(taskAssignees),
+	notificationPreferences: one(notificationPreferences, {
+		fields: [users.id],
+		references: [notificationPreferences.userId],
+	}),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -293,11 +386,44 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 	comments: many(comments),
 	activityLogs: many(activityLogs),
 	focusSessions: many(focusSessions),
+	taskAssignees: many(taskAssignees),
 }));
 
-export const commentsRelations = relations(comments, ({ one }) => ({
+export const commentsRelations = relations(comments, ({ one, many }) => ({
 	task: one(tasks, { fields: [comments.taskId], references: [tasks.id] }),
 	author: one(users, { fields: [comments.authorId], references: [users.id] }),
+	mentions: many(commentMentions),
+}));
+
+export const commentMentionsRelations = relations(
+	commentMentions,
+	({ one }) => ({
+		comment: one(comments, {
+			fields: [commentMentions.commentId],
+			references: [comments.id],
+		}),
+		user: one(users, {
+			fields: [commentMentions.userId],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+	recipient: one(users, {
+		fields: [notifications.recipientId],
+		references: [users.id],
+		relationName: "notificationRecipient",
+	}),
+	actor: one(users, {
+		fields: [notifications.actorId],
+		references: [users.id],
+		relationName: "notificationActor",
+	}),
+	project: one(projects, {
+		fields: [notifications.projectId],
+		references: [projects.id],
+	}),
 }));
 
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
@@ -309,4 +435,9 @@ export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
 		fields: [projectMembers.userId],
 		references: [users.id],
 	}),
+}));
+
+export const taskAssigneesRelations = relations(taskAssignees, ({ one }) => ({
+	task: one(tasks, { fields: [taskAssignees.taskId], references: [tasks.id] }),
+	user: one(users, { fields: [taskAssignees.userId], references: [users.id] }),
 }));

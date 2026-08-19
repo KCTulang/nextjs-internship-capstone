@@ -1,250 +1,222 @@
 "use client";
 
+import { format, getDay, parse, startOfWeek } from "date-fns";
+import { enUS } from "date-fns/locale/en-US";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { priorityClass } from "@/lib/utils";
+import { useCallback, useMemo, useState } from "react";
+import {
+	Calendar,
+	dateFnsLocalizer,
+	type ToolbarProps,
+	type View,
+} from "react-big-calendar";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import { useUIStore } from "@/stores/ui-store";
+import { priorityClass } from "@/utils";
 
 export type CalendarTask = {
 	id: string;
 	title: string;
+	description?: string | null;
 	projectName?: string | null;
 	projectSlug?: string | null;
 	priority?: string | null;
 	dueDate?: Date | null;
 	labels?: string[] | null;
 	listName?: string | null;
+	assignee?: { id: string; name: string | null; email: string | null } | null;
 };
 
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_NAMES = [
-	"January",
-	"February",
-	"March",
-	"April",
-	"May",
-	"June",
-	"July",
-	"August",
-	"September",
-	"October",
-	"November",
-	"December",
-];
+const locales = {
+	"en-US": enUS,
+};
 
-const VISIBLE_LIMIT = 3;
+const localizer = dateFnsLocalizer({
+	format,
+	parse,
+	startOfWeek,
+	getDay,
+	locales,
+});
 
-function toDateKey(d: Date): string {
-	return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function buildMonthGrid(year: number, month: number): Date[] {
-	const startOffset = new Date(year, month, 1).getDay();
-	const cells: Date[] = [];
-	for (let i = -startOffset; i < 42 - startOffset; i++) {
-		cells.push(new Date(year, month, 1 + i));
-	}
-	return cells;
-}
-
-interface DayCellProps {
-	date: Date;
-	tasks: CalendarTask[];
-	isCurrentMonth: boolean;
-	isToday: boolean;
-	onTaskClick: (task: CalendarTask) => void;
-}
-
-function DayCell({
-	date,
-	tasks,
-	isCurrentMonth,
-	isToday,
-	onTaskClick,
-}: DayCellProps) {
-	const [expanded, setExpanded] = useState(false);
-	const visible = expanded ? tasks : tasks.slice(0, VISIBLE_LIMIT);
-	const overflow = tasks.length - VISIBLE_LIMIT;
-
-	return (
-		<div
-			className={`min-h-22.5 p-1.5 flex flex-col gap-0.5 border-b border-r border-border transition-colors ${
-				isCurrentMonth ? "bg-card" : "bg-muted/30"
-			}`}
-		>
-			<span
-				className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full mb-0.5 shrink-0 ${
-					isToday
-						? "bg-primary text-primary-foreground"
-						: isCurrentMonth
-							? "text-foreground"
-							: "text-muted-foreground/50"
-				}`}
-			>
-				{date.getDate()}
-			</span>
-
-			{visible.map((task) => {
-				const hasLink = !!task.projectSlug;
-				return hasLink ? (
-					<button
-						key={task.id}
-						type="button"
-						onClick={() => onTaskClick(task)}
-						title={task.title}
-						className={`w-full text-left text-[10px] font-medium truncate px-1.5 py-0.5 rounded border leading-snug transition-opacity hover:opacity-80 active:opacity-60 cursor-pointer ${priorityClass(task.priority)}`}
-					>
-						{task.title}
-					</button>
-				) : (
-					<span
-						key={task.id}
-						title={`${task.title} (no linked project)`}
-						className={`w-full text-[10px] font-medium truncate px-1.5 py-0.5 rounded border leading-snug opacity-40 cursor-not-allowed ${priorityClass(task.priority)}`}
-					>
-						{task.title}
-					</span>
-				);
-			})}
-
-			{!expanded && overflow > 0 && (
-				<button
-					type="button"
-					onClick={() => setExpanded(true)}
-					className="text-[10px] text-muted-foreground hover:text-foreground font-medium text-left px-1 transition-colors"
-				>
-					+{overflow} more
-				</button>
-			)}
-			{expanded && tasks.length > VISIBLE_LIMIT && (
-				<button
-					type="button"
-					onClick={() => setExpanded(false)}
-					className="text-[10px] text-muted-foreground hover:text-foreground font-medium text-left px-1 transition-colors"
-				>
-					Show less
-				</button>
-			)}
-		</div>
-	);
-}
+export type LockInCalendarEvent = {
+	id: string;
+	title: string;
+	start: Date;
+	end: Date;
+	resource: CalendarTask;
+};
 
 interface CalendarGridProps {
-	tasksWithDates: CalendarTask[];
+	tasksWithDates: (CalendarTask & { dueDate: Date })[];
 }
 
 export function CalendarGrid({ tasksWithDates }: CalendarGridProps) {
-	const router = useRouter();
+	const { openCreateTaskModal, openPreviewTaskModal } = useUIStore();
 
-	const today = new Date();
-	const [viewYear, setViewYear] = useState(today.getFullYear());
-	const [viewMonth, setViewMonth] = useState(today.getMonth());
+	const [view, setView] = useState<View>("month");
+	const [date, setDate] = useState(new Date());
 
-	const tasksByDay = new Map<string, CalendarTask[]>();
-	for (const task of tasksWithDates) {
-		if (!task.dueDate) continue;
-		const key = toDateKey(new Date(task.dueDate));
-		if (!tasksByDay.has(key)) tasksByDay.set(key, []);
-		tasksByDay.get(key)?.push(task);
-	}
+	const events = useMemo(() => {
+		return tasksWithDates.map((task) => {
+			const start = new Date(task.dueDate);
+			const end = new Date(task.dueDate);
 
-	const cells = buildMonthGrid(viewYear, viewMonth);
-	const todayKey = toDateKey(today);
+			end.setHours(end.getHours() + 1);
 
-	function prevMonth() {
-		if (viewMonth === 0) {
-			setViewYear((y) => y - 1);
-			setViewMonth(11);
-		} else {
-			setViewMonth((m) => m - 1);
-		}
-	}
+			return {
+				id: task.id,
+				title: task.title,
+				start,
+				end,
+				allDay: true,
+				resource: task,
+			};
+		});
+	}, [tasksWithDates]);
 
-	function nextMonth() {
-		if (viewMonth === 11) {
-			setViewYear((y) => y + 1);
-			setViewMonth(0);
-		} else {
-			setViewMonth((m) => m + 1);
-		}
-	}
+	const handleSelectEvent = useCallback(
+		(event: LockInCalendarEvent) => {
+			openPreviewTaskModal(event.resource);
+		},
+		[openPreviewTaskModal],
+	);
 
-	function goToToday() {
-		setViewYear(today.getFullYear());
-		setViewMonth(today.getMonth());
-	}
+	const handleSelectSlot = useCallback(
+		(slotInfo: {
+			start: Date;
+			end: Date;
+			action: "select" | "click" | "doubleClick";
+		}) => {
+			openCreateTaskModal({ initialDueDate: slotInfo.start });
+		},
+		[openCreateTaskModal],
+	);
 
-	function handleTaskClick(task: CalendarTask) {
-		if (task.projectSlug) {
-			router.push(`/projects/${task.projectSlug}?taskId=${task.id}`, {
-				scroll: false,
-			});
-		}
-	}
+	const CustomToolbar = useCallback(
+		(toolbarProps: ToolbarProps<LockInCalendarEvent, object>) => {
+			const goToBack = () => toolbarProps.onNavigate("PREV");
+			const goToNext = () => toolbarProps.onNavigate("NEXT");
+			const goToCurrent = () => toolbarProps.onNavigate("TODAY");
+
+			const label = () => {
+				const d = toolbarProps.date;
+				if (toolbarProps.view === "month") {
+					return format(d, "MMMM yyyy");
+				}
+				if (toolbarProps.view === "week") {
+					return `Week of ${format(startOfWeek(d, { weekStartsOn: 0 }), "MMM do")}`;
+				}
+				if (toolbarProps.view === "day") {
+					return format(d, "EEEE, MMM do");
+				}
+				return toolbarProps.label;
+			};
+
+			return (
+				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-4 border-b border-border gap-4 bg-card rounded-t-xl">
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={goToBack}
+							aria-label="Previous"
+							className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border border-border bg-background"
+						>
+							<ChevronLeft size={16} />
+						</button>
+						<button
+							type="button"
+							onClick={goToCurrent}
+							className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-md hover:bg-muted transition-colors bg-background"
+						>
+							Today
+						</button>
+						<button
+							type="button"
+							onClick={goToNext}
+							aria-label="Next"
+							className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border border-border bg-background"
+						>
+							<ChevronRight size={16} />
+						</button>
+						<h2 className="text-base font-semibold text-foreground ml-3 hidden sm:block">
+							{label()}
+						</h2>
+					</div>
+					<h2 className="text-base font-semibold text-foreground sm:hidden">
+						{label()}
+					</h2>
+					<div className="flex items-center p-1 bg-muted/50 rounded-lg border border-border">
+						{(["month", "week"] as View[]).map((v) => (
+							<button
+								key={v}
+								type="button"
+								onClick={() => toolbarProps.onView(v)}
+								className={`px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-all ${
+									toolbarProps.view === v
+										? "bg-background text-foreground shadow-sm"
+										: "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+								}`}
+							>
+								{v}
+							</button>
+						))}
+					</div>
+				</div>
+			);
+		},
+		[],
+	);
+
+	const EventComponent = useCallback(
+		({ event }: { event: LockInCalendarEvent }) => {
+			const pClass = priorityClass(event.resource.priority);
+			return (
+				<div
+					className={`p-1.5 rounded text-xs w-full h-full flex flex-col gap-1 shadow-sm border ${pClass}`}
+					title={`${event.title} \nProject: ${event.resource.projectName || "None"}`}
+				>
+					<div className="font-semibold text-foreground truncate">
+						{event.title}
+					</div>
+					{event.resource.description && (
+						<div className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
+							{event.resource.description}
+						</div>
+					)}
+					<div className="mt-auto pt-1 flex items-center gap-1.5 text-[10px] font-medium text-foreground opacity-80 truncate">
+						<div className={`w-1.5 h-1.5 rounded-full bg-current shrink-0`} />
+						<span className="truncate">{event.resource.projectName}</span>
+					</div>
+				</div>
+			);
+		},
+		[],
+	);
 
 	return (
-		<div className="bg-card rounded-lg border border-border overflow-hidden">
-			{/* Header */}
-			<div className="flex items-center justify-between px-4 py-3 border-b border-border">
-				<div className="flex items-center gap-3">
-					<h2 className="text-base font-semibold text-foreground">
-						{MONTH_NAMES[viewMonth]} {viewYear}
-					</h2>
-					<button
-						type="button"
-						onClick={goToToday}
-						className="text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-0.5 transition-colors"
-					>
-						Today
-					</button>
-				</div>
-				<div className="flex items-center gap-1">
-					<button
-						type="button"
-						onClick={prevMonth}
-						aria-label="Previous month"
-						className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-					>
-						<ChevronLeft size={16} />
-					</button>
-					<button
-						type="button"
-						onClick={nextMonth}
-						aria-label="Next month"
-						className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-					>
-						<ChevronRight size={16} />
-					</button>
-				</div>
-			</div>
-
-			<div className="grid grid-cols-7 border-b border-border">
-				{DAY_LABELS.map((d) => (
-					<div
-						key={d}
-						className="py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-r border-border last:border-r-0"
-					>
-						{d}
-					</div>
-				))}
-			</div>
-
-			<div className="grid grid-cols-7">
-				{cells.map((date) => {
-					const key = toDateKey(date);
-					const dayTasks = tasksByDay.get(key) ?? [];
-					return (
-						<DayCell
-							key={key}
-							date={date}
-							tasks={dayTasks}
-							isCurrentMonth={date.getMonth() === viewMonth}
-							isToday={key === todayKey}
-							onTaskClick={handleTaskClick}
-						/>
-					);
-				})}
-			</div>
+		<div className="bg-card rounded-xl border border-border overflow-hidden flex flex-col h-[700px] shadow-sm calendar-container">
+			<Calendar
+				localizer={localizer}
+				events={events}
+				startAccessor="start"
+				endAccessor="end"
+				views={["month", "week"]}
+				style={{ height: "100%", flex: 1 }}
+				view={view}
+				onView={setView}
+				date={date}
+				onNavigate={setDate}
+				components={{
+					toolbar: CustomToolbar,
+					event: EventComponent,
+				}}
+				onSelectEvent={handleSelectEvent}
+				onSelectSlot={handleSelectSlot}
+				selectable
+				popup
+				tooltipAccessor={(e) => e.title}
+			/>
 		</div>
 	);
 }

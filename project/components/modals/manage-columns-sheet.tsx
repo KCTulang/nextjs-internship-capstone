@@ -20,7 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
-import { type List, useTasksStore } from "@/hooks/use-tasks";
+import { type List, useTasksStore } from "@/stores/board-store";
 
 interface ManageColumnsSheetProps {
 	isOpen: boolean;

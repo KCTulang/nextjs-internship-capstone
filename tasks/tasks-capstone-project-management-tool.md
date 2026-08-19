@@ -90,13 +90,13 @@ Each intern will work through all tasks below for their individual implementatio
 
 ### Phase 6: Advanced Features (Weeks 6-8)
 
-- [ ] 6.0 Advanced Features & Polish
-  - [ ] 6.1 Implement task assignment and user collaboration features
-  - [ ] 6.2 Add task due dates, priorities, and labels
-  - [ ] 6.3 Create task comments and activity history
-  - [ ] 6.4 Implement project member management and permissions
-  - [ ] 6.5 Add bulk task operations and keyboard shortcuts
-  - [ ] 6.6 Optimize performance and implement loading states
+- [x] 6.0 Advanced Features & Polish
+  - [x] 6.1 Implement task assignment and user collaboration features
+  - [x] 6.2 Add task due dates, priorities, and labels
+  - [x] 6.3 Create task comments and activity history
+  - [x] 6.4 Implement project member management and permissions
+  - [x] 6.5 Add bulk task operations and keyboard shortcuts
+  - [x] 6.6 Optimize performance and implement loading states
 
 ### Phase 7: Testing (Weeks 7-9)
 

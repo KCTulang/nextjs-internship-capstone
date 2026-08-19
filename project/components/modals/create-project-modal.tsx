@@ -4,8 +4,8 @@ import { useAuth } from "@clerk/nextjs";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/hooks/use-projects";
-import { createProjectSchema } from "@/lib/validations";
 import { useUIStore } from "@/stores/ui-store";
+import { createProjectSchema } from "@/utils/validations";
 
 export function CreateProjectModal() {
 	const { userId } = useAuth();

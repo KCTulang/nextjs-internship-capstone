@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectBySlugAction } from "@/app/actions/projects";
 import { KanbanBoard } from "@/components/kanban-board";
+import { PresenceAvatars } from "@/components/presence-avatars";
 import { ProjectHeaderActions } from "@/components/project-header-actions";
 
 export default async function ProjectPage({
@@ -38,7 +39,10 @@ export default async function ProjectPage({
 					</div>
 				</div>
 
-				<ProjectHeaderActions project={project} />
+				<div className="flex items-center gap-4">
+					<PresenceAvatars projectId={project.id} />
+					<ProjectHeaderActions project={project} />
+				</div>
 			</div>
 
 			<div className="flex-1 bg-card rounded-lg border border-border p-3 sm:p-4 lg:p-6 min-h-125 sm:min-h-150 overflow-hidden flex flex-col">

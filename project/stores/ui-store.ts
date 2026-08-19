@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { CalendarTask } from "@/components/calendar/calendar-grid";
 import type { Project } from "@/hooks/use-projects";
 
 export interface Toast {
@@ -20,6 +21,9 @@ interface UIState {
 
 	isTaskDetailModalOpen: boolean;
 	selectedTaskId: string | null;
+
+	isPreviewTaskModalOpen: boolean;
+	selectedPreviewTask: CalendarTask | null;
 
 	sidebarOpen: boolean;
 	theme: "light" | "dark";
@@ -44,6 +48,8 @@ interface UIState {
 	closeInviteMemberModal: () => void;
 	openTaskDetailModal: (taskId: string) => void;
 	closeTaskDetailModal: () => void;
+	openPreviewTaskModal: (task: CalendarTask) => void;
+	closePreviewTaskModal: () => void;
 	toggleSidebar: () => void;
 	setTheme: (theme: "light" | "dark") => void;
 	setLoading: (loading: boolean, message?: string) => void;
@@ -74,6 +80,8 @@ export const useUIStore = create<UIState>((set) => ({
 	selectedProjectForEdit: null,
 	isTaskDetailModalOpen: false,
 	selectedTaskId: null,
+	isPreviewTaskModalOpen: false,
+	selectedPreviewTask: null,
 
 	sidebarOpen: false,
 	theme: "dark",
@@ -111,6 +119,10 @@ export const useUIStore = create<UIState>((set) => ({
 		set({ isTaskDetailModalOpen: true, selectedTaskId: taskId }),
 	closeTaskDetailModal: () =>
 		set({ isTaskDetailModalOpen: false, selectedTaskId: null }),
+	openPreviewTaskModal: (task) =>
+		set({ isPreviewTaskModalOpen: true, selectedPreviewTask: task }),
+	closePreviewTaskModal: () =>
+		set({ isPreviewTaskModalOpen: false, selectedPreviewTask: null }),
 	toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 	setTheme: (theme) => set({ theme }),
 	setLoading: (loading, message = "") =>
