@@ -112,20 +112,6 @@ export const updateNameSchema = z.object({
 
 export type UpdateNameInput = z.infer<typeof updateNameSchema>;
 
-export const updateUsernameSchema = z.object({
-	username: z
-		.string()
-		.min(4, "Username must be at least 4 characters")
-		.max(50, "Username must be 50 characters or fewer")
-		.regex(
-			/^[a-zA-Z0-9_]+$/,
-			"Username can only contain letters, numbers, and underscores",
-		)
-		.trim(),
-});
-
-export type UpdateUsernameInput = z.infer<typeof updateUsernameSchema>;
-
 export const updatePasswordSchema = z
 	.object({
 		currentPassword: z.string().min(1, "Current password is required"),

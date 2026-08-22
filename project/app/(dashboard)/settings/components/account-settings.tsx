@@ -1,17 +1,19 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { Loader2, Mail, Plus, Shield } from "lucide-react";
-import Image from "next/image";
+import { Loader2, Mail, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
-import { updateUserProfileAction } from "@/app/actions/user";
-import { useUIStore } from "@/stores/ui-store";
+import { useEffect, useState } from "react";
 import {
-	updateNameSchema,
-	updateUsernameSchema,
-	validate,
-} from "@/utils/validations";
+	clearCustomAvatarAction,
+	persistCustomAvatarAction,
+	syncGoogleAvatarAction,
+	updateUserProfileAction,
+} from "@/app/actions/user";
+import { UserAvatar } from "@/components/user-avatar";
+import { useUIStore } from "@/stores/ui-store";
+import { updateNameSchema, validate } from "@/utils/validations";
 
 const PROVIDERS = [
 	{
@@ -32,17 +34,13 @@ export function AccountSettings({
 	googleAvatarUrl,
 }: AccountSettingsProps) {
 	const { user, isLoaded } = useUser();
+	const router = useRouter();
 	const { addToast } = useUIStore();
 
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [isSavingName, setIsSavingName] = useState(false);
-
-	const [isEditingUsername, setIsEditingUsername] = useState(false);
-	const [username, setUsername] = useState("");
-	const [isSavingUsername, setIsSavingUsername] = useState(false);
-
 	const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
 	const [isAddingEmail, setIsAddingEmail] = useState(false);
@@ -51,6 +49,23 @@ export function AccountSettings({
 	const [pendingEmailId, setPendingEmailId] = useState<string | null>(null);
 	const [isEmailActionLoading, setIsEmailActionLoading] = useState(false);
 
+	useEffect(() => {
+		if (isLoaded && user && sessionStorage.getItem("sync_google") === "true") {
+			const sync = async () => {
+				sessionStorage.removeItem("sync_google");
+				await user.reload();
+
+				const connected = user.externalAccounts.some(
+					(a) => a.provider === "google",
+				);
+				if (!connected) return;
+
+				await syncGoogleAvatarAction();
+				router.refresh();
+			};
+			sync();
+		}
+	}, [isLoaded, user, router]);
 
 	if (!isLoaded) {
 		return (
@@ -104,6 +119,10 @@ export function AccountSettings({
 		setIsUploadingAvatar(true);
 		try {
 			await user.setProfileImage({ file });
+			const res = await persistCustomAvatarAction();
+			if (!res.success)
+				throw new Error(res.error || "Failed to persist avatar");
+			await user.reload();
 			addToast({ type: "success", message: "Profile image updated." });
 		} catch (err) {
 			addToast({
@@ -121,6 +140,9 @@ export function AccountSettings({
 		setIsUploadingAvatar(true);
 		try {
 			await user.setProfileImage({ file: null });
+			const res = await clearCustomAvatarAction();
+			if (!res.success) throw new Error(res.error || "Failed to clear avatar");
+			await user.reload();
 			addToast({ type: "success", message: "Profile image removed." });
 		} catch (err) {
 			addToast({
@@ -131,36 +153,6 @@ export function AccountSettings({
 			});
 		} finally {
 			setIsUploadingAvatar(false);
-		}
-	};
-
-	const startEditingUsername = () => {
-		setUsername(user.username || "");
-		setIsEditingUsername(true);
-	};
-
-	const saveUsername = async () => {
-		const validation = validate(updateUsernameSchema, { username });
-		if (!validation.success) {
-			const firstError = Object.values(validation.errors)[0];
-			addToast({ type: "error", message: firstError });
-			return;
-		}
-
-		setIsSavingUsername(true);
-		try {
-			await user.update({ username });
-			setIsEditingUsername(false);
-			addToast({ type: "success", message: "Username updated successfully." });
-		} catch (err) {
-			addToast({
-				type: "error",
-				message:
-					(err as { errors?: { message?: string; longMessage?: string }[] })
-						.errors?.[0]?.message || "Failed to update username.",
-			});
-		} finally {
-			setIsSavingUsername(false);
 		}
 	};
 
@@ -297,7 +289,6 @@ export function AccountSettings({
 
 	return (
 		<div className="py-2 space-y-10 max-w-3xl">
-
 			<section>
 				<div className="mb-4">
 					<h3 className="text-base font-semibold text-foreground">Profile</h3>
@@ -424,63 +415,6 @@ export function AccountSettings({
 							)}
 						</div>
 					</div>
-				</div>
-			</section>
-
-			<section>
-				<div className="mb-4">
-					<h3 className="text-base font-semibold text-foreground">Username</h3>
-					<p className="text-sm text-muted-foreground mt-1">
-						Your unique application identifier.
-					</p>
-				</div>
-				<div className="border border-border bg-card shadow-sm rounded-xl p-6">
-					{isEditingUsername ? (
-						<div className="space-y-4 max-w-sm">
-							<div className="space-y-1.5">
-								<input
-									type="text"
-									value={username}
-									onChange={(e) => setUsername(e.target.value)}
-									className="w-full bg-background border border-input text-foreground rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-									placeholder="Choose a username"
-								/>
-							</div>
-							<div className="flex gap-2">
-								<button
-									type="button"
-									onClick={saveUsername}
-									disabled={isSavingUsername}
-									className="px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-								>
-									Save
-								</button>
-								<button
-									type="button"
-									onClick={() => setIsEditingUsername(false)}
-									disabled={isSavingUsername}
-									className="px-3 py-1.5 bg-muted text-foreground text-sm font-medium rounded-md hover:bg-muted/80 transition-colors"
-								>
-									Cancel
-								</button>
-							</div>
-						</div>
-					) : (
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-sm text-foreground">
-									{user.username || "Not set"}
-								</p>
-							</div>
-							<button
-								type="button"
-								onClick={startEditingUsername}
-								className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-3 py-1.5 bg-primary/10 rounded-md"
-							>
-								Update
-							</button>
-						</div>
-					)}
 				</div>
 			</section>
 
