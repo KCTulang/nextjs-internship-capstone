@@ -325,6 +325,7 @@ export default async function HomePage() {
 							width={18}
 							height={32}
 							className="dark:invert opacity-70"
+							style={{ width: "auto", height: "auto" }}
 						/>
 						<span className="text-sm text-muted-foreground">
 							Tune out the noise. Lock into your work.

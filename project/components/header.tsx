@@ -23,6 +23,7 @@ export function Header() {
 							width={24}
 							height={42}
 							className="dark:invert"
+							style={{ width: "auto", height: "auto" }}
 							priority
 						/>
 					</Link>
