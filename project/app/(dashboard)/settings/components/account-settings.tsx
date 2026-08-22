@@ -21,10 +21,6 @@ const PROVIDERS = [
 		icon: Mail,
 	},
 ];
-import {
-	type ReverificationHandler,
-	ReverificationModal,
-} from "./../../../../components/ui/reverification-modal";
 
 interface AccountSettingsProps {
 	customAvatarUrl: string | null;
@@ -55,8 +51,6 @@ export function AccountSettings({
 	const [pendingEmailId, setPendingEmailId] = useState<string | null>(null);
 	const [isEmailActionLoading, setIsEmailActionLoading] = useState(false);
 
-	const [reverificationHandler, setReverificationHandler] =
-		useState<ReverificationHandler | null>(null);
 
 	if (!isLoaded) {
 		return (
@@ -303,10 +297,6 @@ export function AccountSettings({
 
 	return (
 		<div className="py-2 space-y-10 max-w-3xl">
-			<ReverificationModal
-				handler={reverificationHandler}
-				onClose={() => setReverificationHandler(null)}
-			/>
 
 			<section>
 				<div className="mb-4">

@@ -59,6 +59,7 @@ export function SecuritySettings() {
 
 	const [reverificationHandler, setReverificationHandler] =
 		useState<ReverificationHandler | null>(null);
+
 	const executePasswordUpdate = useReverification(
 		async () => {
 			await user?.updatePassword({
@@ -72,14 +73,9 @@ export function SecuritySettings() {
 		},
 	);
 
-	const executeDeleteAccount = useReverification(
-		async () => {
-			await user?.delete();
-		},
-		{
-			onNeedsReverification: (params) => setReverificationHandler(params),
-		},
-	);
+	const executeDeleteAccount = async () => {
+		await user?.delete();
+	};
 
 	const loadSessions = useCallback(async () => {
 		setIsLoadingSessions(true);
@@ -238,11 +234,6 @@ export function SecuritySettings() {
 
 	return (
 		<div className="py-2 space-y-10 max-w-3xl">
-			<ReverificationModal
-				handler={reverificationHandler}
-				onClose={() => setReverificationHandler(null)}
-			/>
-
 			<section>
 				<div className="mb-4">
 					<h3 className="text-base font-semibold text-foreground">Password</h3>
@@ -583,6 +574,11 @@ export function SecuritySettings() {
 					</div>
 				</form>
 			</Modal>
+
+			<ReverificationModal
+				handler={reverificationHandler}
+				onClose={() => setReverificationHandler(null)}
+			/>
 		</div>
 	);
 }
