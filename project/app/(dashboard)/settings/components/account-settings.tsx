@@ -17,7 +17,15 @@ import {
 	ReverificationModal,
 } from "./../../../../components/ui/reverification-modal";
 
-export function AccountSettings() {
+interface AccountSettingsProps {
+	customAvatarUrl: string | null;
+	googleAvatarUrl: string | null;
+}
+
+export function AccountSettings({
+	customAvatarUrl,
+	googleAvatarUrl,
+}: AccountSettingsProps) {
 	const { user, isLoaded } = useUser();
 	const { addToast } = useUIStore();
 
@@ -294,22 +302,13 @@ export function AccountSettings() {
 					<div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
 						<div className="relative group shrink-0">
 							<div className="w-20 h-20 rounded-full overflow-hidden border border-border bg-muted">
-								{user.hasImage ? (
-									<Image
-										unoptimized
-										width={100}
-										height={100}
-										src={user.imageUrl}
-										alt="Avatar"
-										className="w-full h-full object-cover"
-									/>
-								) : (
-									<div className="w-full h-full flex items-center justify-center text-2xl font-semibold text-muted-foreground">
-										{(user.firstName || user.username || "?")
-											.charAt(0)
-											.toUpperCase()}
-									</div>
-								)}
+								<UserAvatar
+									customAvatarUrl={customAvatarUrl}
+									googleAvatarUrl={googleAvatarUrl}
+									firstName={user.firstName}
+									lastName={user.lastName}
+									size={80}
+								/>
 							</div>
 
 							<div className="mt-3 flex gap-2">

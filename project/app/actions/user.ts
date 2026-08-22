@@ -49,11 +49,9 @@ export async function updateUserProfileAction(
 			`${updatedClerkUser.firstName || ""} ${updatedClerkUser.lastName || ""}`.trim();
 		const primaryEmail = updatedClerkUser.emailAddresses[0]?.emailAddress;
 		const name = fullName || primaryEmail?.split("@")[0] || clerkId;
-		const imageUrl = updatedClerkUser.imageUrl;
 
 		const result = await queries.users.update(clerkId, {
 			name,
-			imageUrl,
 		});
 
 		if (result.length === 0) {
@@ -61,7 +59,6 @@ export async function updateUserProfileAction(
 				clerkId,
 				email: primaryEmail || "",
 				name,
-				imageUrl,
 			});
 		}
 
@@ -72,5 +69,80 @@ export async function updateUserProfileAction(
 	} catch (error) {
 		console.error("Failed to update user profile manually:", error);
 		return { success: false, error: "Failed to update user profile" };
+	}
+}
+
+export async function persistCustomAvatarAction() {
+	try {
+		const { userId: clerkId } = await auth();
+		if (!clerkId) {
+			return { success: false, error: "Unauthorized" };
+		}
+
+		const client = await clerkClient();
+		const refreshed = await client.users.getUser(clerkId);
+		const finalUrl = refreshed.imageUrl;
+
+		await queries.users.update(clerkId, {
+			customAvatarUrl: finalUrl,
+		});
+
+		revalidatePath("/settings");
+		revalidatePath("/team");
+
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to persist custom avatar:", error);
+		return { success: false, error: "Failed to persist custom avatar" };
+	}
+}
+
+export async function clearCustomAvatarAction() {
+	try {
+		const { userId: clerkId } = await auth();
+		if (!clerkId) {
+			return { success: false, error: "Unauthorized" };
+		}
+
+		await queries.users.update(clerkId, {
+			customAvatarUrl: null,
+		});
+
+		revalidatePath("/settings");
+		revalidatePath("/team");
+
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to clear custom avatar:", error);
+		return { success: false, error: "Failed to clear custom avatar" };
+	}
+}
+
+export async function syncGoogleAvatarAction() {
+	try {
+		const { userId: clerkId } = await auth();
+		if (!clerkId) {
+			return { success: false, error: "Unauthorized" };
+		}
+
+		const client = await clerkClient();
+		const refreshed = await client.users.getUser(clerkId);
+		const googleAccount = refreshed.externalAccounts.find(
+			(account) => account.provider === "google",
+		);
+
+		const googleAvatarUrl = googleAccount?.imageUrl ?? null;
+
+		await queries.users.update(clerkId, {
+			googleAvatarUrl,
+		});
+
+		revalidatePath("/settings");
+		revalidatePath("/team");
+
+		return { success: true };
+	} catch (error) {
+		console.error("Failed to sync google avatar:", error);
+		return { success: false, error: "Failed to sync google avatar" };
 	}
 }

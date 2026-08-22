@@ -18,8 +18,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function DashboardLayout({
 	children,
+	customAvatarUrl,
+	googleAvatarUrl,
 }: {
 	children: React.ReactNode;
+	customAvatarUrl?: string | null;
+	googleAvatarUrl?: string | null;
 }) {
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [isCollapsed, setIsCollapsed] = useState(false);
@@ -57,7 +61,10 @@ export default function DashboardLayout({
 							<ThemeToggle />
 
 							<div className="flex items-center justify-center">
-								<CustomUserButton />
+								<CustomUserButton
+									customAvatarUrl={customAvatarUrl}
+									googleAvatarUrl={googleAvatarUrl}
+								/>
 							</div>
 						</div>
 					</div>

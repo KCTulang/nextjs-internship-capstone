@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import { UserAvatar } from "@/components/user-avatar";
 import { useCollaboration } from "@/hooks/use-collaboration";
 
 interface PresenceAvatarsProps {
@@ -107,19 +107,13 @@ export function PresenceAvatars({ projectId }: PresenceAvatarsProps) {
 						className="relative w-8 h-8 rounded-full border-2 border-background overflow-hidden bg-primary/10 flex items-center justify-center shrink-0 group cursor-default"
 						title={user.info.name}
 					>
-						{user.info.imageUrl ? (
-							<Image
-								src={user.info.imageUrl}
-								alt={user.info.name}
-								width={32}
-								height={32}
-								className="object-cover"
-							/>
-						) : (
-							<span className="text-[10px] font-bold text-primary">
-								{user.info.name.substring(0, 2).toUpperCase()}
-							</span>
-						)}
+						<UserAvatar
+							customAvatarUrl={user.info.imageUrl ?? null}
+							googleAvatarUrl={null}
+							firstName={user.info.name.split(" ")[0]}
+							lastName={user.info.name.split(" ").slice(1).join(" ") || null}
+							size={32}
+						/>
 						{focusingUserIds.has(user.id) && (
 							<div
 								className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 z-20"
