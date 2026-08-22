@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Modal } from "./modal";
@@ -20,35 +20,36 @@ export function ReverificationModal({
 	handler,
 	onClose,
 }: ReverificationModalProps) {
-	const { user } = useUser();
+	const { session } = useSession();
 	const [password, setPassword] = useState("");
 	const [isVerifying, setIsVerifying] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const handleVerify = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!user || !handler) return;
+		if (!session || !handler) return;
 
 		setIsVerifying(true);
 		setError(null);
 
 		try {
-			const isValid = await (
-				user as unknown as {
-					verifyPassword: (args: { password: string }) => Promise<boolean>;
-				}
-			).verifyPassword({ password });
+			const verification = await session.attemptFirstFactorVerification({
+				strategy: "password",
+				password,
+			});
 
-			if (isValid) {
+			if (verification.status === "complete") {
 				handler.complete();
 				onClose();
 			} else {
 				setError("Incorrect password");
 			}
 		} catch (err) {
+			console.error("Reverification Error:", err);
 			const errorMessage =
 				(err as Error & { errors?: Array<{ message: string }> })?.errors?.[0]
-					?.message || "Verification failed";
+					?.message ||
+				(err instanceof Error ? err.message : "Verification failed");
 			setError(errorMessage);
 		} finally {
 			setIsVerifying(false);

@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 		user_id: clerkId,
 		user_info: {
 			name,
-			imageUrl: user.imageUrl,
+			imageUrl: dbUser.customAvatarUrl ?? dbUser.googleAvatarUrl ?? undefined,
 		},
 	};
 

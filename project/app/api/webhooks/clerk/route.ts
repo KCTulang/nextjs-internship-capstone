@@ -56,7 +56,6 @@ export async function POST(req: Request) {
 			email_addresses,
 			first_name,
 			last_name,
-			image_url,
 			primary_email_address_id,
 		} = evt.data;
 
@@ -69,13 +68,18 @@ export async function POST(req: Request) {
 		const fullName = `${first_name || ""} ${last_name || ""}`.trim();
 		const name = fullName || primaryEmail?.split("@")[0] || id;
 
+		const googleAccount = evt.data.external_accounts?.find(
+			(account) => account.provider === "google",
+		);
+		const googleAvatarUrl = googleAccount?.image_url ?? null;
+
 		if (primaryEmail) {
 			try {
 				await queries.users.create({
 					clerkId: id,
 					email: primaryEmail,
 					name: name,
-					imageUrl: image_url,
+					googleAvatarUrl,
 				});
 				console.log(`User created in database: ${id}`);
 				revalidatePath("/team");
@@ -92,7 +96,6 @@ export async function POST(req: Request) {
 			email_addresses,
 			first_name,
 			last_name,
-			image_url,
 			primary_email_address_id,
 		} = evt.data;
 
@@ -105,12 +108,17 @@ export async function POST(req: Request) {
 		const fullName = `${first_name || ""} ${last_name || ""}`.trim();
 		const name = fullName || primaryEmail?.split("@")[0] || id;
 
+		const googleAccount = evt.data.external_accounts?.find(
+			(account) => account.provider === "google",
+		);
+		const googleAvatarUrl = googleAccount?.image_url ?? null;
+
 		if (primaryEmail) {
 			try {
 				const result = await queries.users.update(id, {
 					email: primaryEmail,
 					name: name,
-					imageUrl: image_url,
+					googleAvatarUrl,
 				});
 
 				if (result.length === 0) {
@@ -118,7 +126,7 @@ export async function POST(req: Request) {
 						clerkId: id,
 						email: primaryEmail,
 						name: name,
-						imageUrl: image_url,
+						googleAvatarUrl,
 					});
 					console.log(`User fallback created in database: ${id}`);
 				} else {

@@ -4,9 +4,10 @@ import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSignUp } from "@clerk/nextjs/legacy";
 import {
 	ArrowLeft,
+	Check,
+	Circle,
 	Eye,
 	EyeOff,
-	Github,
 	Loader2,
 	Moon,
 	Sun,
@@ -14,8 +15,16 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+import { z } from "zod";
 import { useTheme } from "@/components/theme-provider";
+
+const signUpSchema = z.object({
+	firstName: z.string().min(1, "First name is required"),
+	lastName: z.string().min(1, "Last name is required"),
+	email: z.string().email("Invalid email address"),
+	password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 function GoogleIcon() {
 	return (
@@ -58,12 +67,49 @@ export default function SignUpPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+	const [hasSubmitted, setHasSubmitted] = useState(false);
+
+	useEffect(() => {
+		if (hasSubmitted) {
+			const parseResult = signUpSchema.safeParse({
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+				email: email.trim(),
+				password,
+			});
+
+			if (!parseResult.success) {
+				setFieldErrors(
+					parseResult.error.flatten().fieldErrors as Record<string, string[]>,
+				);
+			} else {
+				setFieldErrors({});
+			}
+		}
+	}, [firstName, lastName, email, password, hasSubmitted]);
 
 	async function handleRegister(e: FormEvent) {
 		e.preventDefault();
 		if (!isLoaded || !signUp) return;
 
+		setHasSubmitted(true);
 		setError(null);
+		setFieldErrors({});
+
+		const parseResult = signUpSchema.safeParse({
+			firstName: firstName.trim(),
+			lastName: lastName.trim(),
+			email: email.trim(),
+			password,
+		});
+
+		if (!parseResult.success) {
+			const formatted = parseResult.error.flatten().fieldErrors;
+			setFieldErrors(formatted as Record<string, string[]>);
+			return;
+		}
+
 		setIsSubmitting(true);
 
 		try {
@@ -215,19 +261,6 @@ export default function SignUpPage() {
 								)}
 								Continue with Google
 							</button>
-							<button
-								type="button"
-								onClick={() => handleOAuth("oauth_github")}
-								disabled={!isLoaded || oauthLoading !== null || isSubmitting}
-								className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-							>
-								{oauthLoading === "oauth_github" ? (
-									<Loader2 size={18} className="animate-spin" />
-								) : (
-									<Github size={18} />
-								)}
-								Continue with GitHub
-							</button>
 						</div>
 
 						<div className="flex items-center gap-4 w-full mb-8">
@@ -269,8 +302,17 @@ export default function SignUpPage() {
 										value={firstName}
 										onChange={(e) => setFirstName(e.target.value)}
 										placeholder="John"
-										className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+										className={`w-full px-5 py-3.5 rounded-full border ${
+											fieldErrors.firstName
+												? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+												: "border-slate-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-blue-500"
+										} bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm`}
 									/>
+									{fieldErrors.firstName && (
+										<p className="text-red-500 text-xs mt-1 pl-2">
+											{fieldErrors.firstName[0]}
+										</p>
+									)}
 								</div>
 								<div className="space-y-2 flex-1">
 									<label
@@ -287,8 +329,17 @@ export default function SignUpPage() {
 										value={lastName}
 										onChange={(e) => setLastName(e.target.value)}
 										placeholder="Doe"
-										className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+										className={`w-full px-5 py-3.5 rounded-full border ${
+											fieldErrors.lastName
+												? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+												: "border-slate-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-blue-500"
+										} bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm`}
 									/>
+									{fieldErrors.lastName && (
+										<p className="text-red-500 text-xs mt-1 pl-2">
+											{fieldErrors.lastName[0]}
+										</p>
+									)}
 								</div>
 							</div>
 
@@ -307,8 +358,17 @@ export default function SignUpPage() {
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
 									placeholder="you@example.com"
-									className="w-full px-5 py-3.5 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+									className={`w-full px-5 py-3.5 rounded-full border ${
+										fieldErrors.email
+											? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+											: "border-slate-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-blue-500"
+									} bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm`}
 								/>
+								{fieldErrors.email && (
+									<p className="text-red-500 text-xs mt-1 pl-2">
+										{fieldErrors.email[0]}
+									</p>
+								)}
 							</div>
 
 							<div className="space-y-2">
@@ -327,7 +387,11 @@ export default function SignUpPage() {
 										value={password}
 										onChange={(e) => setPassword(e.target.value)}
 										placeholder="Create a password"
-										className="w-full px-5 py-3.5 pr-12 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm"
+										className={`w-full px-5 py-3.5 pr-12 rounded-full border ${
+											fieldErrors.password
+												? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+												: "border-slate-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-blue-500"
+										} bg-white dark:bg-zinc-900 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:shadow-[0_0_15px_rgba(59,130,246,0.3)] dark:focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all shadow-sm`}
 									/>
 									<button
 										type="button"
@@ -340,10 +404,35 @@ export default function SignUpPage() {
 										{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
 									</button>
 								</div>
-								<p className="text-[11px] text-slate-500 dark:text-zinc-500 font-medium pl-2">
-									Must be at least 8 characters.
-								</p>
+								{fieldErrors.password && (
+									<p className="text-red-500 text-xs mt-1 pl-2">
+										{fieldErrors.password[0]}
+									</p>
+								)}
+								<div className="mt-3 pl-2 flex flex-col gap-2">
+									<div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-zinc-500">
+										{password.length >= 8 ? (
+											<Check size={14} className="text-green-500" />
+										) : (
+											<Circle size={14} />
+										)}
+										<span
+											className={
+												password.length >= 8
+													? "text-slate-700 dark:text-zinc-300"
+													: ""
+											}
+										>
+											At least 8 characters
+										</span>
+									</div>
+								</div>
 							</div>
+
+							<div
+								id="clerk-captcha"
+								className="flex justify-center w-full empty:hidden mt-2"
+							></div>
 
 							<button
 								type="submit"

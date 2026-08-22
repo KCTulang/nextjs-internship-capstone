@@ -2,19 +2,11 @@
 
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSignIn } from "@clerk/nextjs/legacy";
-import {
-	ArrowLeft,
-	Eye,
-	EyeOff,
-	Github,
-	Loader2,
-	Moon,
-	Sun,
-} from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, Moon, Sun } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
 
 function GoogleIcon() {
@@ -40,7 +32,23 @@ function GoogleIcon() {
 	);
 }
 
+import { Suspense } from "react";
+
 export default function SignInPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center text-slate-500">
+					Loading...
+				</div>
+			}
+		>
+			<SignInContent />
+		</Suspense>
+	);
+}
+
+function SignInContent() {
 	const { isLoaded, signIn, setActive } = useSignIn() as {
 		isLoaded: boolean;
 		signIn: {
@@ -52,11 +60,13 @@ export default function SignInPage() {
 				strategy: string;
 				redirectUrl: string;
 				redirectUrlComplete: string;
+				transferable?: boolean;
 			}) => Promise<void>;
 		};
 		setActive: (params: { session: string | null }) => Promise<void>;
 	};
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const { theme, setTheme } = useTheme();
 
 	const [email, setEmail] = useState("");
@@ -65,6 +75,17 @@ export default function SignInPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		const clerkError = searchParams.get("clerk_error");
+		const errParam = searchParams.get("error");
+		if (clerkError || errParam) {
+			setError(
+				"No LockIn account was found for this Google email. Please sign up to create an account.",
+			);
+			router.replace("/sign-in", { scroll: false });
+		}
+	}, [searchParams, router]);
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -106,6 +127,7 @@ export default function SignInPage() {
 				strategy,
 				redirectUrl: "/sso-callback",
 				redirectUrlComplete: "/dashboard",
+				transferable: false,
 			});
 		} catch {
 			setError("OAuth sign in failed. Please try again.");
@@ -175,19 +197,6 @@ export default function SignInPage() {
 							<GoogleIcon />
 						)}
 						Continue with Google
-					</button>
-					<button
-						type="button"
-						onClick={() => handleOAuth("oauth_github")}
-						disabled={!isLoaded || oauthLoading !== null || isSubmitting}
-						className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-full border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-					>
-						{oauthLoading === "oauth_github" ? (
-							<Loader2 size={18} className="animate-spin" />
-						) : (
-							<Github size={18} />
-						)}
-						Continue with GitHub
 					</button>
 				</div>
 

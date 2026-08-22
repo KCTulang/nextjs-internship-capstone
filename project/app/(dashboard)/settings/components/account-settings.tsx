@@ -1,35 +1,46 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { Loader2, Mail, Plus, Shield } from "lucide-react";
-import Image from "next/image";
+import { Loader2, Mail, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
-import { updateUserProfileAction } from "@/app/actions/user";
+import { useEffect, useState } from "react";
+import {
+	clearCustomAvatarAction,
+	persistCustomAvatarAction,
+	syncGoogleAvatarAction,
+	updateUserProfileAction,
+} from "@/app/actions/user";
+import { UserAvatar } from "@/components/user-avatar";
 import { useUIStore } from "@/stores/ui-store";
-import {
-	updateNameSchema,
-	updateUsernameSchema,
-	validate,
-} from "@/utils/validations";
-import {
-	type ReverificationHandler,
-	ReverificationModal,
-} from "./../../../../components/ui/reverification-modal";
+import { updateNameSchema, validate } from "@/utils/validations";
 
-export function AccountSettings() {
+const PROVIDERS = [
+	{
+		id: "google",
+		label: "Google",
+		strategy: "oauth_google" as const,
+		icon: Mail,
+	},
+];
+
+interface AccountSettingsProps {
+	customAvatarUrl: string | null;
+	googleAvatarUrl: string | null;
+}
+
+export function AccountSettings({
+	customAvatarUrl,
+	googleAvatarUrl,
+}: AccountSettingsProps) {
 	const { user, isLoaded } = useUser();
+	const router = useRouter();
 	const { addToast } = useUIStore();
 
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [isSavingName, setIsSavingName] = useState(false);
-
-	const [isEditingUsername, setIsEditingUsername] = useState(false);
-	const [username, setUsername] = useState("");
-	const [isSavingUsername, setIsSavingUsername] = useState(false);
-
 	const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
 	const [isAddingEmail, setIsAddingEmail] = useState(false);
@@ -38,8 +49,23 @@ export function AccountSettings() {
 	const [pendingEmailId, setPendingEmailId] = useState<string | null>(null);
 	const [isEmailActionLoading, setIsEmailActionLoading] = useState(false);
 
-	const [reverificationHandler, setReverificationHandler] =
-		useState<ReverificationHandler | null>(null);
+	useEffect(() => {
+		if (isLoaded && user && sessionStorage.getItem("sync_google") === "true") {
+			const sync = async () => {
+				sessionStorage.removeItem("sync_google");
+				await user.reload();
+
+				const connected = user.externalAccounts.some(
+					(a) => a.provider === "google",
+				);
+				if (!connected) return;
+
+				await syncGoogleAvatarAction();
+				router.refresh();
+			};
+			sync();
+		}
+	}, [isLoaded, user, router]);
 
 	if (!isLoaded) {
 		return (
@@ -93,6 +119,10 @@ export function AccountSettings() {
 		setIsUploadingAvatar(true);
 		try {
 			await user.setProfileImage({ file });
+			const res = await persistCustomAvatarAction();
+			if (!res.success)
+				throw new Error(res.error || "Failed to persist avatar");
+			await user.reload();
 			addToast({ type: "success", message: "Profile image updated." });
 		} catch (err) {
 			addToast({
@@ -110,6 +140,9 @@ export function AccountSettings() {
 		setIsUploadingAvatar(true);
 		try {
 			await user.setProfileImage({ file: null });
+			const res = await clearCustomAvatarAction();
+			if (!res.success) throw new Error(res.error || "Failed to clear avatar");
+			await user.reload();
 			addToast({ type: "success", message: "Profile image removed." });
 		} catch (err) {
 			addToast({
@@ -120,36 +153,6 @@ export function AccountSettings() {
 			});
 		} finally {
 			setIsUploadingAvatar(false);
-		}
-	};
-
-	const startEditingUsername = () => {
-		setUsername(user.username || "");
-		setIsEditingUsername(true);
-	};
-
-	const saveUsername = async () => {
-		const validation = validate(updateUsernameSchema, { username });
-		if (!validation.success) {
-			const firstError = Object.values(validation.errors)[0];
-			addToast({ type: "error", message: firstError });
-			return;
-		}
-
-		setIsSavingUsername(true);
-		try {
-			await user.update({ username });
-			setIsEditingUsername(false);
-			addToast({ type: "success", message: "Username updated successfully." });
-		} catch (err) {
-			addToast({
-				type: "error",
-				message:
-					(err as { errors?: { message?: string; longMessage?: string }[] })
-						.errors?.[0]?.message || "Failed to update username.",
-			});
-		} finally {
-			setIsSavingUsername(false);
 		}
 	};
 
@@ -245,6 +248,9 @@ export function AccountSettings() {
 		strategy: "oauth_google" | "oauth_github" | "oauth_microsoft",
 	) => {
 		try {
+			if (strategy === "oauth_google") {
+				sessionStorage.setItem("sync_google", "true");
+			}
 			await user.createExternalAccount({
 				strategy,
 				redirectUrl: "/sso-callback",
@@ -265,6 +271,11 @@ export function AccountSettings() {
 
 		try {
 			await externalAccount.destroy();
+			await user.reload();
+			if (externalAccount.provider === "google") {
+				await syncGoogleAvatarAction();
+			}
+			router.refresh();
 			addToast({ type: "success", message: "Account disconnected." });
 		} catch (err) {
 			addToast({
@@ -278,11 +289,6 @@ export function AccountSettings() {
 
 	return (
 		<div className="py-2 space-y-10 max-w-3xl">
-			<ReverificationModal
-				handler={reverificationHandler}
-				onClose={() => setReverificationHandler(null)}
-			/>
-
 			<section>
 				<div className="mb-4">
 					<h3 className="text-base font-semibold text-foreground">Profile</h3>
@@ -294,22 +300,13 @@ export function AccountSettings() {
 					<div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
 						<div className="relative group shrink-0">
 							<div className="w-20 h-20 rounded-full overflow-hidden border border-border bg-muted">
-								{user.hasImage ? (
-									<Image
-										unoptimized
-										width={100}
-										height={100}
-										src={user.imageUrl}
-										alt="Avatar"
-										className="w-full h-full object-cover"
-									/>
-								) : (
-									<div className="w-full h-full flex items-center justify-center text-2xl font-semibold text-muted-foreground">
-										{(user.firstName || user.username || "?")
-											.charAt(0)
-											.toUpperCase()}
-									</div>
-								)}
+								<UserAvatar
+									customAvatarUrl={customAvatarUrl}
+									googleAvatarUrl={googleAvatarUrl}
+									firstName={user.firstName}
+									lastName={user.lastName}
+									size={80}
+								/>
 							</div>
 
 							<div className="mt-3 flex gap-2">
@@ -418,63 +415,6 @@ export function AccountSettings() {
 							)}
 						</div>
 					</div>
-				</div>
-			</section>
-
-			<section>
-				<div className="mb-4">
-					<h3 className="text-base font-semibold text-foreground">Username</h3>
-					<p className="text-sm text-muted-foreground mt-1">
-						Your unique application identifier.
-					</p>
-				</div>
-				<div className="border border-border bg-card shadow-sm rounded-xl p-6">
-					{isEditingUsername ? (
-						<div className="space-y-4 max-w-sm">
-							<div className="space-y-1.5">
-								<input
-									type="text"
-									value={username}
-									onChange={(e) => setUsername(e.target.value)}
-									className="w-full bg-background border border-input text-foreground rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:border-ring transition-all"
-									placeholder="Choose a username"
-								/>
-							</div>
-							<div className="flex gap-2">
-								<button
-									type="button"
-									onClick={saveUsername}
-									disabled={isSavingUsername}
-									className="px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-								>
-									Save
-								</button>
-								<button
-									type="button"
-									onClick={() => setIsEditingUsername(false)}
-									disabled={isSavingUsername}
-									className="px-3 py-1.5 bg-muted text-foreground text-sm font-medium rounded-md hover:bg-muted/80 transition-colors"
-								>
-									Cancel
-								</button>
-							</div>
-						</div>
-					) : (
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-sm text-foreground">
-									{user.username || "Not set"}
-								</p>
-							</div>
-							<button
-								type="button"
-								onClick={startEditingUsername}
-								className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-3 py-1.5 bg-primary/10 rounded-md"
-							>
-								Update
-							</button>
-						</div>
-					)}
 				</div>
 			</section>
 
@@ -622,55 +562,50 @@ export function AccountSettings() {
 					</p>
 				</div>
 				<div className="border border-border bg-card shadow-sm rounded-xl divide-y divide-border">
-					{user.externalAccounts.map((account) => (
-						<div
-							key={account.id}
-							className="p-6 flex items-center justify-between"
-						>
-							<div className="flex items-center gap-3">
-								<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-									<Shield className="w-4 h-4 text-foreground/70" />
-								</div>
-								<div>
-									<p className="text-sm font-medium text-foreground capitalize">
-										{account.provider.replace("oauth_", "")}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{account.emailAddress}
-									</p>
-								</div>
-							</div>
-							<button
-								type="button"
-								onClick={() => handleDisconnectOAuth(account.id)}
-								className="text-sm font-medium text-destructive hover:text-destructive/80 transition-colors px-2 py-1"
+					{PROVIDERS.map((provider) => {
+						const connectedAccount = user.externalAccounts.find(
+							(a) => a.provider === provider.id,
+						);
+						return (
+							<div
+								key={provider.id}
+								className="p-6 flex items-center justify-between"
 							>
-								Disconnect
-							</button>
-						</div>
-					))}
-
-					{!user.externalAccounts.some(
-						(a) => (a.provider as string) === "oauth_google",
-					) && (
-						<div className="p-6 bg-muted/30 flex items-center justify-between">
-							<div className="flex items-center gap-3">
-								<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-									<Mail className="w-4 h-4 text-foreground/70" />
+								<div className="flex items-center gap-3">
+									<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+										<provider.icon className="w-4 h-4 text-foreground/70" />
+									</div>
+									<div>
+										<p className="text-sm font-medium text-foreground">
+											{provider.label}
+										</p>
+										{connectedAccount && (
+											<p className="text-xs text-muted-foreground">
+												{connectedAccount.emailAddress}
+											</p>
+										)}
+									</div>
 								</div>
-								<div>
-									<p className="text-sm font-medium text-foreground">Google</p>
-								</div>
+								{connectedAccount ? (
+									<button
+										type="button"
+										onClick={() => handleDisconnectOAuth(connectedAccount.id)}
+										className="text-sm font-medium text-destructive hover:text-destructive/80 transition-colors px-2 py-1"
+									>
+										Disconnect
+									</button>
+								) : (
+									<button
+										type="button"
+										onClick={() => handleConnectOAuth(provider.strategy)}
+										className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-2 py-1"
+									>
+										Connect
+									</button>
+								)}
 							</div>
-							<button
-								type="button"
-								onClick={() => handleConnectOAuth("oauth_google")}
-								className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-2 py-1"
-							>
-								Connect
-							</button>
-						</div>
-					)}
+						);
+					})}
 				</div>
 			</section>
 		</div>

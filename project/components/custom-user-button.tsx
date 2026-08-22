@@ -2,12 +2,20 @@
 
 import { useClerk, useUser } from "@clerk/nextjs";
 import { LogOut, Settings } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { UserAvatar } from "@/components/user-avatar";
 
-export function CustomUserButton() {
+interface CustomUserButtonProps {
+	customAvatarUrl?: string | null;
+	googleAvatarUrl?: string | null;
+}
+
+export function CustomUserButton({
+	customAvatarUrl,
+	googleAvatarUrl,
+}: CustomUserButtonProps) {
 	const { isLoaded, user } = useUser();
 	const { signOut } = useClerk();
 	const router = useRouter();
@@ -50,24 +58,25 @@ export function CustomUserButton() {
 				onClick={() => setIsOpen(!isOpen)}
 				className="flex items-center justify-center rounded-full overflow-hidden border border-border hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary/40"
 			>
-				<Image
-					src={user.imageUrl}
-					alt={user.fullName ?? "User avatar"}
-					width={32}
-					height={32}
-					className="w-8 h-8 object-cover"
+				<UserAvatar
+					customAvatarUrl={customAvatarUrl}
+					googleAvatarUrl={googleAvatarUrl}
+					firstName={user.firstName}
+					lastName={user.lastName}
+					size={32}
 				/>
 			</button>
 
 			{isOpen && (
 				<div className="absolute right-0 mt-2 w-64 bg-card border border-border shadow-xl rounded-xl overflow-hidden z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
 					<div className="flex items-center gap-3 px-4 py-3 border-b border-border mb-1">
-						<Image
-							src={user.imageUrl}
-							alt={user.fullName ?? "User avatar"}
-							width={40}
-							height={40}
-							className="w-10 h-10 rounded-full border border-border object-cover"
+						<UserAvatar
+							customAvatarUrl={customAvatarUrl}
+							googleAvatarUrl={googleAvatarUrl}
+							firstName={user.firstName}
+							lastName={user.lastName}
+							size={40}
+							className="rounded-full border border-border"
 						/>
 						<div className="flex flex-col overflow-hidden">
 							<span className="text-sm font-semibold text-foreground truncate">

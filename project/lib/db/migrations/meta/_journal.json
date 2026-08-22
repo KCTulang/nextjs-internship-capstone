@@ -78,6 +78,20 @@
 			"when": 1787129175985,
 			"tag": "0010_overjoyed_white_tiger",
 			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1787404952576,
+			"tag": "0011_chubby_namorita",
+			"breakpoints": true
+		},
+		{
+			"idx": 12,
+			"version": "7",
+			"when": 1787409326085,
+			"tag": "0012_sloppy_earthquake",
+			"breakpoints": true
 		}
 	]
 }
