@@ -12,6 +12,15 @@ import {
 	updateUsernameSchema,
 	validate,
 } from "@/utils/validations";
+
+const PROVIDERS = [
+	{
+		id: "google",
+		label: "Google",
+		strategy: "oauth_google" as const,
+		icon: Mail,
+	},
+];
 import {
 	type ReverificationHandler,
 	ReverificationModal,
@@ -253,6 +262,9 @@ export function AccountSettings({
 		strategy: "oauth_google" | "oauth_github" | "oauth_microsoft",
 	) => {
 		try {
+			if (strategy === "oauth_google") {
+				sessionStorage.setItem("sync_google", "true");
+			}
 			await user.createExternalAccount({
 				strategy,
 				redirectUrl: "/sso-callback",
@@ -273,6 +285,11 @@ export function AccountSettings({
 
 		try {
 			await externalAccount.destroy();
+			await user.reload();
+			if (externalAccount.provider === "google") {
+				await syncGoogleAvatarAction();
+			}
+			router.refresh();
 			addToast({ type: "success", message: "Account disconnected." });
 		} catch (err) {
 			addToast({
@@ -621,55 +638,50 @@ export function AccountSettings({
 					</p>
 				</div>
 				<div className="border border-border bg-card shadow-sm rounded-xl divide-y divide-border">
-					{user.externalAccounts.map((account) => (
-						<div
-							key={account.id}
-							className="p-6 flex items-center justify-between"
-						>
-							<div className="flex items-center gap-3">
-								<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-									<Shield className="w-4 h-4 text-foreground/70" />
-								</div>
-								<div>
-									<p className="text-sm font-medium text-foreground capitalize">
-										{account.provider.replace("oauth_", "")}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{account.emailAddress}
-									</p>
-								</div>
-							</div>
-							<button
-								type="button"
-								onClick={() => handleDisconnectOAuth(account.id)}
-								className="text-sm font-medium text-destructive hover:text-destructive/80 transition-colors px-2 py-1"
+					{PROVIDERS.map((provider) => {
+						const connectedAccount = user.externalAccounts.find(
+							(a) => a.provider === provider.id,
+						);
+						return (
+							<div
+								key={provider.id}
+								className="p-6 flex items-center justify-between"
 							>
-								Disconnect
-							</button>
-						</div>
-					))}
-
-					{!user.externalAccounts.some(
-						(a) => (a.provider as string) === "oauth_google",
-					) && (
-						<div className="p-6 bg-muted/30 flex items-center justify-between">
-							<div className="flex items-center gap-3">
-								<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-									<Mail className="w-4 h-4 text-foreground/70" />
+								<div className="flex items-center gap-3">
+									<div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+										<provider.icon className="w-4 h-4 text-foreground/70" />
+									</div>
+									<div>
+										<p className="text-sm font-medium text-foreground">
+											{provider.label}
+										</p>
+										{connectedAccount && (
+											<p className="text-xs text-muted-foreground">
+												{connectedAccount.emailAddress}
+											</p>
+										)}
+									</div>
 								</div>
-								<div>
-									<p className="text-sm font-medium text-foreground">Google</p>
-								</div>
+								{connectedAccount ? (
+									<button
+										type="button"
+										onClick={() => handleDisconnectOAuth(connectedAccount.id)}
+										className="text-sm font-medium text-destructive hover:text-destructive/80 transition-colors px-2 py-1"
+									>
+										Disconnect
+									</button>
+								) : (
+									<button
+										type="button"
+										onClick={() => handleConnectOAuth(provider.strategy)}
+										className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-2 py-1"
+									>
+										Connect
+									</button>
+								)}
 							</div>
-							<button
-								type="button"
-								onClick={() => handleConnectOAuth("oauth_google")}
-								className="text-sm font-medium text-primary hover:text-primary/80 transition-colors px-2 py-1"
-							>
-								Connect
-							</button>
-						</div>
-					)}
+						);
+					})}
 				</div>
 			</section>
 		</div>
