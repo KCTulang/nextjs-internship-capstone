@@ -38,6 +38,7 @@ export const users = pgTable('users', {
 import { relations } from "drizzle-orm";
 import {
 	boolean,
+	date,
 	index,
 	integer,
 	pgTable,
@@ -109,7 +110,7 @@ export const tasks = pgTable(
 			onDelete: "set null",
 		}),
 		priority: text("priority").notNull().default("medium"),
-		dueDate: timestamp("due_date"),
+		dueDate: date("due_date", { mode: "string" }),
 		labels: text("labels").array(),
 		position: integer("position").notNull(),
 		createdAt: timestamp("created_at").defaultNow(),

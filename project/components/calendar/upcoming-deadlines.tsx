@@ -12,6 +12,7 @@ import { useCalendarShortcuts } from "@/hooks/use-calendar-shortcuts";
 import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
+import { isDateOnlyOverdue } from "@/utils/date-only";
 import type { CalendarTask } from "./calendar-grid";
 
 const DONE_LIST_NAMES = new Set([
@@ -27,15 +28,12 @@ function isCompletedList(listName?: string | null): boolean {
 }
 
 function isOverdue(
-	dueDate: Date | null | undefined,
+	dueDate: string | null | undefined,
 	listName?: string | null,
 ): boolean {
 	if (!dueDate) return false;
 	if (isCompletedList(listName)) return false;
-	const due = new Date(dueDate);
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	return due < today;
+	return isDateOnlyOverdue(dueDate);
 }
 
 interface UpcomingDeadlinesProps {

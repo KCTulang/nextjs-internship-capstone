@@ -126,10 +126,21 @@ export function TaskDetailPanel({
 	updateTaskDetailsRef.current = updateTaskDetails;
 	const projectIdRef = useRef(projectId);
 	projectIdRef.current = projectId;
+	const initializedTaskIdRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		const currentTask = taskRef.current;
-		if (currentTask && currentTask.id === taskId) {
+		if (!taskId) {
+			initializedTaskIdRef.current = null;
+			return;
+		}
+
+		const currentTask = task;
+		if (
+			currentTask &&
+			currentTask.id === taskId &&
+			initializedTaskIdRef.current !== taskId
+		) {
+			initializedTaskIdRef.current = taskId;
 			setTitle(currentTask.title);
 			setDescription(currentTask.description || "");
 			setLabelsString(currentTask.labels?.join(", ") || "");
@@ -163,7 +174,7 @@ export function TaskDetailPanel({
 				}
 			}, 0);
 		}
-	}, [taskId]);
+	}, [task, taskId]);
 
 	const { useEvent } = useCollaboration(projectId);
 	useEvent(
@@ -654,15 +665,9 @@ export function TaskDetailPanel({
 									</div>
 									<input
 										type="date"
-										value={
-											task.dueDate
-												? new Date(task.dueDate).toISOString().split("T")[0]
-												: ""
-										}
+										value={task.dueDate || ""}
 										onChange={(e) => {
-											const date = e.target.value
-												? new Date(e.target.value)
-												: null;
+											const date = e.target.value || null;
 											updateTaskDetails(task.id, { dueDate: date });
 											setTimeout(() => {
 												import("@/app/actions/activity").then(
@@ -843,7 +848,7 @@ export function TaskDetailPanel({
 												value={newComment}
 												onChange={(e) => setNewComment(e.target.value)}
 												placeholder="Write a comment..."
-												className="w-full min-h-20p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+												className="w-full min-h-20 p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
 											/>
 											<div className="flex justify-end">
 												<button

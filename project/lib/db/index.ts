@@ -203,6 +203,15 @@ export const queries = {
 		create: async (data: typeof schema.tasks.$inferInsert) => {
 			return await db.insert(schema.tasks).values(data).returning();
 		},
+		getHydratedById: async (id: string) => {
+			return await db.query.tasks.findFirst({
+				where: eq(schema.tasks.id, id),
+				with: {
+					assignee: true,
+					comments: { columns: { id: true } },
+				},
+			});
+		},
 		update: async (
 			id: string,
 			data: Partial<typeof schema.tasks.$inferInsert>,

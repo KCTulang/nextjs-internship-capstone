@@ -13,6 +13,7 @@ import {
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
+import { parseDateOnly, toDateOnly } from "@/utils/date-only";
 
 export type CalendarTask = {
 	id: string;
@@ -21,7 +22,7 @@ export type CalendarTask = {
 	projectName?: string | null;
 	projectSlug?: string | null;
 	priority?: string | null;
-	dueDate?: Date | null;
+	dueDate?: string | null;
 	labels?: string[] | null;
 	listName?: string | null;
 	assignee?: { id: string; name: string | null; email: string | null } | null;
@@ -48,7 +49,7 @@ export type LockInCalendarEvent = {
 };
 
 interface CalendarGridProps {
-	tasksWithDates: (CalendarTask & { dueDate: Date })[];
+	tasksWithDates: (CalendarTask & { dueDate: string })[];
 }
 
 export function CalendarGrid({ tasksWithDates }: CalendarGridProps) {
@@ -59,9 +60,8 @@ export function CalendarGrid({ tasksWithDates }: CalendarGridProps) {
 
 	const events = useMemo(() => {
 		return tasksWithDates.map((task) => {
-			const start = new Date(task.dueDate);
-			const end = new Date(task.dueDate);
-
+			const start = parseDateOnly(task.dueDate);
+			const end = parseDateOnly(task.dueDate);
 			end.setHours(end.getHours() + 1);
 
 			return {
@@ -88,7 +88,10 @@ export function CalendarGrid({ tasksWithDates }: CalendarGridProps) {
 			end: Date;
 			action: "select" | "click" | "doubleClick";
 		}) => {
-			openCreateTaskModal({ initialDueDate: slotInfo.start });
+			openCreateTaskModal({
+				initialDueDate: toDateOnly(slotInfo.start),
+				source: "global",
+			});
 		},
 		[openCreateTaskModal],
 	);

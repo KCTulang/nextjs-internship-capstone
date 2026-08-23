@@ -1,6 +1,12 @@
 // TypeScript type definitions
 // Task 1.3: Set up project structure and folder organization
 
+export type {
+	TaskAssigneeDTO,
+	TaskCommentDTO,
+	TaskDTO,
+} from "./task";
+
 export interface User {
 	id: string;
 	clerkId: string;
@@ -32,22 +38,7 @@ export interface List {
 	tasks: Task[];
 }
 
-export interface Task {
-	id: string;
-	title: string;
-	description?: string | null;
-	listId: string;
-	assigneeId?: string | null;
-	assigneeIds?: string[];
-	assignees?: { id: string; name: string; email: string }[];
-	priority: "low" | "medium" | "high";
-	dueDate?: Date | null;
-	position: number;
-	createdAt?: Date | null;
-	updatedAt?: Date | null;
-	comments?: { id: string }[];
-	labels?: string[] | null;
-}
+export type Task = import("./task").TaskDTO;
 
 export interface Comment {
 	id: string;

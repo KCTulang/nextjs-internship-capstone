@@ -13,7 +13,9 @@ interface UIState {
 	isCreateTaskModalOpen: boolean;
 	selectedListIdForNewTask: string | null;
 	activeProjectId: string | null;
-	initialDueDate: Date | null;
+	activeProjectName: string | null;
+	initialDueDate: string | null;
+	taskCreationSource: "column" | "board" | "global";
 	isEditProjectModalOpen: boolean;
 	selectedProjectForEdit: Project | null;
 	openEditProjectModal: (project: Project) => void;
@@ -40,7 +42,9 @@ interface UIState {
 	openCreateTaskModal: (options?: {
 		listId?: string;
 		projectId?: string;
-		initialDueDate?: Date;
+		projectName?: string;
+		initialDueDate?: string;
+		source?: "column" | "board" | "global";
 	}) => void;
 	closeCreateTaskModal: () => void;
 	isInviteMemberModalOpen: boolean;
@@ -75,7 +79,9 @@ export const useUIStore = create<UIState>((set) => ({
 	isCreateTaskModalOpen: false,
 	selectedListIdForNewTask: null,
 	activeProjectId: null,
+	activeProjectName: null,
 	initialDueDate: null,
+	taskCreationSource: "global",
 	isEditProjectModalOpen: false,
 	selectedProjectForEdit: null,
 	isTaskDetailModalOpen: false,
@@ -106,14 +112,18 @@ export const useUIStore = create<UIState>((set) => ({
 			isCreateTaskModalOpen: true,
 			selectedListIdForNewTask: options?.listId || null,
 			activeProjectId: options?.projectId || null,
+			activeProjectName: options?.projectName || null,
 			initialDueDate: options?.initialDueDate || null,
+			taskCreationSource: options?.source || "global",
 		}),
 	closeCreateTaskModal: () =>
 		set({
 			isCreateTaskModalOpen: false,
 			selectedListIdForNewTask: null,
 			activeProjectId: null,
+			activeProjectName: null,
 			initialDueDate: null,
+			taskCreationSource: "global",
 		}),
 	openTaskDetailModal: (taskId) =>
 		set({ isTaskDetailModalOpen: true, selectedTaskId: taskId }),

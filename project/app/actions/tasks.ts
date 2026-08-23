@@ -1,8 +1,9 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
 import {
@@ -13,7 +14,9 @@ import {
 	tasks,
 	users,
 } from "@/lib/db/schema";
+import { toTaskDTO } from "@/lib/tasks/task-dto";
 import { publishProjectEvent } from "@/services/realtime/events";
+import type { TaskDTO } from "@/types/task";
 import { createTaskSchema, updateTaskSchema } from "@/utils/validations";
 import { logActivity } from "./activity";
 
@@ -23,95 +26,245 @@ async function requireAuth() {
 	return userId;
 }
 
+export async function getTaskCreationOptionsAction() {
+	try {
+		const clerkId = await requireAuth();
+		const currentUser = await queries.users.getByClerkId(clerkId);
+		if (!currentUser) return { success: false, error: "User not found" };
+
+		const memberships = await db
+			.select({ projectId: projectMembers.projectId })
+			.from(projectMembers)
+			.where(eq(projectMembers.userId, currentUser.id));
+		const ownedProjects = await db
+			.select({ projectId: projects.id })
+			.from(projects)
+			.where(eq(projects.ownerId, currentUser.id));
+		const projectIds = Array.from(
+			new Set([
+				...memberships.map((membership) => membership.projectId),
+				...ownedProjects.map((project) => project.projectId),
+			]),
+		);
+
+		if (projectIds.length === 0) return { success: true, data: [] };
+
+		const [projectRows, listRows, memberRows] = await Promise.all([
+			db
+				.select({
+					id: projects.id,
+					name: projects.name,
+					ownerId: projects.ownerId,
+				})
+				.from(projects)
+				.where(inArray(projects.id, projectIds)),
+			db
+				.select({
+					id: lists.id,
+					name: lists.name,
+					projectId: lists.projectId,
+					position: lists.position,
+					isCompleted: lists.isCompleted,
+				})
+				.from(lists)
+				.where(inArray(lists.projectId, projectIds)),
+			db
+				.select({
+					projectId: projectMembers.projectId,
+					id: users.id,
+					name: users.name,
+					email: users.email,
+				})
+				.from(projectMembers)
+				.innerJoin(users, eq(projectMembers.userId, users.id))
+				.where(inArray(projectMembers.projectId, projectIds)),
+		]);
+		const ownerIds = Array.from(
+			new Set(projectRows.map((project) => project.ownerId)),
+		);
+		const ownerRows = await db
+			.select({ id: users.id, name: users.name, email: users.email })
+			.from(users)
+			.where(inArray(users.id, ownerIds));
+
+		return {
+			success: true,
+			data: projectRows
+				.map((project) => ({
+					id: project.id,
+					name: project.name,
+					lists: listRows
+						.filter((list) => list.projectId === project.id)
+						.sort((a, b) => a.position - b.position)
+						.map(({ id, name, isCompleted }) => ({
+							id,
+							name,
+							isCompleted,
+						})),
+					members: Array.from(
+						new Map(
+							[
+								...ownerRows.filter((owner) => owner.id === project.ownerId),
+								...memberRows.filter(
+									(member) => member.projectId === project.id,
+								),
+							].map((member) => [
+								member.id,
+								{ id: member.id, name: member.name, email: member.email },
+							]),
+						).values(),
+					),
+				}))
+				.sort((a, b) => a.name.localeCompare(b.name)),
+		};
+	} catch (error) {
+		console.error("Failed to load task creation options:", error);
+		return { success: false, error: "Failed to load task creation options" };
+	}
+}
+
 export async function createTaskAction(
 	rawData: {
 		title: string;
-		description?: string | null;
+		description?: string;
 		listId: string;
 		priority?: string;
-		dueDate?: Date | null;
+		dueDate?: string | null;
 		assigneeId?: string | null;
-		assigneeIds?: string[];
-		position: number;
-		labels?: string[] | null;
+		labels?: string[];
 	},
 	projectId?: string | null,
-) {
+): Promise<
+	| { success: true; data: TaskDTO }
+	| {
+			success: false;
+			error: string;
+			fieldErrors?: Record<string, string>;
+	  }
+> {
 	try {
-		await requireAuth();
-		const data = createTaskSchema.parse(rawData);
-		const newTask = await queries.tasks.create({
-			title: data.title,
-			description: data.description || null,
-			listId: data.listId,
-			priority: data.priority || "medium",
-			dueDate: data.dueDate || null,
-			assigneeId: data.assigneeId || null,
-			position: data.position,
-			labels: data.labels || null,
+		const clerkId = await requireAuth();
+		const parsed = createTaskSchema.safeParse(rawData);
+		if (!parsed.success) {
+			return {
+				success: false,
+				error: "Please correct the highlighted fields.",
+				fieldErrors: Object.fromEntries(
+					parsed.error.issues.map((issue) => [
+						issue.path.join("."),
+						issue.message,
+					]),
+				),
+			};
+		}
+		const data = parsed.data;
+		const currentUser = await queries.users.getByClerkId(clerkId);
+		if (!currentUser) return { success: false, error: "User not found" };
+
+		const destinationList = await db.query.lists.findFirst({
+			where: eq(lists.id, data.listId),
 		});
+		if (!destinationList) {
+			return {
+				success: false,
+				error: "The selected destination list no longer exists.",
+				fieldErrors: { listId: "Select an available list." },
+			};
+		}
+		if (projectId && projectId !== destinationList.projectId) {
+			return {
+				success: false,
+				error: "The destination list is not in this project.",
+			};
+		}
 
-		const createdTask = newTask[0];
+		const project = await db.query.projects.findFirst({
+			where: eq(projects.id, destinationList.projectId),
+		});
+		const membership = await db.query.projectMembers.findFirst({
+			where: and(
+				eq(projectMembers.projectId, destinationList.projectId),
+				eq(projectMembers.userId, currentUser.id),
+			),
+		});
+		if (!project || (project.ownerId !== currentUser.id && !membership)) {
+			return {
+				success: false,
+				error: "You do not have access to this project.",
+			};
+		}
 
-		const finalAssigneeIds =
-			data.assigneeIds || (data.assigneeId ? [data.assigneeId] : []);
-		if (finalAssigneeIds.length > 0) {
-			const assigneesToInsert = finalAssigneeIds.map((uid) => ({
-				taskId: createdTask.id,
-				userId: uid,
-			}));
-			await db.insert(taskAssignees).values(assigneesToInsert);
-
-			const clerkId = await auth().then((a) => a.userId as string);
-			const currentUser = await queries.users.getByClerkId(clerkId);
-			if (currentUser) {
-				let actualProjectId = projectId;
-				if (!actualProjectId) {
-					const list = await db.query.lists.findFirst({
-						where: eq(lists.id, data.listId),
-					});
-					actualProjectId = list?.projectId || null;
-				}
-				if (actualProjectId) {
-					for (const uid of finalAssigneeIds) {
-						if (uid !== currentUser.id) {
-							await createNotificationAction({
-								userId: uid,
-								actorId: currentUser.id,
-								type: "assignment",
-								taskId: createdTask.id,
-								projectId: actualProjectId,
-								message: "assigned you to a new task",
-							});
-						}
-					}
-				}
+		if (data.assigneeId) {
+			const assigneeMembership = await db.query.projectMembers.findFirst({
+				where: and(
+					eq(projectMembers.projectId, destinationList.projectId),
+					eq(projectMembers.userId, data.assigneeId),
+				),
+			});
+			if (project.ownerId !== data.assigneeId && !assigneeMembership) {
+				return {
+					success: false,
+					error: "The selected assignee is not a project member.",
+					fieldErrors: { assigneeId: "Select a project member." },
+				};
 			}
 		}
 
-		let actualProjectId = projectId;
-		if (!actualProjectId) {
-			const list = await db.query.lists.findFirst({
-				where: eq(lists.id, data.listId),
+		const lastTask = await db.query.tasks.findFirst({
+			where: eq(tasks.listId, data.listId),
+			orderBy: [desc(tasks.position)],
+			columns: { position: true },
+		});
+		const position = (lastTask?.position ?? 0) + 1024;
+		const newTask = await queries.tasks.create({
+			title: data.title,
+			description: data.description ?? null,
+			listId: data.listId,
+			priority: data.priority,
+			dueDate: data.dueDate,
+			assigneeId: data.assigneeId ?? null,
+			position,
+			labels: data.labels,
+		});
+
+		const createdTask = newTask[0];
+		if (data.assigneeId) {
+			await db.insert(taskAssignees).values({
+				taskId: createdTask.id,
+				userId: data.assigneeId,
 			});
-			actualProjectId = list?.projectId || null;
+			if (data.assigneeId !== currentUser.id) {
+				await createNotificationAction({
+					userId: data.assigneeId,
+					actorId: currentUser.id,
+					type: "assignment",
+					taskId: createdTask.id,
+					projectId: destinationList.projectId,
+					message: "assigned you to a new task",
+				});
+			}
 		}
 
-		if (actualProjectId) {
-			await publishProjectEvent({
-				type: "task.created",
-				projectId: actualProjectId,
-				actorId: await auth().then((a) => a.userId as string),
-				entityId: createdTask.id,
-				timestamp: new Date().toISOString(),
-				payload: { task: createdTask },
-			});
-		}
+		const hydratedTask = await queries.tasks.getHydratedById(createdTask.id);
+		if (!hydratedTask) throw new Error("Created task could not be hydrated");
+		const taskDTO = toTaskDTO(hydratedTask);
+
+		await publishProjectEvent({
+			type: "task.created",
+			projectId: destinationList.projectId,
+			actorId: currentUser.id,
+			entityId: createdTask.id,
+			timestamp: new Date().toISOString(),
+			payload: { task: taskDTO },
+		});
 
 		revalidatePath(`/`, "layout");
-		return { success: true, data: createdTask };
+		return { success: true, data: taskDTO };
 	} catch (error) {
 		console.error("Failed to create task:", error);
+		if (error instanceof ZodError) {
+			return { success: false, error: "Invalid task details." };
+		}
 		return { success: false, error: "Failed to create task" };
 	}
 }
@@ -123,11 +276,10 @@ export async function updateTaskAction(
 		description?: string | null;
 		listId?: string | null;
 		priority?: string;
-		dueDate?: Date | null;
+		dueDate?: string | null;
 		assigneeId?: string | null;
-		assigneeIds?: string[];
 		position?: number;
-		labels?: string[] | null;
+		labels?: string[];
 	},
 	projectId?: string | null,
 ) {
@@ -144,7 +296,7 @@ export async function updateTaskAction(
 			return { success: false, error: "Task not found" };
 		}
 
-		const updatedTask = await queries.tasks.update(taskId, data);
+		await queries.tasks.update(taskId, data);
 
 		const logPromises = [];
 		if (data.title && data.title !== currentTask.title) {
@@ -172,23 +324,16 @@ export async function updateTaskAction(
 			);
 		}
 		if (data.dueDate !== undefined) {
-			const currentStr = currentTask.dueDate
-				? new Date(currentTask.dueDate).toISOString()
-				: null;
-			const newStr = data.dueDate ? new Date(data.dueDate).toISOString() : null;
+			const currentStr = currentTask.dueDate;
+			const newStr = data.dueDate;
 			if (currentStr !== newStr) {
 				logPromises.push(
 					logActivity(taskId, "task_due_date_changed", currentStr, newStr),
 				);
 			}
 		}
-		if (data.assigneeId !== undefined || data.assigneeIds !== undefined) {
-			const finalAssigneeIds =
-				data.assigneeIds !== undefined
-					? data.assigneeIds
-					: data.assigneeId
-						? [data.assigneeId]
-						: [];
+		if (data.assigneeId !== undefined) {
+			const finalAssigneeIds = data.assigneeId ? [data.assigneeId] : [];
 
 			const existing = await db
 				.select()
@@ -272,6 +417,9 @@ export async function updateTaskAction(
 		}
 
 		await Promise.all(logPromises);
+		const hydratedTask = await queries.tasks.getHydratedById(taskId);
+		if (!hydratedTask) throw new Error("Updated task could not be hydrated");
+		const taskDTO = toTaskDTO(hydratedTask);
 
 		let actualProjectId = projectId;
 		if (!actualProjectId && currentTask.listId) {
@@ -288,12 +436,12 @@ export async function updateTaskAction(
 				actorId: await auth().then((a) => a.userId as string),
 				entityId: taskId,
 				timestamp: new Date().toISOString(),
-				payload: { task: updatedTask[0] },
+				payload: { task: taskDTO },
 			});
 		}
 
 		revalidatePath(`/`, "layout");
-		return { success: true, data: updatedTask[0] };
+		return { success: true, data: taskDTO };
 	} catch (error) {
 		console.error("Failed to update task:", error);
 		return { success: false, error: "Failed to update task" };

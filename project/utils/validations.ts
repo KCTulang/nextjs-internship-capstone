@@ -22,35 +22,53 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
+const normalizedLabelsSchema = z
+	.array(z.string().trim().min(1, "Labels cannot be empty").max(50))
+	.max(20, "A task can have at most 20 labels")
+	.transform((labels) =>
+		Array.from(
+			new Map(labels.map((label) => [label.toLowerCase(), label])).values(),
+		),
+	);
+
 export const createTaskSchema = z.object({
+	title: z
+		.string()
+		.trim()
+		.min(1, "Enter a task title.")
+		.max(200, "Task title must be 200 characters or fewer."),
+	description: z
+		.string()
+		.max(2000, "Description must be 2,000 characters or fewer.")
+		.trim()
+		.optional(),
+	listId: z.string().uuid("Select a destination list."),
+	priority: z.enum(TASK_PRIORITIES).default("medium"),
+	dueDate: z.iso.date("Enter a valid due date.").nullable().default(null),
+	assigneeId: z.string().uuid("Select a valid assignee.").nullable().optional(),
+	labels: normalizedLabelsSchema.default([]),
+});
+
+export const updateTaskSchema = z.object({
 	title: z
 		.string()
 		.min(1, "Task title is required")
 		.max(200, "Task title must be 200 characters or fewer")
-		.trim(),
+		.trim()
+		.optional(),
 	description: z
 		.string()
 		.max(2000, "Description must be 2000 characters or fewer")
 		.trim()
+		.nullable()
 		.optional(),
-	listId: z.string().uuid("Invalid list ID"),
-	priority: z.enum(TASK_PRIORITIES).default("medium"),
-	dueDate: z.coerce.date().optional(),
+	listId: z.string().uuid("Invalid list ID").optional(),
+	priority: z.enum(TASK_PRIORITIES).optional(),
+	dueDate: z.iso.date("Invalid due date").nullable().optional(),
+	position: z.number().int().nonnegative().optional(),
 	assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
-	assigneeIds: z.array(z.string().uuid("Invalid assignee ID")).optional(),
-	position: z.number().int().nonnegative().default(1000),
-	labels: z.array(z.string()).optional(),
+	labels: normalizedLabelsSchema.optional(),
 });
-
-export const updateTaskSchema = createTaskSchema
-	.omit({ listId: true, position: true })
-	.partial()
-	.extend({
-		listId: z.string().uuid("Invalid list ID").optional(),
-		position: z.number().int().nonnegative().optional(),
-		assigneeId: z.string().uuid("Invalid assignee ID").nullable().optional(),
-		assigneeIds: z.array(z.string().uuid("Invalid assignee ID")).optional(),
-	});
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
