@@ -99,6 +99,13 @@
 			"when": 1787421488177,
 			"tag": "0013_famous_scalphunter",
 			"breakpoints": true
+		},
+		{
+			"idx": 14,
+			"version": "7",
+			"when": 1787477917279,
+			"tag": "0014_strong_magik",
+			"breakpoints": true
 		}
 	]
 }

@@ -107,20 +107,6 @@ export const queries = {
 			});
 		},
 
-		// create
-		create: async (data: typeof schema.projects.$inferInsert) => {
-			const [project] = await db
-				.insert(schema.projects)
-				.values(data)
-				.returning();
-			await db.insert(schema.projectMembers).values({
-				projectId: project.id,
-				userId: data.ownerId,
-				role: "admin",
-			});
-			return [project];
-		},
-
 		// update
 		update: async (
 			id: string,
@@ -153,16 +139,13 @@ export const queries = {
 
 			if (userId) {
 				const isMember = project.members.some((m) => m.userId === userId);
-				if (!isMember) return null;
+				if (project.ownerId !== userId && !isMember) return null;
 			}
 
 			return project;
 		},
 	},
 	lists: {
-		create: async (data: typeof schema.lists.$inferInsert) => {
-			return await db.insert(schema.lists).values(data).returning();
-		},
 		getByProject: async (projectId: string) => {
 			return await db.query.lists.findMany({
 				where: eq(schema.lists.projectId, projectId),
@@ -181,22 +164,6 @@ export const queries = {
 					},
 				},
 			});
-		},
-		update: async (
-			id: string,
-			data: Partial<typeof schema.lists.$inferInsert>,
-		) => {
-			return await db
-				.update(schema.lists)
-				.set(data)
-				.where(eq(schema.lists.id, id))
-				.returning();
-		},
-		delete: async (id: string) => {
-			return await db
-				.delete(schema.lists)
-				.where(eq(schema.lists.id, id))
-				.returning();
 		},
 	},
 	tasks: {

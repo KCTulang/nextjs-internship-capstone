@@ -9,6 +9,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence } from "framer-motion";
 import {
+	CheckCircle2,
 	GripHorizontal,
 	MoreHorizontal,
 	Pencil,
@@ -72,7 +73,8 @@ const COLUMN_COLORS = [
 	},
 ];
 
-function getDefaultColor(name: string) {
+function getDefaultColor(name: string, isCompleted: boolean) {
+	if (isCompleted) return COLUMN_COLORS[4];
 	const lower = name.toLowerCase();
 	if (
 		lower.includes("do") ||
@@ -86,28 +88,30 @@ function getDefaultColor(name: string) {
 		return COLUMN_COLORS[2];
 	if (lower.includes("hold") || lower.includes("block"))
 		return COLUMN_COLORS[3];
-	if (lower.includes("done") || lower.includes("complete"))
-		return COLUMN_COLORS[4];
 	return COLUMN_COLORS[0];
 }
 
 interface KanbanColumnProps {
 	list: List;
 	projectId: string;
+	projectName?: string;
 	isOverlay?: boolean;
 	isMobileView?: boolean;
+	canManageColumns?: boolean;
 	onMoveTaskClick?: (task: Task) => void;
 }
 
 export function KanbanColumn({
 	list,
 	projectId,
+	projectName,
 	isOverlay = false,
 	isMobileView = false,
+	canManageColumns = false,
 	onMoveTaskClick,
 }: KanbanColumnProps) {
-	const { renameList, removeList } = useTasksStore();
-	const { openCreateTaskModal } = useUIStore();
+	const { renameList, removeList, setCompletedList } = useTasksStore();
+	const { addToast, openCreateTaskModal } = useUIStore();
 
 	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
 		id: `drop-${list.id}`,
@@ -124,7 +128,7 @@ export function KanbanColumn({
 	} = useSortable({
 		id: list.id,
 		data: { type: "Column", list },
-		disabled: isOverlay || isMobileView,
+		disabled: isOverlay || isMobileView || !canManageColumns,
 	});
 
 	const style = {
@@ -138,7 +142,7 @@ export function KanbanColumn({
 			const saved = localStorage.getItem(colorKey);
 			if (saved !== null) return parseInt(saved, 10);
 		}
-		return COLUMN_COLORS.indexOf(getDefaultColor(list.name));
+		return COLUMN_COLORS.indexOf(getDefaultColor(list.name, list.isCompleted));
 	});
 	const color = COLUMN_COLORS[colorIdx] ?? COLUMN_COLORS[0];
 
@@ -183,6 +187,14 @@ export function KanbanColumn({
 	};
 
 	const handleDelete = () => {
+		if (list.isCompleted) {
+			addToast({
+				type: "error",
+				message: "Set another column as completed before deleting this column.",
+			});
+			setMenuOpen(false);
+			return;
+		}
 		if (window.confirm(`Delete column "${list.name}" and all its tasks?`)) {
 			removeList(list.id, projectId);
 		}
@@ -217,7 +229,7 @@ export function KanbanColumn({
 
 			<div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
-					{!isMobileView && (
+					{!isMobileView && canManageColumns && (
 						<div
 							{...attributes}
 							{...listeners}
@@ -228,6 +240,12 @@ export function KanbanColumn({
 					)}
 
 					<span className={`w-2 h-2 rounded-full shrink-0 ${color.dot}`} />
+					{list.isCompleted && (
+						<CheckCircle2
+							aria-label="Completed column"
+							className="size-4 shrink-0 text-emerald-500"
+						/>
+					)}
 
 					{isRenaming ? (
 						<input
@@ -250,6 +268,7 @@ export function KanbanColumn({
 							className="text-sm font-semibold text-foreground truncate cursor-pointer hover:text-primary transition-colors"
 							title="Double-click to rename"
 							onDoubleClick={() => {
+								if (!canManageColumns) return;
 								setIsRenaming(true);
 								setRenameValue(list.name);
 							}}
@@ -268,75 +287,109 @@ export function KanbanColumn({
 				<div className="flex items-center gap-1 shrink-0">
 					<button
 						type="button"
-						onClick={() => openCreateTaskModal({ listId: list.id, projectId })}
+						onClick={() =>
+							openCreateTaskModal({
+								listId: list.id,
+								projectId,
+								projectName,
+								source: "column",
+							})
+						}
 						title="Add task"
 						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
 					>
 						<Plus size={15} />
 					</button>
 
-					<div ref={menuRef} className="relative">
-						<button
-							type="button"
-							onClick={() => {
-								setMenuOpen((v) => !v);
-								setShowColorPicker(false);
-							}}
-							title="Column options"
-							className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-						>
-							<MoreHorizontal size={15} />
-						</button>
+					{canManageColumns && (
+						<div ref={menuRef} className="relative">
+							<button
+								type="button"
+								onClick={() => {
+									setMenuOpen((v) => !v);
+									setShowColorPicker(false);
+								}}
+								title="Column options"
+								aria-label={`Manage ${list.name} column`}
+								aria-expanded={menuOpen}
+								className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								<MoreHorizontal size={15} />
+							</button>
 
-						{menuOpen && (
-							<div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-								<button
-									type="button"
-									onClick={() => {
-										setIsRenaming(true);
-										setRenameValue(list.name);
-										setMenuOpen(false);
-									}}
-									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-								>
-									<Pencil size={14} className="text-muted-foreground" />
-									Rename
-								</button>
-								<button
-									type="button"
-									onClick={() => setShowColorPicker((v) => !v)}
-									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-								>
-									<span className={`w-3.5 h-3.5 rounded-full ${color.dot}`} />
-									Color
-								</button>
-								{showColorPicker && (
-									<div className="px-3 pb-3 pt-1">
-										<div className="flex flex-wrap gap-2">
-											{COLUMN_COLORS.map((c, i) => (
-												<button
-													key={c.name}
-													type="button"
-													title={c.name}
-													onClick={() => handleColorSelect(i)}
-													className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${c.dot} ${colorIdx === i ? "ring-2 ring-offset-1 ring-foreground/40 scale-110" : ""}`}
-												/>
-											))}
+							{menuOpen && (
+								<div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+									<button
+										type="button"
+										disabled={list.isCompleted}
+										onClick={() => {
+											void setCompletedList(list.id, projectId);
+											setMenuOpen(false);
+										}}
+										className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:text-emerald-600 disabled:hover:bg-transparent dark:disabled:text-emerald-400"
+									>
+										<CheckCircle2 size={14} />
+										{list.isCompleted ? "Completed column" : "Set as completed"}
+									</button>
+									{list.isCompleted && (
+										<p className="px-3 pb-2 text-xs leading-4 text-muted-foreground">
+											Set another column as completed before deleting this one.
+										</p>
+									)}
+									<button
+										type="button"
+										onClick={() => {
+											setIsRenaming(true);
+											setRenameValue(list.name);
+											setMenuOpen(false);
+										}}
+										className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+									>
+										<Pencil size={14} className="text-muted-foreground" />
+										Rename column
+									</button>
+									<button
+										type="button"
+										onClick={() => setShowColorPicker((v) => !v)}
+										className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+									>
+										<span className={`w-3.5 h-3.5 rounded-full ${color.dot}`} />
+										Color
+									</button>
+									{showColorPicker && (
+										<div className="px-3 pb-3 pt-1">
+											<div className="flex flex-wrap gap-2">
+												{COLUMN_COLORS.map((c, i) => (
+													<button
+														key={c.name}
+														type="button"
+														title={c.name}
+														onClick={() => handleColorSelect(i)}
+														className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${c.dot} ${colorIdx === i ? "ring-2 ring-offset-1 ring-foreground/40 scale-110" : ""}`}
+													/>
+												))}
+											</div>
 										</div>
-									</div>
-								)}
-								<div className="h-px bg-border my-1" />
-								<button
-									type="button"
-									onClick={handleDelete}
-									className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
-								>
-									<Trash2 size={14} />
-									Delete column
-								</button>
-							</div>
-						)}
-					</div>
+									)}
+									<div className="h-px bg-border my-1" />
+									<button
+										type="button"
+										onClick={handleDelete}
+										disabled={list.isCompleted}
+										title={
+											list.isCompleted
+												? "Set another column as completed before deleting this one"
+												: undefined
+										}
+										className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+									>
+										<Trash2 size={14} />
+										Delete column
+									</button>
+								</div>
+							)}
+						</div>
+					)}
 				</div>
 			</div>
 
@@ -375,7 +428,14 @@ export function KanbanColumn({
 
 			<button
 				type="button"
-				onClick={() => openCreateTaskModal({ listId: list.id, projectId })}
+				onClick={() =>
+					openCreateTaskModal({
+						listId: list.id,
+						projectId,
+						projectName,
+						source: "column",
+					})
+				}
 				className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
 			>
 				<Plus size={14} />

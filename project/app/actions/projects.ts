@@ -1,8 +1,12 @@
 "use server";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { queries } from "@/lib/db";
+import { db, queries } from "@/lib/db";
+import { projectCompletionAdvisoryLock } from "@/lib/db/project-column-guards";
+import { lists, projectMembers, projects } from "@/lib/db/schema";
+import { hasExactlyOneCompletedList } from "@/lib/tasks/completion";
 import { createProjectSchema, updateProjectSchema } from "@/utils/validations";
 
 async function requireAuth() {
@@ -59,24 +63,55 @@ export async function createProjectAction(rawData: {
 			.replace(/(^-|-$)+/g, "");
 		const randomStr = Math.random().toString(36).substring(2, 6);
 		const slug = `${baseSlug}-${randomStr}`;
+		const projectId = crypto.randomUUID();
+		const [, newProject, , , defaultLists] = await db.batch([
+			db.execute(projectCompletionAdvisoryLock(projectId)),
+			db
+				.insert(projects)
+				.values({
+					id: projectId,
+					name: data.name,
+					slug,
+					description: data.description || null,
+					dueDate: data.dueDate || null,
+					ownerId: user.id,
+				})
+				.returning(),
+			db.insert(projectMembers).values({
+				projectId,
+				userId: user.id,
+				role: "admin",
+			}),
+			db.insert(lists).values([
+				{
+					name: "To Do",
+					projectId,
+					position: 1000,
+					isCompleted: false,
+				},
+				{
+					name: "In Progress",
+					projectId,
+					position: 2000,
+					isCompleted: false,
+				},
+				{
+					name: "Done",
+					projectId,
+					position: 3000,
+					isCompleted: true,
+				},
+			]),
+			db.select().from(lists).where(eq(lists.projectId, projectId)),
+		]);
 
-		const newProject = await queries.projects.create({
-			name: data.name,
-			slug,
-			description: data.description || null,
-			dueDate: data.dueDate || null,
-			ownerId: user.id,
-		});
-
-		const projectId = newProject[0].id;
-
-		await queries.lists.create({ name: "To Do", projectId, position: 1000 });
-		await queries.lists.create({
-			name: "In Progress",
-			projectId,
-			position: 2000,
-		});
-		await queries.lists.create({ name: "Done", projectId, position: 3000 });
+		if (
+			newProject.length !== 1 ||
+			defaultLists.length !== 3 ||
+			!hasExactlyOneCompletedList(defaultLists)
+		) {
+			throw new Error("Failed to create a valid project board");
+		}
 
 		revalidatePath("/dashboard");
 		return { success: true, data: newProject[0] };
@@ -123,7 +158,13 @@ export async function getProjectBySlugAction(slug: string) {
 			return { success: false, error: "Unauthorized or project not found" };
 		}
 
-		return { success: true, data: project };
+		const canManageColumns =
+			project.ownerId === user.id ||
+			project.members.some(
+				(member) => member.userId === user.id && member.role === "admin",
+			);
+
+		return { success: true, data: { ...project, canManageColumns } };
 	} catch (error) {
 		console.error("Failed to fetch project by slug:", error);
 		return { success: false, error: "Failed to fetch project" };

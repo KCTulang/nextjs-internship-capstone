@@ -25,6 +25,7 @@ export type CalendarTask = {
 	dueDate?: string | null;
 	labels?: string[] | null;
 	listName?: string | null;
+	listIsCompleted: boolean;
 	assignee?: { id: string; name: string | null; email: string | null } | null;
 };
 

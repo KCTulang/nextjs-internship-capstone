@@ -33,6 +33,7 @@ export interface List {
 	name: string;
 	projectId: string;
 	position: number;
+	isCompleted: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 	tasks: Task[];

@@ -8,16 +8,20 @@ import { useUIStore } from "@/stores/ui-store";
 
 interface DashboardStats {
 	teamMembers: number;
-	completedTasks: number;
-	pendingTasks: number;
+	completedTasks: number | null;
+	pendingTasks: number | null;
 	projectCount: number;
 }
 
 interface DashboardClientProps {
 	initialStats: DashboardStats;
+	completionError?: string;
 }
 
-export function DashboardClient({ initialStats }: DashboardClientProps) {
+export function DashboardClient({
+	initialStats,
+	completionError,
+}: DashboardClientProps) {
 	const { openCreateProjectModal, openInviteMemberModal } = useUIStore();
 	const { projects, isLoading, fetchProjects } = useProjectStore();
 
@@ -41,12 +45,12 @@ export function DashboardClient({ initialStats }: DashboardClientProps) {
 		},
 		{
 			name: "Completed Tasks",
-			value: initialStats.completedTasks.toString(),
+			value: initialStats.completedTasks?.toString() ?? "—",
 			icon: CheckCircle,
 		},
 		{
 			name: "Pending Tasks",
-			value: initialStats.pendingTasks.toString(),
+			value: initialStats.pendingTasks?.toString() ?? "—",
 			icon: Clock,
 		},
 	];
@@ -59,6 +63,12 @@ export function DashboardClient({ initialStats }: DashboardClientProps) {
 					Welcome back! Here's an overview of your projects and tasks.
 				</p>
 			</div>
+
+			{completionError && (
+				<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+					{completionError}
+				</div>
+			)}
 
 			<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 				{stats.map((stat) => (

@@ -40,6 +40,7 @@ import { Calendar, Edit, Folder, Trash, Users } from "lucide-react";
 import Link from "next/link";
 import type { Project } from "@/hooks/use-projects";
 import { useProjectStore } from "@/hooks/use-projects";
+import { getProjectCompletionStats } from "@/lib/tasks/completion";
 import { useUIStore } from "@/stores/ui-store";
 
 interface ProjectCardProps {
@@ -52,26 +53,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
 	const realMemberCount = project.members ? project.members.length : 1;
 
-	let totalTasks = 0;
-	let completedTasks = 0;
-
-	if (project.lists) {
-		project.lists.forEach((list) => {
-			const taskCount = list.tasks?.length || 0;
-			totalTasks += taskCount;
-
-			const listName = list.name.toLowerCase();
-			if (listName.includes("done") || listName.includes("complete")) {
-				completedTasks += taskCount;
-			}
-		});
-	}
-
-	const realProgress =
-		totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-	const realStatus =
-		realProgress === 100 && totalTasks > 0 ? "completed" : "active";
+	const completion = getProjectCompletionStats(project.lists ?? []);
+	const realStatus = completion.success
+		? completion.progress === 100 && completion.totalTasks > 0
+			? "completed"
+			: "active"
+		: "setup required";
 
 	return (
 		<div className="group relative bg-card hover:bg-card/80 border border-border rounded-xl p-5 transition-all hover:shadow-lg hover:shadow-primary/5 hover:border-primary/40">
@@ -130,14 +117,23 @@ export function ProjectCard({ project }: ProjectCardProps) {
 			<div className="mb-4">
 				<div className="flex items-center justify-between text-xs mb-1.5">
 					<span className="text-muted-foreground font-medium">Progress</span>
-					<span className="text-foreground font-semibold">{realProgress}%</span>
+					<span className="text-foreground font-semibold">
+						{completion.success ? `${completion.progress}%` : "—"}
+					</span>
 				</div>
 				<div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
 					<div
 						className="h-full bg-primary rounded-full transition-all duration-500"
-						style={{ width: `${realProgress}%` }}
+						style={{
+							width: `${completion.success ? completion.progress : 0}%`,
+						}}
 					/>
 				</div>
+				{!completion.success && (
+					<p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+						{completion.guidance}
+					</p>
+				)}
 			</div>
 
 			<div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t border-border">

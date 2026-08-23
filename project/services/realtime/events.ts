@@ -16,6 +16,7 @@ export type RealtimeEventType =
 	| "list.updated"
 	| "list.deleted"
 	| "list.reordered"
+	| "list.completion_changed"
 	| "comment.created"
 	| "comment.updated"
 	| "comment.deleted"
@@ -27,20 +28,43 @@ export type RealtimeEventType =
 	| "focus.cancelled"
 	| "notification.created";
 
-export interface CollaborationEvent {
-	type: RealtimeEventType;
+interface BaseCollaborationEvent<TType extends RealtimeEventType> {
+	type: TType;
 	projectId: string;
 	actorId: string;
 	entityId: string;
 	timestamp: string;
-	payload?: {
-		task?: unknown;
-		list?: unknown;
-		comment?: unknown;
-		notification?: unknown;
-		[key: string]: unknown;
+}
+
+export interface ListCompletionChangedEvent
+	extends BaseCollaborationEvent<"list.completion_changed"> {
+	payload: {
+		completedListId: string;
 	};
 }
+
+type GeneralRealtimeEventType = Exclude<
+	RealtimeEventType,
+	"list.completion_changed"
+>;
+
+type GeneralEventPayload = {
+	task?: unknown;
+	list?: unknown;
+	comment?: unknown;
+	notification?: unknown;
+	[key: string]: unknown;
+};
+
+export type GeneralCollaborationEvent = {
+	[TType in GeneralRealtimeEventType]: BaseCollaborationEvent<TType> & {
+		payload?: GeneralEventPayload;
+	};
+}[GeneralRealtimeEventType];
+
+export type CollaborationEvent =
+	| ListCompletionChangedEvent
+	| GeneralCollaborationEvent;
 
 export async function publishProjectEvent(event: CollaborationEvent) {
 	try {

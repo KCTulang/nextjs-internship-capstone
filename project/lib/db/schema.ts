@@ -35,7 +35,7 @@ export const users = pgTable('users', {
 
 // ... other tables
 */
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	boolean,
 	date,
@@ -44,6 +44,7 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 
@@ -89,12 +90,18 @@ export const lists = pgTable(
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
 		position: integer("position").notNull(),
+		isCompleted: boolean("is_completed").notNull().default(false),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
 			.$onUpdate(() => new Date()),
 	},
-	(table) => [index("list_project_idx").on(table.projectId)],
+	(table) => [
+		index("list_project_idx").on(table.projectId),
+		uniqueIndex("list_project_completed_unique")
+			.on(table.projectId)
+			.where(sql`${table.isCompleted} = true`),
+	],
 );
 
 export const tasks = pgTable(

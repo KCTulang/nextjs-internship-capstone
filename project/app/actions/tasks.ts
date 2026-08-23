@@ -7,6 +7,12 @@ import { ZodError } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
 import {
+	canAccessProject,
+	projectCompletionAdvisoryLock,
+	projectCompletionAdvisoryLocks,
+	validateProjectId,
+} from "@/lib/db/project-column-guards";
+import {
 	lists,
 	projectMembers,
 	projects,
@@ -14,7 +20,12 @@ import {
 	tasks,
 	users,
 } from "@/lib/db/schema";
+import { resolveCompletionDestinations } from "@/lib/tasks/completion";
 import { toTaskDTO } from "@/lib/tasks/task-dto";
+import {
+	parseTaskOrderRequest,
+	parseUniqueTaskIds,
+} from "@/lib/tasks/task-movement-guards";
 import { publishProjectEvent } from "@/services/realtime/events";
 import type { TaskDTO } from "@/types/task";
 import { createTaskSchema, updateTaskSchema } from "@/utils/validations";
@@ -524,6 +535,7 @@ export async function getAllUserTasksAction() {
 				projectSlug: projects.slug,
 				labels: tasks.labels,
 				listName: lists.name,
+				listIsCompleted: lists.isCompleted,
 				assigneeId: tasks.assigneeId,
 				assigneeName: users.name,
 				assigneeEmail: users.email,
@@ -545,6 +557,7 @@ export async function getAllUserTasksAction() {
 			projectSlug: t.projectSlug,
 			labels: t.labels,
 			listName: t.listName,
+			listIsCompleted: t.listIsCompleted,
 			status: t.listName,
 			assignee: t.assigneeId
 				? {
@@ -602,7 +615,7 @@ export async function getAnalyticsAction() {
 				id: tasks.id,
 				listId: tasks.listId,
 				projectId: lists.projectId,
-				listPosition: lists.position,
+				listIsCompleted: lists.isCompleted,
 			})
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -612,25 +625,25 @@ export async function getAnalyticsAction() {
 			.select({
 				id: lists.id,
 				projectId: lists.projectId,
-				position: lists.position,
+				isCompleted: lists.isCompleted,
 			})
 			.from(lists)
 			.where(inArray(lists.projectId, projectIds));
 
-		const maxPositionListIds = new Set<string>();
-		for (const pid of projectIds) {
-			const projectLists = allLists.filter((l) => l.projectId === pid);
-			if (projectLists.length > 0) {
-				const maxList = projectLists.reduce((prev, current) =>
-					prev.position > current.position ? prev : current,
-				);
-				maxPositionListIds.add(maxList.id);
-			}
+		const destinations = resolveCompletionDestinations(projectIds, allLists);
+		if (!destinations.success) {
+			return {
+				success: false,
+				code: destinations.code,
+				error: destinations.error,
+				guidance: destinations.guidance,
+				projectCount: projectIds.length,
+			};
 		}
 
 		const totalTasks = allTasks.length;
 		const completedTasks = allTasks.filter(
-			(t) => t.listId && maxPositionListIds.has(t.listId),
+			(task) => task.listIsCompleted,
 		).length;
 		const completionRate =
 			totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -732,89 +745,285 @@ export async function bulkUpdateTasksPriorityAction(
 	}
 }
 
+type CompleteTasksResult =
+	| { success: true; data: TaskDTO[]; movedTaskIds: string[] }
+	| {
+			success: false;
+			error: string;
+			code?:
+				| "INVALID_INPUT"
+				| "FORBIDDEN"
+				| "MISSING_COMPLETED_LIST"
+				| "MULTIPLE_COMPLETED_LISTS";
+	  };
+
+async function completeTasksAuthoritatively(
+	clerkId: string,
+	taskIds: readonly string[],
+): Promise<CompleteTasksResult> {
+	const uniqueTaskIds = parseUniqueTaskIds(taskIds);
+	if (!uniqueTaskIds) {
+		return {
+			success: false,
+			code: "INVALID_INPUT",
+			error: "Invalid task IDs.",
+		};
+	}
+
+	const taskProjects = await db
+		.select({ id: tasks.id, projectId: lists.projectId })
+		.from(tasks)
+		.innerJoin(lists, eq(tasks.listId, lists.id))
+		.where(inArray(tasks.id, uniqueTaskIds));
+	if (taskProjects.length !== uniqueTaskIds.length) {
+		return {
+			success: false,
+			code: "FORBIDDEN",
+			error: "One or more tasks are unavailable or not movable.",
+		};
+	}
+
+	const projectIds = [...new Set(taskProjects.map((task) => task.projectId))];
+	const lockQueries = projectCompletionAdvisoryLocks(projectIds);
+	const authorizationQuery = db
+		.select({
+			taskId: tasks.id,
+			projectId: lists.projectId,
+			allowed: canAccessProject(clerkId, sql`${lists.projectId}`),
+			actorId: sql<string>`(
+				select actor."id" from "users" actor
+				where actor."clerk_id" = ${clerkId}
+				limit 1
+			)`,
+		})
+		.from(tasks)
+		.innerJoin(lists, eq(tasks.listId, lists.id))
+		.where(inArray(tasks.id, uniqueTaskIds));
+	const metadataQuery = db
+		.select({
+			projectId: lists.projectId,
+			completedCount:
+				sql<number>`count(*) filter (where ${lists.isCompleted} = true)`.mapWith(
+					Number,
+				),
+		})
+		.from(lists)
+		.where(inArray(lists.projectId, projectIds))
+		.groupBy(lists.projectId);
+
+	const taskIdSql = sql.join(
+		uniqueTaskIds.map((id) => sql`${id}::uuid`),
+		sql`, `,
+	);
+	const projectIdSql = sql.join(
+		projectIds.map((id) => sql`${validateProjectId(id)}::uuid`),
+		sql`, `,
+	);
+	const allRequestsValid = sql<boolean>`(
+		select count(*) = ${uniqueTaskIds.length}
+			and bool_and(${canAccessProject(clerkId, sql`source."project_id"`)})
+		from "tasks" requested_task
+		join "lists" source on source."id" = requested_task."list_id"
+		where requested_task."id" in (${taskIdSql})
+			and source."project_id" in (${projectIdSql})
+	)`;
+	const allMetadataValid = sql<boolean>`(
+		select count(*) = ${projectIds.length}
+		from (
+			select completion_list."project_id"
+			from "lists" completion_list
+			where completion_list."project_id" in (${projectIdSql})
+			group by completion_list."project_id"
+			having count(*) filter (where completion_list."is_completed" = true) = 1
+		) valid_projects
+	)`;
+
+	const movementQuery = db.execute(sql`
+		with completion_destinations as (
+			select completion_list."project_id",
+				(array_agg(completion_list."id") filter (
+					where completion_list."is_completed" = true
+				))[1] as completed_list_id
+			from "lists" completion_list
+			where completion_list."project_id" in (${projectIdSql})
+			group by completion_list."project_id"
+			having count(*) filter (where completion_list."is_completed" = true) = 1
+		), destination_positions as (
+			select destination."list_id", coalesce(max(destination."position"), 0) as max_position
+			from "tasks" destination
+			where destination."list_id" in (
+				select completed_list_id from completion_destinations
+			)
+			group by destination."list_id"
+		), candidate as (
+			select requested_task."id" as task_id,
+				requested_task."list_id" as old_list_id,
+				completion_destinations.completed_list_id,
+				actor."id" as actor_id,
+				(coalesce(destination_positions.max_position, 0)
+					+ row_number() over (
+						partition by completion_destinations.completed_list_id
+						order by requested_task."id"
+					) * 1024)::integer as next_position
+			from "tasks" requested_task
+			join "lists" source on source."id" = requested_task."list_id"
+			join completion_destinations
+				on completion_destinations."project_id" = source."project_id"
+			left join destination_positions
+				on destination_positions."list_id" = completion_destinations.completed_list_id
+			join "users" actor on actor."clerk_id" = ${clerkId}
+			where requested_task."id" in (${taskIdSql})
+				and requested_task."list_id" <> completion_destinations.completed_list_id
+				and ${allRequestsValid}
+				and ${allMetadataValid}
+		), moved as (
+			update "tasks" moving_task
+			set "list_id" = candidate.completed_list_id,
+				"position" = candidate.next_position,
+				"updated_at" = now()
+			from candidate
+			where moving_task."id" = candidate.task_id
+			returning moving_task."id", candidate.old_list_id,
+				candidate.completed_list_id, candidate.actor_id
+		), logged as (
+			insert into "activity_logs" (
+				"task_id", "user_id", "type", "from_value", "to_value"
+			)
+			select moved."id", moved.actor_id, 'task_moved',
+				moved.old_list_id::text, moved.completed_list_id::text
+			from moved
+			returning "task_id"
+		)
+		select "task_id" from logged
+	`);
+	const authoritativeTasksQuery = db.query.tasks.findMany({
+		where: inArray(tasks.id, uniqueTaskIds),
+		with: {
+			assignee: true,
+			comments: { columns: { id: true } },
+		},
+	});
+
+	const transactionQueries = [
+		...lockQueries.map((lock) => db.execute(lock)),
+		authorizationQuery,
+		metadataQuery,
+		movementQuery,
+		authoritativeTasksQuery,
+	];
+	const results = await db.batch(
+		transactionQueries as unknown as Parameters<typeof db.batch>[0],
+	);
+	const authorizationIndex = lockQueries.length;
+	const metadataIndex = authorizationIndex + 1;
+	const movementIndex = metadataIndex + 1;
+	const authorizationRows = results[authorizationIndex] as Awaited<
+		ReturnType<typeof authorizationQuery.execute>
+	>;
+	const metadataRows = results[metadataIndex] as Awaited<
+		ReturnType<typeof metadataQuery.execute>
+	>;
+	const authoritativeRows = results.at(-1) as Awaited<
+		ReturnType<typeof authoritativeTasksQuery.execute>
+	>;
+
+	if (
+		authorizationRows.length !== uniqueTaskIds.length ||
+		authorizationRows.some(
+			(row) =>
+				!row.allowed ||
+				taskProjects.find((task) => task.id === row.taskId)?.projectId !==
+					row.projectId,
+		)
+	) {
+		return {
+			success: false,
+			code: "FORBIDDEN",
+			error: "You do not have permission to move one or more selected tasks.",
+		};
+	}
+
+	for (const projectId of projectIds) {
+		const completedCount =
+			metadataRows.find((row) => row.projectId === projectId)?.completedCount ??
+			0;
+		if (completedCount === 0) {
+			return {
+				success: false,
+				code: "MISSING_COMPLETED_LIST",
+				error:
+					"A project has no completed column. Ask an owner or admin to configure one.",
+			};
+		}
+		if (completedCount > 1) {
+			return {
+				success: false,
+				code: "MULTIPLE_COMPLETED_LISTS",
+				error:
+					"A project has multiple completed columns. Ask an owner or admin to repair it.",
+			};
+		}
+	}
+
+	const movedTaskIds = (
+		(results[movementIndex] as { rows?: { task_id: string }[] }).rows ?? []
+	).map((row) => row.task_id);
+	const taskDTOs = authoritativeRows.map(toTaskDTO);
+
+	for (const task of taskDTOs.filter((item) =>
+		movedTaskIds.includes(item.id),
+	)) {
+		const projectId = taskProjects.find(
+			(item) => item.id === task.id,
+		)?.projectId;
+		if (!projectId) continue;
+		await publishProjectEvent({
+			type: "task.moved",
+			projectId,
+			actorId: authorizationRows[0]?.actorId ?? clerkId,
+			entityId: task.id,
+			timestamp: new Date().toISOString(),
+			payload: { task },
+		});
+	}
+
+	return { success: true, data: taskDTOs, movedTaskIds };
+}
+
 export async function bulkMarkCompleteAction(taskIds: string[]) {
 	try {
 		const clerkId = await requireAuth();
-		const user = await queries.users.getByClerkId(clerkId);
-		if (!user) throw new Error("Unauthorized");
-		if (taskIds.length === 0) return { success: true };
-
-		const validTasks = await db
-			.select({ id: tasks.id, projectId: lists.projectId })
-			.from(tasks)
-			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
-			.where(
-				and(
-					inArray(tasks.id, taskIds),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
-				),
-			);
-
-		if (validTasks.length > 0) {
-			const tasksByProject = new Map<string, string[]>();
-			for (const task of validTasks) {
-				if (!tasksByProject.has(task.projectId)) {
-					tasksByProject.set(task.projectId, []);
-				}
-				tasksByProject.get(task.projectId)?.push(task.id);
-			}
-
-			const projectIds = Array.from(tasksByProject.keys());
-
-			const projectLists = await db
-				.select({
-					id: lists.id,
-					projectId: lists.projectId,
-					position: lists.position,
-				})
-				.from(lists)
-				.where(inArray(lists.projectId, projectIds));
-
-			const queriesToRun: Parameters<typeof db.batch>[0][0][] = [];
-			const logs: ReturnType<typeof logActivity>[] = [];
-
-			for (const [projectId, pTasks] of tasksByProject.entries()) {
-				const pLists = projectLists.filter((l) => l.projectId === projectId);
-				if (pLists.length === 0) continue;
-
-				const maxList = pLists.reduce((prev, current) =>
-					prev.position > current.position ? prev : current,
-				);
-
-				const tasksInMaxList = await db
-					.select({ position: tasks.position })
-					.from(tasks)
-					.where(eq(tasks.listId, maxList.id));
-
-				let maxPos = 0;
-				if (tasksInMaxList.length > 0) {
-					maxPos = Math.max(...tasksInMaxList.map((t) => t.position));
-				}
-
-				for (let i = 0; i < pTasks.length; i++) {
-					const taskId = pTasks[i];
-					queriesToRun.push(
-						db
-							.update(tasks)
-							.set({ listId: maxList.id, position: maxPos + 1000 * (i + 1) })
-							.where(eq(tasks.id, taskId)),
-					);
-					logs.push(logActivity(taskId, "task_moved"));
-				}
-			}
-
-			if (queriesToRun.length > 0) {
-				await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
-			}
-			await Promise.all(logs);
+		if (taskIds.length === 0) {
+			return { success: true as const, data: [], movedTaskIds: [] };
 		}
-
-		revalidatePath("/", "layout");
-		return { success: true };
+		const result = await completeTasksAuthoritatively(clerkId, taskIds);
+		if (result.success) revalidatePath("/", "layout");
+		return result;
 	} catch (error) {
 		console.error("Failed to bulk mark complete:", error);
-		return { success: false, error: "Failed to bulk mark complete" };
+		return { success: false as const, error: "Failed to bulk mark complete" };
+	}
+}
+
+export async function completeTaskForLockInAction(taskId: string) {
+	try {
+		const result = await completeTasksAuthoritatively(await requireAuth(), [
+			taskId,
+		]);
+		if (!result.success) return result;
+		const task = result.data[0];
+		if (!task) {
+			return { success: false as const, error: "Task is unavailable." };
+		}
+		revalidatePath("/", "layout");
+		return {
+			success: true as const,
+			data: task,
+			moved: result.movedTaskIds.includes(task.id),
+		};
+	} catch (error) {
+		console.error("Failed to complete LockIn task:", error);
+		return { success: false as const, error: "Failed to complete task" };
 	}
 }
 
@@ -826,36 +1035,112 @@ export async function bulkUpdateTaskOrderAction(
 		const clerkId = await requireAuth();
 		const user = await queries.users.getByClerkId(clerkId);
 		if (!user) throw new Error("Unauthorized");
-		if (updates.length === 0) return { success: true };
+		if (updates.length === 0) return { success: true as const, data: [] };
+		const parsedRequest = parseTaskOrderRequest(projectId, updates);
+		if (!parsedRequest.success) {
+			return { success: false as const, error: parsedRequest.error };
+		}
+		const parsedProjectId = parsedRequest.projectId;
+		const parsedUpdates = parsedRequest.updates;
 
-		const queriesToRun = updates.map((update) =>
-			db
-				.update(tasks)
-				.set({ position: update.position, listId: update.listId })
-				.where(eq(tasks.id, update.id)),
+		const taskIds = parsedUpdates.map((update) => update.id);
+		const destinationIds = [
+			...new Set(parsedUpdates.map((update) => update.listId)),
+		];
+		const relationshipsValid = sql<boolean>`
+			${canAccessProject(clerkId, parsedProjectId)}
+			and (
+				select count(*) = ${taskIds.length}
+				from "tasks" requested_task
+				join "lists" source on source."id" = requested_task."list_id"
+				where requested_task."id" in (${sql.join(
+					taskIds.map((id) => sql`${id}::uuid`),
+					sql`, `,
+				)})
+					and source."project_id" = ${parsedProjectId}::uuid
+			)
+			and (
+				select count(*) = ${destinationIds.length}
+				from "lists" destination
+				where destination."id" in (${sql.join(
+					destinationIds.map((id) => sql`${id}::uuid`),
+					sql`, `,
+				)})
+					and destination."project_id" = ${parsedProjectId}::uuid
+			)`;
+		const validationQuery = db
+			.select({ valid: relationshipsValid })
+			.from(projects)
+			.where(eq(projects.id, parsedProjectId))
+			.limit(1);
+		const requestedMoves = sql.join(
+			parsedUpdates.map(
+				(update) =>
+					sql`(${update.id}::uuid, ${update.listId}::uuid, ${update.position}::integer)`,
+			),
+			sql`, `,
 		);
+		const movementQuery = db.execute(sql`
+			update "tasks" moving_task
+			set "list_id" = requested."list_id",
+				"position" = requested."position",
+				"updated_at" = now()
+			from (values ${requestedMoves}) as requested("id", "list_id", "position")
+			where moving_task."id" = requested."id"
+				and ${relationshipsValid}
+			returning moving_task."id"
+		`);
+		const authoritativeQuery = db.query.tasks.findMany({
+			where: inArray(tasks.id, taskIds),
+			with: { assignee: true, comments: { columns: { id: true } } },
+		});
+		const results = await db.batch([
+			db.execute(projectCompletionAdvisoryLock(parsedProjectId)),
+			validationQuery,
+			movementQuery,
+			authoritativeQuery,
+		]);
+		const validation = results[1] as { valid: boolean }[];
+		if (!validation[0]?.valid) {
+			return {
+				success: false as const,
+				error:
+					"Task movement was rejected because a task, destination, or project permission is invalid.",
+			};
+		}
+		const movedRows =
+			(results[2] as unknown as { rows?: { id: string }[] }).rows ?? [];
+		if (movedRows.length !== parsedUpdates.length) {
+			return {
+				success: false as const,
+				error:
+					"Task movement conflicted with another change. Refresh and retry.",
+			};
+		}
+		const authoritativeRows = results.at(-1) as Awaited<
+			ReturnType<typeof authoritativeQuery.execute>
+		>;
+		const taskDTOs = authoritativeRows.map(toTaskDTO);
 
-		if (queriesToRun.length > 0) {
-			await db.batch([queriesToRun[0], ...queriesToRun.slice(1)]);
-
-			if (projectId) {
-				for (const update of updates) {
-					await publishProjectEvent({
-						type: "task.reordered",
-						projectId,
-						actorId: user.id,
-						entityId: update.id,
-						timestamp: new Date().toISOString(),
-						payload: update,
-					});
-				}
-			}
+		for (const task of taskDTOs) {
+			await publishProjectEvent({
+				type: "task.reordered",
+				projectId: parsedProjectId,
+				actorId: user.id,
+				entityId: task.id,
+				timestamp: new Date().toISOString(),
+				payload: {
+					id: task.id,
+					listId: task.listId,
+					position: task.position,
+				},
+			});
 		}
 
 		revalidatePath(`/dashboard`, "layout");
-		return { success: true };
+		return { success: true as const, data: taskDTOs };
 	} catch (error) {
 		console.error("Failed to bulk update tasks:", error);
-		return { success: false, error: "Failed to bulk update tasks" };
+		return { success: false as const, error: "Failed to bulk update tasks" };
 	}
 }

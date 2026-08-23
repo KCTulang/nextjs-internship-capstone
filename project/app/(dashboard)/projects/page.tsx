@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { ProjectCard } from "@/components/project-card";
 import { useProjectStore } from "@/hooks/use-projects";
+import { getProjectCompletionStats } from "@/lib/tasks/completion";
 import { useUIStore } from "@/stores/ui-store";
 
 const STATUS_TABS = ["All", "Active", "Completed"] as const;
@@ -34,6 +35,13 @@ export default function ProjectsPage() {
 	const [sortBy, setSortBy] = useState<SortOption>("newest");
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [showFilters, setShowFilters] = useState(false);
+	const projectsWithInvalidCompletion = useMemo(
+		() =>
+			projects.filter(
+				(project) => !getProjectCompletionStats(project.lists ?? []).success,
+			),
+		[projects],
+	);
 
 	useEffect(() => {
 		fetchProjects(true);
@@ -53,20 +61,11 @@ export default function ProjectsPage() {
 
 		if (statusFilter !== "All") {
 			result = result.filter((p) => {
-				const totalTasks =
-					p.lists?.reduce((s, l) => s + (l.tasks?.length || 0), 0) || 0;
-				const doneTasks =
-					p.lists
-						?.filter(
-							(l) =>
-								l.name.toLowerCase().includes("done") ||
-								l.name.toLowerCase().includes("complete"),
-						)
-						.reduce((s, l) => s + (l.tasks?.length || 0), 0) || 0;
-				const progress = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0;
+				const completion = getProjectCompletionStats(p.lists ?? []);
+				if (!completion.success) return statusFilter === "Active";
 				return statusFilter === "Completed"
-					? progress === 100 && totalTasks > 0
-					: !(progress === 100 && totalTasks > 0);
+					? completion.progress === 100 && completion.totalTasks > 0
+					: !(completion.progress === 100 && completion.totalTasks > 0);
 			});
 		}
 
@@ -136,6 +135,15 @@ export default function ProjectsPage() {
 					</button>
 				))}
 			</div>
+
+			{projectsWithInvalidCompletion.length > 0 && (
+				<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+					{projectsWithInvalidCompletion.length} project
+					{projectsWithInvalidCompletion.length === 1 ? " needs" : "s need"} a
+					valid completed column. Ask an owner or admin to configure it; those
+					projects are not classified as completed.
+				</div>
+			)}
 
 			<div className="flex flex-col sm:flex-row gap-3">
 				<div className="relative flex-1">

@@ -5,6 +5,7 @@ import {
 	deleteListAction,
 	generateDefaultListsAction,
 	getListsAction,
+	setCompletedListAction,
 	updateListAction,
 } from "@/app/actions/lists";
 import {
@@ -92,6 +93,7 @@ export interface TasksState {
 		projectId: string,
 	) => Promise<void>;
 	removeList: (listId: string, projectId: string) => Promise<void>;
+	setCompletedList: (listId: string, projectId: string) => Promise<void>;
 	moveList: (
 		listId: string,
 		newPosition: number,
@@ -606,11 +608,19 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	},
 
 	removeList: async (listId, projectId) => {
-		set((state) => ({
-			lists: state.lists.filter((l) => l.id !== listId),
-		}));
+		const target = get().lists.find((list) => list.id === listId);
+		if (target?.isCompleted) {
+			useUIStore.getState().addToast({
+				type: "error",
+				message: "Set another column as completed before deleting this column.",
+			});
+			return;
+		}
 		const res = await deleteListAction(listId, projectId);
 		if (res.success) {
+			set((state) => ({
+				lists: state.lists.filter((list) => list.id !== listId),
+			}));
 			useUIStore
 				.getState()
 				.addToast({ type: "success", message: "List deleted successfully." });
@@ -618,6 +628,27 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			useUIStore.getState().addToast({
 				type: "error",
 				message: res.error || "Failed to delete list.",
+			});
+		}
+	},
+
+	setCompletedList: async (listId, projectId) => {
+		const res = await setCompletedListAction(listId, projectId);
+		if (res.success) {
+			set((state) => ({
+				lists: state.lists.map((list) => ({
+					...list,
+					isCompleted: list.id === listId,
+				})),
+			}));
+			useUIStore.getState().addToast({
+				type: "success",
+				message: "Completed column updated.",
+			});
+		} else {
+			useUIStore.getState().addToast({
+				type: "error",
+				message: res.error || "Failed to set the completed column.",
 			});
 		}
 	},

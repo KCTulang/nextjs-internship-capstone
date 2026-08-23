@@ -1,7 +1,7 @@
 "use client";
 
 import Pusher from "pusher-js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
 	CollaborationEvent,
 	RealtimeEventType,
@@ -23,13 +23,15 @@ const getPusher = () => {
 	return globalPusherInstance;
 };
 
-type EventHandler = (event: CollaborationEvent) => void;
+type EventHandler<TType extends RealtimeEventType> = (
+	event: Extract<CollaborationEvent, { type: TType }>,
+) => void;
 
-export function useProjectEvent(
+export function useProjectEvent<TType extends RealtimeEventType>(
 	pusher: Pusher | null,
 	projectId: string | null | undefined,
-	eventType: RealtimeEventType,
-	handler: EventHandler,
+	eventType: TType,
+	handler: EventHandler<TType>,
 	deps: unknown[] = [],
 ) {
 	useEffect(() => {
@@ -45,6 +47,25 @@ export function useProjectEvent(
 			channel.unbind(eventType, handler);
 		};
 	}, [pusher, projectId, eventType, handler, ...deps]);
+}
+
+export function usePusherReconnect(pusher: Pusher | null, handler: () => void) {
+	const handlerRef = useRef(handler);
+	const hasConnected = useRef(false);
+	handlerRef.current = handler;
+
+	useEffect(() => {
+		if (!pusher) return;
+		hasConnected.current = pusher.connection.state === "connected";
+		const handleConnected = () => {
+			if (hasConnected.current) handlerRef.current();
+			hasConnected.current = true;
+		};
+		pusher.connection.bind("connected", handleConnected);
+		return () => {
+			pusher.connection.unbind("connected", handleConnected);
+		};
+	}, [pusher]);
 }
 
 export function useCollaboration(projectId: string | null | undefined) {
@@ -65,13 +86,12 @@ export function useCollaboration(projectId: string | null | undefined) {
 		};
 	}, [pusher, projectId]);
 
-	const useEvent = (
-		eventType: RealtimeEventType,
-		handler: EventHandler,
+	const useEvent = <TType extends RealtimeEventType>(
+		eventType: TType,
+		handler: EventHandler<TType>,
 		deps: unknown[] = [],
 	) => {
 		useProjectEvent(pusher, projectId, eventType, handler, deps);
 	};
-
 	return { pusher, useEvent };
 }
