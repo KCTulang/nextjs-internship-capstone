@@ -20,6 +20,7 @@ export interface Project {
 	lists?: {
 		id: string;
 		name: string;
+		isCompleted: boolean;
 		tasks: unknown[];
 	}[];
 }

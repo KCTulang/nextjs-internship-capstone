@@ -6,6 +6,7 @@ import {
 import { UpcomingDeadlines } from "@/components/calendar/upcoming-deadlines";
 
 import { TaskDetailPanel } from "@/components/task-detail-panel";
+import { isDateOnly } from "@/utils/date-only";
 
 export default async function CalendarPage(props: {
 	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -17,17 +18,10 @@ export default async function CalendarPage(props: {
 	const res = await getAllUserTasksAction();
 
 	const allTasks: CalendarTask[] =
-		res.success && res.data
-			? (res.data as CalendarTask[]).map((t) => ({
-					...t,
-
-					dueDate: t.dueDate ? new Date(t.dueDate) : null,
-				}))
-			: [];
+		res.success && res.data ? (res.data as CalendarTask[]) : [];
 
 	const tasksWithDates = allTasks.filter(
-		(t): t is CalendarTask & { dueDate: Date } =>
-			t.dueDate instanceof Date && !Number.isNaN(t.dueDate.getTime()),
+		(t): t is CalendarTask & { dueDate: string } => isDateOnly(t.dueDate),
 	);
 
 	return (

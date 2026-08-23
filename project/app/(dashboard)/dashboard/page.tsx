@@ -8,24 +8,32 @@ export default async function DashboardPage() {
 		getTeamMembersAction(),
 	]);
 
-	const analytics =
-		analyticsRes.success && analyticsRes.data
-			? analyticsRes.data
-			: {
-					totalTasks: 0,
-					completedTasks: 0,
-					completionRate: 0,
-					projectCount: 0,
-				};
+	const analytics = analyticsRes.success ? analyticsRes.data : null;
+	const completionError = analyticsRes.success
+		? undefined
+		: "guidance" in analyticsRes
+			? `${analyticsRes.error} ${analyticsRes.guidance}`
+			: analyticsRes.error;
 
 	const teamSize = teamRes.success && teamRes.data ? teamRes.data.length : 0;
 
 	const initialStats = {
 		teamMembers: teamSize,
-		completedTasks: analytics.completedTasks,
-		pendingTasks: analytics.totalTasks - analytics.completedTasks,
-		projectCount: analytics.projectCount,
+		completedTasks: analytics?.completedTasks ?? null,
+		pendingTasks: analytics
+			? analytics.totalTasks - analytics.completedTasks
+			: null,
+		projectCount:
+			analytics?.projectCount ??
+			(!analyticsRes.success && "projectCount" in analyticsRes
+				? (analyticsRes.projectCount ?? 0)
+				: 0),
 	};
 
-	return <DashboardClient initialStats={initialStats} />;
+	return (
+		<DashboardClient
+			initialStats={initialStats}
+			completionError={completionError}
+		/>
+	);
 }

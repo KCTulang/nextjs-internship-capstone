@@ -5,6 +5,7 @@ import {
 	deleteListAction,
 	generateDefaultListsAction,
 	getListsAction,
+	setCompletedListAction,
 	updateListAction,
 } from "@/app/actions/lists";
 import {
@@ -15,36 +16,19 @@ import {
 } from "@/app/actions/tasks";
 import type { CollaborationEvent } from "@/services/realtime/events";
 import { useUIStore } from "@/stores/ui-store";
+import type { TaskDTO } from "@/types/task";
+import type { TaskPriority } from "@/utils/validations";
+import {
+	applyCompletedListDesignation,
+	type BoardList,
+	compareBoardLists,
+	compareBoardTasks,
+	upsertListById,
+	upsertTaskById,
+} from "./board-state";
 
-export interface Task {
-	id: string;
-	title: string;
-	description: string | null;
-	listId: string;
-	assigneeId: string | null;
-	priority: "low" | "medium" | "high";
-	dueDate: Date | null;
-	position: number;
-	labels: string[] | null;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-	assignee?: {
-		id: string;
-		name: string;
-		email: string;
-	} | null;
-	comments?: { id: string }[];
-}
-
-export interface List {
-	id: string;
-	name: string;
-	projectId: string;
-	position: number;
-	createdAt: Date | null;
-	updatedAt: Date | null;
-	tasks: Task[];
-}
+export type Task = TaskDTO;
+export type List = BoardList;
 
 export interface Member {
 	id: string;
@@ -57,6 +41,8 @@ export interface TasksState {
 	members: Member[];
 	isLoading: boolean;
 	isSyncing: boolean;
+	isCreatingTask: boolean;
+	isCreatingList: boolean;
 	error: string | null;
 	mutationVersions: Record<string, number>;
 
@@ -64,15 +50,24 @@ export interface TasksState {
 	fetchBoard: (projectId: string) => Promise<void>;
 	generateDefaultLists: (projectId: string) => Promise<void>;
 	applyRealtimeEvent: (event: CollaborationEvent) => void;
+	reconcileTasks: (tasks: TaskDTO[]) => void;
 
 	createTask: (
-		data: Partial<Task> & {
+		data: {
 			title: string;
+			description?: string;
 			listId: string;
-			position: number;
+			priority?: TaskPriority;
+			dueDate?: string | null;
+			assigneeId?: string | null;
+			labels?: string[];
 		},
 		projectId?: string | null,
-	) => Promise<void>;
+	) => Promise<{
+		success: boolean;
+		error?: string;
+		fieldErrors?: Record<string, string>;
+	}>;
 	updateTaskDetails: (
 		taskId: string,
 		data: Partial<Task>,
@@ -88,13 +83,17 @@ export interface TasksState {
 	) => Promise<void>;
 	deleteTask: (taskId: string, projectId?: string | null) => Promise<void>;
 
-	addList: (name: string, projectId: string) => Promise<void>;
+	addList: (
+		name: string,
+		projectId: string,
+	) => Promise<{ success: boolean; error?: string }>;
 	renameList: (
 		listId: string,
 		name: string,
 		projectId: string,
 	) => Promise<void>;
 	removeList: (listId: string, projectId: string) => Promise<void>;
+	setCompletedList: (listId: string, projectId: string) => Promise<void>;
 	moveList: (
 		listId: string,
 		newPosition: number,
@@ -114,59 +113,26 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	members: [],
 	isLoading: false,
 	isSyncing: false,
+	isCreatingTask: false,
+	isCreatingList: false,
 	error: null,
 	mutationVersions: {},
 	selectedTaskIds: [],
 	setSelectedTaskIds: (ids) => set({ selectedTaskIds: ids }),
 
 	setMembers: (members) => set({ members }),
+	reconcileTasks: (tasks) =>
+		set((state) => ({
+			lists: tasks.reduce(upsertTaskById, state.lists),
+		})),
 
 	applyRealtimeEvent: (event) => {
-		const _state = get();
-
 		if (event.type === "task.created" && event.payload?.task) {
 			const task = event.payload.task as Task;
-			set((state) => ({
-				lists: state.lists.map((list) =>
-					list.id === task.listId && !list.tasks.some((t) => t.id === task.id)
-						? {
-								...list,
-								tasks: [...list.tasks, task].sort(
-									(a, b) => a.position - b.position,
-								),
-							}
-						: list,
-				),
-			}));
+			set((state) => ({ lists: upsertTaskById(state.lists, task) }));
 		} else if (event.type === "task.updated" && event.payload?.task) {
 			const updatedTask = event.payload.task as Task;
-			set((state) => {
-				let existingTask: Task | null = null;
-				for (const list of state.lists) {
-					const t = list.tasks.find((t) => t.id === updatedTask.id);
-					if (t) {
-						existingTask = t;
-						break;
-					}
-				}
-
-				const finalTask = existingTask
-					? { ...existingTask, ...updatedTask }
-					: updatedTask;
-
-				const newLists = state.lists.map((list) => ({
-					...list,
-					tasks: list.tasks.filter((t) => t.id !== finalTask.id),
-				}));
-
-				const targetList = newLists.find((l) => l.id === finalTask.listId);
-				if (targetList) {
-					targetList.tasks.push(finalTask);
-					targetList.tasks.sort((a, b) => a.position - b.position);
-				}
-
-				return { lists: newLists };
-			});
+			set((state) => ({ lists: upsertTaskById(state.lists, updatedTask) }));
 		} else if (event.type === "task.deleted") {
 			set((state) => ({
 				lists: state.lists.map((list) => ({
@@ -184,7 +150,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 				const targetList = newLists.find((l) => l.id === task.listId);
 				if (targetList) {
 					targetList.tasks.push(task);
-					targetList.tasks.sort((a, b) => a.position - b.position);
+					targetList.tasks.sort(compareBoardTasks);
 				}
 				return { lists: newLists };
 			});
@@ -208,20 +174,13 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
 				if (originalTask && targetList) {
 					targetList.tasks.push({ ...originalTask, listId, position });
-					targetList.tasks.sort((a, b) => a.position - b.position);
+					targetList.tasks.sort(compareBoardTasks);
 				}
 				return { lists: newLists };
 			});
 		} else if (event.type === "list.created" && event.payload?.list) {
-			const list = event.payload.list as List;
-			set((state) => {
-				if (state.lists.some((l) => l.id === list.id)) return state;
-				return {
-					lists: [...state.lists, { ...list, tasks: [] }].sort(
-						(a, b) => a.position - b.position,
-					),
-				};
-			});
+			const list = event.payload.list as Omit<List, "tasks">;
+			set((state) => ({ lists: upsertListById(state.lists, list) }));
 		} else if (event.type === "list.updated" && event.payload?.list) {
 			const listData = event.payload.list as {
 				id: string;
@@ -242,8 +201,19 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			set((state) => ({
 				lists: state.lists
 					.map((l) => (l.id === id ? { ...l, position } : l))
-					.sort((a, b) => a.position - b.position),
+					.sort(compareBoardLists),
 			}));
+		} else if (event.type === "list.completion_changed") {
+			const { completedListId } = event.payload;
+			const result = applyCompletedListDesignation(
+				get().lists,
+				completedListId,
+			);
+			if (result.status === "unknown") {
+				void get().fetchBoard(event.projectId);
+				return;
+			}
+			set({ lists: result.lists });
 		} else if (
 			event.type === "task.assigned" ||
 			event.type === "task.unassigned"
@@ -341,11 +311,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 		set({ isLoading: true, error: null });
 		const res = await getListsAction(projectId);
 		if (res.success && res.data) {
-			const lists = (res.data as unknown as List[]).sort(
-				(a, b) => a.position - b.position,
-			);
+			const lists = (res.data as unknown as List[]).sort(compareBoardLists);
 			lists.forEach((l) => {
-				if (l.tasks) l.tasks.sort((a, b) => a.position - b.position);
+				if (l.tasks) l.tasks.sort(compareBoardTasks);
 			});
 			set({ lists, isLoading: false });
 		} else {
@@ -364,28 +332,27 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	},
 
 	createTask: async (data, projectId) => {
-		const res = await createTaskAction(data, projectId);
-		if (res.success && res.data) {
-			set((state) => {
-				const newLists = state.lists.map((list) => {
-					if (list.id === data.listId) {
-						return {
-							...list,
-							tasks: [...list.tasks, res.data as unknown as Task],
-						};
-					}
-					return list;
+		if (get().isCreatingTask) {
+			return { success: false, error: "Task creation is already in progress." };
+		}
+		set({ isCreatingTask: true });
+		try {
+			const res = await createTaskAction(data, projectId);
+			if (res.success) {
+				set((state) => ({ lists: upsertTaskById(state.lists, res.data) }));
+				useUIStore.getState().addToast({
+					type: "success",
+					message: "Task created successfully.",
 				});
-				return { lists: newLists };
-			});
-			useUIStore
-				.getState()
-				.addToast({ type: "success", message: "Task created successfully." });
-		} else {
+				return { success: true };
+			}
 			useUIStore.getState().addToast({
 				type: "error",
 				message: res.error || "Failed to create task.",
 			});
+			return res;
+		} finally {
+			set({ isCreatingTask: false });
 		}
 	},
 
@@ -417,7 +384,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			const targetList = newLists.find((l) => l.id === finalTask.listId);
 			if (targetList) {
 				targetList.tasks.push(finalTask);
-				targetList.tasks.sort((a, b) => a.position - b.position);
+				targetList.tasks.sort(compareBoardTasks);
 			}
 
 			return {
@@ -438,7 +405,6 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 				set((state) => {
 					const currentVersion = state.mutationVersions[taskId];
 					if (currentVersion !== reqId) {
-						// A newer mutation has already started; don't roll back over it.
 						return state;
 					}
 
@@ -450,7 +416,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 					const targetList = newLists.find((l) => l.id === prevTask.listId);
 					if (targetList) {
 						targetList.tasks.push(prevTask);
-						targetList.tasks.sort((a, b) => a.position - b.position);
+						targetList.tasks.sort(compareBoardTasks);
 					}
 
 					return { lists: newLists };
@@ -562,6 +528,10 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 					message: res.error || "Failed to move task. Reverting.",
 				});
 				set({ lists: JSON.parse(snapshot) });
+			} else {
+				set((state) => ({
+					lists: res.data.reduce(upsertTaskById, state.lists),
+				}));
 			}
 		}
 		set({ isSyncing: false });
@@ -588,28 +558,35 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	},
 
 	addList: async (name, projectId) => {
+		if (get().isCreatingList) {
+			return { success: false, error: "List creation is already in progress." };
+		}
+		set({ isCreatingList: true });
 		const { lists } = get();
 		const maxPosition = lists.reduce((max, l) => Math.max(max, l.position), 0);
-		const res = await createListAction({
-			name,
-			projectId,
-			position: maxPosition + 1000,
-		});
-		if (res.success && res.data) {
-			set((state) => ({
-				lists: [
-					...state.lists,
-					{ ...(res.data as unknown as List), tasks: [] },
-				],
-			}));
-			useUIStore
-				.getState()
-				.addToast({ type: "success", message: "List created successfully." });
-		} else {
+		try {
+			const res = await createListAction({
+				name,
+				projectId,
+				position: maxPosition + 1000,
+			});
+			if (res.success && res.data) {
+				set((state) => ({
+					lists: upsertListById(state.lists, res.data as Omit<List, "tasks">),
+				}));
+				useUIStore.getState().addToast({
+					type: "success",
+					message: "List created successfully.",
+				});
+				return { success: true };
+			}
 			useUIStore.getState().addToast({
 				type: "error",
 				message: res.error || "Failed to create list.",
 			});
+			return { success: false, error: res.error || "Failed to create list." };
+		} finally {
+			set({ isCreatingList: false });
 		}
 	},
 
@@ -631,11 +608,19 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 	},
 
 	removeList: async (listId, projectId) => {
-		set((state) => ({
-			lists: state.lists.filter((l) => l.id !== listId),
-		}));
+		const target = get().lists.find((list) => list.id === listId);
+		if (target?.isCompleted) {
+			useUIStore.getState().addToast({
+				type: "error",
+				message: "Set another column as completed before deleting this column.",
+			});
+			return;
+		}
 		const res = await deleteListAction(listId, projectId);
 		if (res.success) {
+			set((state) => ({
+				lists: state.lists.filter((list) => list.id !== listId),
+			}));
 			useUIStore
 				.getState()
 				.addToast({ type: "success", message: "List deleted successfully." });
@@ -643,6 +628,27 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 			useUIStore.getState().addToast({
 				type: "error",
 				message: res.error || "Failed to delete list.",
+			});
+		}
+	},
+
+	setCompletedList: async (listId, projectId) => {
+		const res = await setCompletedListAction(listId, projectId);
+		if (res.success) {
+			set((state) => ({
+				lists: state.lists.map((list) => ({
+					...list,
+					isCompleted: list.id === listId,
+				})),
+			}));
+			useUIStore.getState().addToast({
+				type: "success",
+				message: "Completed column updated.",
+			});
+		} else {
+			useUIStore.getState().addToast({
+				type: "error",
+				message: res.error || "Failed to set the completed column.",
 			});
 		}
 	},

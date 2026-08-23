@@ -16,7 +16,7 @@ export function SettingsNavigation() {
 	const pathname = usePathname();
 
 	return (
-		<nav className="flex space-x-2 overflow-x-auto pb-2 lg:flex-col lg:space-x-0 lg:space-y-1 lg:overflow-visible lg:pb-0 hide-scrollbar">
+		<nav className="-mx-1 flex space-x-2 overflow-x-auto px-1 pb-2 lg:mx-0 lg:flex-col lg:space-x-0 lg:space-y-1 lg:overflow-visible lg:px-0 lg:pb-0 hide-scrollbar">
 			{navigation.map((item) => {
 				const isActive = pathname === item.href;
 
@@ -25,17 +25,17 @@ export function SettingsNavigation() {
 						key={item.name}
 						href={item.href}
 						className={cn(
-							"group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+							"group flex shrink-0 items-center whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 							isActive
-								? "bg-primary/10 text-primary shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)]"
-								: "text-muted-foreground hover:bg-muted hover:text-foreground",
+								? "border-primary bg-primary text-primary-foreground"
+								: "border-border bg-card text-foreground hover:border-primary/50 hover:bg-muted",
 						)}
 					>
 						<item.icon
 							className={cn(
 								"mr-3 h-5 w-5 shrink-0",
 								isActive
-									? "text-primary"
+									? "text-primary-foreground"
 									: "text-muted-foreground group-hover:text-foreground",
 							)}
 							aria-hidden="true"

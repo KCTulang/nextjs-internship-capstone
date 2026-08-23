@@ -48,6 +48,8 @@ export default async function ProjectPage({
 			<div className="flex-1 bg-card rounded-lg border border-border p-3 sm:p-4 lg:p-6 min-h-125 sm:min-h-150 overflow-hidden flex flex-col">
 				<KanbanBoard
 					projectId={project.id}
+					projectName={project.name}
+					canManageColumns={project.canManageColumns}
 					members={Array.from(
 						new Map(
 							[

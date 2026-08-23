@@ -21,10 +21,10 @@ export function AppearanceSettings() {
 				<button
 					type="button"
 					onClick={() => setTheme("light")}
-					className={`flex flex-col items-center justify-center p-6 border rounded-xl transition-all ${
+					className={`flex flex-col items-center justify-center rounded-xl border p-6 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
 						theme === "light"
-							? "border-primary bg-primary/10 text-primary shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)]"
-							: "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground shadow-sm"
+							? "border-primary bg-primary text-primary-foreground"
+							: "border-border bg-card text-foreground hover:border-primary/50 hover:bg-muted"
 					}`}
 				>
 					<Sun size={32} className="mb-3" />
@@ -34,10 +34,10 @@ export function AppearanceSettings() {
 				<button
 					type="button"
 					onClick={() => setTheme("dark")}
-					className={`flex flex-col items-center justify-center p-6 border rounded-xl transition-all ${
+					className={`flex flex-col items-center justify-center rounded-xl border p-6 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
 						theme === "dark"
-							? "border-primary bg-primary/10 text-primary shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)]"
-							: "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground shadow-sm"
+							? "border-primary bg-primary text-primary-foreground"
+							: "border-border bg-card text-foreground hover:border-primary/50 hover:bg-muted"
 					}`}
 				>
 					<Moon size={32} className="mb-3" />

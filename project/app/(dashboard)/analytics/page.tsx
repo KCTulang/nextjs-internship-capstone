@@ -5,15 +5,12 @@ import { getAnalyticsAction } from "@/app/actions/tasks";
 export default async function AnalyticsPage() {
 	const analyticsRes = await getAnalyticsAction();
 	const teamRes = await getTeamMembersAction();
-	const analytics =
-		analyticsRes.success && analyticsRes.data
-			? analyticsRes.data
-			: {
-					totalTasks: 0,
-					completedTasks: 0,
-					completionRate: 0,
-					projectCount: 0,
-				};
+	const analytics = analyticsRes.success ? analyticsRes.data : null;
+	const completionError = analyticsRes.success
+		? undefined
+		: "guidance" in analyticsRes
+			? `${analyticsRes.error} ${analyticsRes.guidance}`
+			: analyticsRes.error;
 	const teamSize = teamRes.success && teamRes.data ? teamRes.data.length : 0;
 
 	return (
@@ -25,18 +22,24 @@ export default async function AnalyticsPage() {
 				</p>
 			</div>
 
+			{completionError && (
+				<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+					{completionError}
+				</div>
+			)}
+
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 				{[
 					{
 						title: "Total Tasks",
-						value: analytics.totalTasks.toString(),
+						value: analytics?.totalTasks.toString() ?? "—",
 						unit: "all time",
 						icon: TrendingUp,
 						color: "blue",
 					},
 					{
 						title: "Completion Rate",
-						value: `${analytics.completionRate}%`,
+						value: analytics ? `${analytics.completionRate}%` : "—",
 						unit: "all projects",
 						icon: BarChart3,
 						color: "green",
@@ -50,7 +53,11 @@ export default async function AnalyticsPage() {
 					},
 					{
 						title: "Active Projects",
-						value: analytics.projectCount.toString(),
+						value:
+							analytics?.projectCount.toString() ??
+							(!analyticsRes.success && "projectCount" in analyticsRes
+								? (analyticsRes.projectCount ?? 0).toString()
+								: "—"),
 						unit: "managing",
 						icon: Clock,
 						color: "orange",
@@ -88,8 +95,9 @@ export default async function AnalyticsPage() {
 					/>
 					<p className="text-foreground font-medium">Task Progress</p>
 					<p className="text-sm text-muted-foreground text-center mt-2 max-w-sm">
-						{analytics.completedTasks} out of {analytics.totalTasks} tasks
-						completed across all projects. Keep up the good work!
+						{analytics
+							? `${analytics.completedTasks} out of ${analytics.totalTasks} tasks completed across all projects. Keep up the good work!`
+							: "Completion totals are unavailable until each project has exactly one completed column."}
 					</p>
 				</div>
 
@@ -98,7 +106,7 @@ export default async function AnalyticsPage() {
 					<p className="text-foreground font-medium">Team Distribution</p>
 					<p className="text-sm text-muted-foreground text-center mt-2 max-w-sm">
 						Collaborating with {teamSize} unique members across{" "}
-						{analytics.projectCount} active projects.
+						{analytics?.projectCount ?? "—"} active projects.
 					</p>
 				</div>
 			</div>

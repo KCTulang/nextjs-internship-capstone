@@ -17,7 +17,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripHorizontal } from "lucide-react";
+import { GripHorizontal, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 import { type List, useTasksStore } from "@/stores/board-store";
@@ -68,8 +68,9 @@ export function ManageColumnsSheet({
 	setIsOpen,
 	projectId,
 }: ManageColumnsSheetProps) {
-	const { lists, moveList } = useTasksStore();
+	const { lists, moveList, addList, isCreatingList } = useTasksStore();
 	const [localLists, setLocalLists] = useState(lists);
+	const [newListTitle, setNewListTitle] = useState("");
 
 	useEffect(() => {
 		if (isOpen) {
@@ -101,6 +102,13 @@ export function ManageColumnsSheet({
 		}
 	}
 
+	async function handleAddColumn() {
+		const title = newListTitle.trim();
+		if (!title || isCreatingList) return;
+		const result = await addList(title, projectId);
+		if (result.success) setNewListTitle("");
+	}
+
 	return (
 		<Drawer.Root open={isOpen} onOpenChange={setIsOpen}>
 			<Drawer.Portal>
@@ -113,8 +121,30 @@ export function ManageColumnsSheet({
 							Manage Columns
 						</Drawer.Title>
 						<Drawer.Description className="text-sm text-muted-foreground mb-6">
-							Drag to reorder your board columns.
+							Add a column or drag existing columns to reorder them.
 						</Drawer.Description>
+
+						<div className="mb-4 flex gap-2">
+							<input
+								type="text"
+								value={newListTitle}
+								onChange={(event) => setNewListTitle(event.target.value)}
+								onKeyDown={(event) => {
+									if (event.key === "Enter") void handleAddColumn();
+								}}
+								placeholder="Column name"
+								className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+							<button
+								type="button"
+								onClick={() => void handleAddColumn()}
+								disabled={!newListTitle.trim() || isCreatingList}
+								className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								<Plus size={16} />
+								{isCreatingList ? "Adding…" : "Add"}
+							</button>
+						</div>
 
 						<div className="flex-1 overflow-y-auto scrollbar-none px-1 pb-10">
 							<DndContext

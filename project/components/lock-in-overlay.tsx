@@ -19,6 +19,7 @@ import {
 	broadcastFocusStateAction,
 	saveFocusSession,
 } from "@/app/actions/focus-sessions";
+import { completeTaskForLockInAction } from "@/app/actions/tasks";
 import { useFocusTimer } from "@/hooks/use-focus-timer";
 import { useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
@@ -42,7 +43,7 @@ export function LockInOverlay() {
 	} = useFocusStore();
 	const { timeElapsed, formattedTime, pause, resume } = useFocusTimer();
 	const { addToast } = useUIStore();
-	const { lists, moveTask } = useTasksStore();
+	const { lists, reconcileTasks } = useTasksStore();
 	const holdProgress = useMotionValue(0);
 	const holdAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
@@ -237,16 +238,6 @@ export function LockInOverlay() {
 		animate(holdProgress, 0, { duration: 0.3, ease: "easeOut" });
 	};
 
-	const getDoneListId = () => {
-		if (lists.length === 0) return null;
-		const doneList = lists.find(
-			(l) =>
-				l.name.toLowerCase().includes("done") ||
-				l.name.toLowerCase().includes("completed"),
-		);
-		return doneList ? doneList.id : lists[lists.length - 1].id;
-	};
-
 	const handleSessionEnd = async (action: "finish" | "break") => {
 		if (isSavingRef.current) return;
 		isSavingRef.current = true;
@@ -259,9 +250,6 @@ export function LockInOverlay() {
 		const endTime = new Date();
 		const duration = timeElapsed;
 
-		const parentList = lists.find((l) => l.id === activeTask.listId);
-		const projectId = parentList?.projectId;
-
 		try {
 			await saveFocusSession({
 				taskId: activeTask.id,
@@ -271,16 +259,16 @@ export function LockInOverlay() {
 			});
 
 			if (action === "finish") {
-				const doneListId = getDoneListId();
-				if (doneListId && projectId && activeTask.listId !== doneListId) {
-					await moveTask(
-						activeTask.id,
-						activeTask.listId,
-						doneListId,
-						0,
-						projectId,
-					);
+				const completion = await completeTaskForLockInAction(activeTask.id);
+				if (!completion.success) {
+					addToast({
+						message: completion.error,
+						type: "error",
+					});
+					isSavingRef.current = false;
+					return;
 				}
+				reconcileTasks([completion.data]);
 			}
 
 			audioWhiteNoiseRef.current?.pause();
@@ -505,7 +493,7 @@ export function LockInOverlay() {
 												Finish Task
 											</div>
 											<div className="text-xs text-white/50">
-												Save time & move to Done
+												Save time & complete task
 											</div>
 										</div>
 									</button>

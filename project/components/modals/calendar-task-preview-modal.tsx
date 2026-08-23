@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import {
 	Calendar,
 	CheckSquare,
@@ -15,6 +14,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
 import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
+import { formatDateOnly } from "@/utils/date-only";
 
 export function CalendarTaskPreviewModal() {
 	const { isPreviewTaskModalOpen, closePreviewTaskModal, selectedPreviewTask } =
@@ -98,7 +98,11 @@ export function CalendarTaskPreviewModal() {
 								<span className="text-xs text-muted-foreground">Due Date</span>
 								<span className="text-sm font-medium text-foreground truncate">
 									{task.dueDate
-										? format(new Date(task.dueDate), "MMM d, yyyy")
+										? formatDateOnly(task.dueDate, {
+												month: "short",
+												day: "numeric",
+												year: "numeric",
+											})
 										: "No Date"}
 								</span>
 							</div>

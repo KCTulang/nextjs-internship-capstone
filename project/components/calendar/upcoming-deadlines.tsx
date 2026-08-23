@@ -12,30 +12,16 @@ import { useCalendarShortcuts } from "@/hooks/use-calendar-shortcuts";
 import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
+import { isDateOnlyOverdue } from "@/utils/date-only";
 import type { CalendarTask } from "./calendar-grid";
 
-const DONE_LIST_NAMES = new Set([
-	"done",
-	"complete",
-	"completed",
-	"finished",
-	"closed",
-]);
-
-function isCompletedList(listName?: string | null): boolean {
-	return DONE_LIST_NAMES.has((listName ?? "").toLowerCase().trim());
-}
-
 function isOverdue(
-	dueDate: Date | null | undefined,
-	listName?: string | null,
+	dueDate: string | null | undefined,
+	isCompleted: boolean,
 ): boolean {
 	if (!dueDate) return false;
-	if (isCompletedList(listName)) return false;
-	const due = new Date(dueDate);
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	return due < today;
+	if (isCompleted) return false;
+	return isDateOnlyOverdue(dueDate);
 }
 
 interface UpcomingDeadlinesProps {
@@ -44,8 +30,12 @@ interface UpcomingDeadlinesProps {
 
 export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 	const router = useRouter();
-	const { selectedTaskIds, toggleTaskSelection, clearSelection } =
-		useTasksStore();
+	const {
+		selectedTaskIds,
+		toggleTaskSelection,
+		clearSelection,
+		reconcileTasks,
+	} = useTasksStore();
 	const { addToast, setLoading, openConfirmModal } = useUIStore();
 	const [isPending, startTransition] = useTransition();
 	const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
@@ -89,9 +79,13 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 			const res = await bulkMarkCompleteAction(selectedTaskIds);
 			setLoading(false);
 			if (res.success) {
+				reconcileTasks(res.data);
 				addToast({
 					type: "success",
-					message: `Marked ${selectedTaskIds.length} tasks as complete`,
+					message:
+						res.movedTaskIds.length === 0
+							? "Selected tasks were already complete"
+							: `Marked ${res.movedTaskIds.length} task${res.movedTaskIds.length === 1 ? "" : "s"} as complete`,
 				});
 				clearSelection();
 			} else {
@@ -234,7 +228,7 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 			)}
 
 			{tasksWithDates.map((task, index) => {
-				const overdue = isOverdue(task.dueDate, task.listName);
+				const overdue = isOverdue(task.dueDate, task.listIsCompleted);
 				const hasLink = !!task.projectSlug;
 				const isSelected = selectedTaskIds.includes(task.id);
 

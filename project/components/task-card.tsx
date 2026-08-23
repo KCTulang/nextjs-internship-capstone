@@ -5,10 +5,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { motion } from "framer-motion";
 import { Calendar, GripVertical, MessageSquare } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Task } from "@/stores/board-store";
 import { useTasksStore } from "@/stores/board-store";
 import { priorityClass } from "@/utils";
+import { formatDateOnly } from "@/utils/date-only";
 
 interface TaskCardProps {
 	task: Task;
@@ -30,9 +31,18 @@ export function TaskCard({
 
 	const isSelected = selectedTaskIds.includes(task.id);
 	const hasSelection = selectedTaskIds.length > 0;
+	const suppressClickAfterDragRef = useRef(false);
+	const suppressClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
 
 	const handleCardClick = (e: React.MouseEvent | React.KeyboardEvent) => {
 		if (isOverlay) return;
+		if (isDragging || suppressClickAfterDragRef.current) {
+			e.preventDefault();
+			e.stopPropagation();
+			return;
+		}
 		if (hasSelection) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -58,6 +68,32 @@ export function TaskCard({
 		},
 		disabled: isOverlay,
 	});
+
+	useEffect(() => {
+		if (suppressClickTimeoutRef.current) {
+			clearTimeout(suppressClickTimeoutRef.current);
+			suppressClickTimeoutRef.current = null;
+		}
+
+		if (isDragging) {
+			suppressClickAfterDragRef.current = true;
+			return;
+		}
+
+		if (suppressClickAfterDragRef.current) {
+			suppressClickTimeoutRef.current = setTimeout(() => {
+				suppressClickAfterDragRef.current = false;
+				suppressClickTimeoutRef.current = null;
+			}, 250);
+		}
+
+		return () => {
+			if (suppressClickTimeoutRef.current) {
+				clearTimeout(suppressClickTimeoutRef.current);
+				suppressClickTimeoutRef.current = null;
+			}
+		};
+	}, [isDragging]);
 
 	const [overlayMounted, setOverlayMounted] = useState(false);
 
@@ -134,6 +170,9 @@ export function TaskCard({
 			<button
 				type="button"
 				{...(isMobileView && !isOverlay ? { ...attributes, ...listeners } : {})}
+				onPointerDown={(event) => {
+					if (isMobileView && !isOverlay) event.stopPropagation();
+				}}
 				onClick={handleCardClick}
 				className={`text-left w-full h-full bg-card dark:bg-white/2 border rounded-xl p-3.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
 					isSelected && (!isDragging || isOverlay)
@@ -204,7 +243,7 @@ export function TaskCard({
 						{task.dueDate && (
 							<div className="flex items-center gap-1" title="Due date">
 								<Calendar size={12} className="opacity-70" />
-								{new Date(task.dueDate).toLocaleDateString(undefined, {
+								{formatDateOnly(task.dueDate, {
 									month: "short",
 									day: "numeric",
 								})}
@@ -241,7 +280,8 @@ export function TaskCard({
 						if (onMoveClick) onMoveClick(task);
 					}}
 					className="absolute top-2 right-2 p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors z-10"
-					title="Move Task"
+					aria-label="Move to column"
+					title="Move to column"
 				>
 					<MessageSquare className="hidden" />{" "}
 					<svg
