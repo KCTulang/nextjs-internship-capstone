@@ -137,7 +137,11 @@ export function NotificationDropdown() {
 		setIsOpen(false);
 
 		if (n.type === "invitation") {
-			router.push("/projects");
+			let url = "/team?tab=my-invitations";
+			if (n.entityId) {
+				url += `&inviteId=${n.entityId}`;
+			}
+			router.push(url);
 		} else if (n.project?.slug) {
 			let url = `/projects/${n.project.slug}`;
 			if (

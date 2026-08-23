@@ -17,8 +17,8 @@ import {
 	Users,
 	X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
 	cancelInvitationAction,
 	resendInvitationAction,
@@ -37,6 +37,7 @@ import { RemoveMemberDialog } from "./components/remove-member-dialog";
 import type { ProjectInvitation, TeamMember } from "./types";
 
 type Tab = "members" | "invitations" | "my-invitations";
+const VALID_TABS: Tab[] = ["members", "invitations", "my-invitations"];
 type ViewMode = "card" | "list";
 
 interface TeamPageClientProps {
@@ -418,7 +419,10 @@ function InvitationCard({
 		: null;
 
 	return (
-		<div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-border/80 transition-colors">
+		<div
+			id={`invite-${invite.id}`}
+			className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-border/80 transition-colors"
+		>
 			<div>
 				<p className="font-semibold text-foreground">{invite.projectName}</p>
 				{invite.inviterName && (
@@ -483,7 +487,38 @@ export function TeamPageClient({
 		setMembers(initialMembers);
 	}, [initialMembers]);
 
-	const [activeTab, setActiveTab] = useState<Tab>("members");
+	const searchParams = useSearchParams();
+	const tabParam = searchParams.get("tab") as Tab | null;
+	const inviteId = searchParams.get("inviteId");
+	const hasScrolledRef = useRef(false);
+
+	const initialTab =
+		tabParam && VALID_TABS.includes(tabParam) ? tabParam : "members";
+	const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+	useEffect(() => {
+		if (tabParam && VALID_TABS.includes(tabParam)) {
+			setActiveTab(tabParam);
+		}
+	}, [tabParam]);
+
+	useEffect(() => {
+		if (
+			activeTab === "my-invitations" &&
+			inviteId &&
+			!hasScrolledRef.current &&
+			initialMyInvites.length > 0
+		) {
+			const timer = setTimeout(() => {
+				const element = document.getElementById(`invite-${inviteId}`);
+				if (element) {
+					element.scrollIntoView({ behavior: "smooth", block: "center" });
+					hasScrolledRef.current = true;
+				}
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [activeTab, inviteId, initialMyInvites]);
 	const [viewMode, setViewMode] = useState<ViewMode>("card");
 	const [search, setSearch] = useState("");
 	const [filterAccess, setFilterAccess] = useState("");
@@ -746,7 +781,6 @@ export function TeamPageClient({
 							</p>
 						</div>
 					) : viewMode === "card" ? (
-						/* ── Card grid (default) ── */
 						<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
 							{filteredMembers.map((member) => (
 								<MemberCard
