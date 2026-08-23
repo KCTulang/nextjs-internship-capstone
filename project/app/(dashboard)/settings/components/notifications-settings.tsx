@@ -92,29 +92,6 @@ export function NotificationsSettings() {
 			</div>
 
 			<div>
-				<h3 className="text-lg font-medium text-foreground mb-4">Focus</h3>
-				<div className="space-y-4">
-					<label className="flex items-center justify-between p-4 border border-border rounded-xl bg-card hover:bg-muted/30 cursor-pointer transition-colors">
-						<div>
-							<div className="font-medium text-foreground">
-								Mute during focus sessions
-							</div>
-							<div className="text-sm text-muted-foreground">
-								Automatically suppress notifications when you are focused
-							</div>
-						</div>
-						<input
-							type="checkbox"
-							className="toggle"
-							checked={prefs.muteDuringFocus}
-							onChange={() => handleToggle("muteDuringFocus")}
-							disabled={isSaving}
-						/>
-					</label>
-				</div>
-			</div>
-
-			<div>
 				<h3 className="text-lg font-medium text-foreground mb-4">
 					Project & Team
 				</h3>
@@ -133,23 +110,6 @@ export function NotificationsSettings() {
 							className="toggle"
 							checked={prefs.invitations}
 							onChange={() => handleToggle("invitations")}
-							disabled={isSaving}
-						/>
-					</label>
-					<label className="flex items-center justify-between p-4 border border-border rounded-xl bg-card hover:bg-muted/30 cursor-pointer transition-colors">
-						<div>
-							<div className="font-medium text-foreground">
-								Team/member updates
-							</div>
-							<div className="text-sm text-muted-foreground">
-								Get notified when members join or roles change
-							</div>
-						</div>
-						<input
-							type="checkbox"
-							className="toggle"
-							checked={prefs.projectActivity}
-							onChange={() => handleToggle("projectActivity")}
 							disabled={isSaving}
 						/>
 					</label>
@@ -178,23 +138,7 @@ export function NotificationsSettings() {
 							disabled={isSaving}
 						/>
 					</label>
-					<label className="flex items-center justify-between p-4 border border-border rounded-xl bg-card hover:bg-muted/30 cursor-pointer transition-colors">
-						<div>
-							<div className="font-medium text-foreground">
-								Due-date reminders
-							</div>
-							<div className="text-sm text-muted-foreground">
-								Get notified when a task is approaching its due date
-							</div>
-						</div>
-						<input
-							type="checkbox"
-							className="toggle"
-							checked={prefs.dueDates}
-							onChange={() => handleToggle("dueDates")}
-							disabled={isSaving}
-						/>
-					</label>
+
 					<label className="flex items-center justify-between p-4 border border-border rounded-xl bg-card hover:bg-muted/30 cursor-pointer transition-colors">
 						<div>
 							<div className="font-medium text-foreground">Mentions</div>
