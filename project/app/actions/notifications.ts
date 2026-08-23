@@ -111,6 +111,25 @@ export async function createNotificationAction({
 	try {
 		if (userId === actorId) return { success: true };
 
+		let shouldDeliver = true;
+
+		const prefs = await queries.notificationPreferences.getByUserId(userId);
+		if (prefs) {
+			if (prefs.muteAll) shouldDeliver = false;
+			if (prefs.mutedUntil && new Date() < prefs.mutedUntil)
+				shouldDeliver = false;
+
+			if (type === "assignment" && !prefs.taskAssignments)
+				shouldDeliver = false;
+			if (type === "mention" && !prefs.mentions) shouldDeliver = false;
+			if (type === "comment" && !prefs.comments) shouldDeliver = false;
+			if (type === "invitation" && !prefs.invitations) shouldDeliver = false;
+		}
+
+		if (!shouldDeliver) {
+			return { success: true };
+		}
+
 		const newNotification = await db
 			.insert(notifications)
 			.values({
@@ -127,38 +146,25 @@ export async function createNotificationAction({
 			where: eq(users.id, userId),
 		});
 
-		let shouldDeliver = true;
-
-		const prefs = await queries.notificationPreferences.getByUserId(userId);
-		if (prefs) {
-			if (prefs.muteAll) shouldDeliver = false;
-			if (prefs.mutedUntil && new Date() < prefs.mutedUntil)
-				shouldDeliver = false;
-
-			if (type === "assignment" && !prefs.taskAssignments)
-				shouldDeliver = false;
-			if (type === "mention" && !prefs.mentions) shouldDeliver = false;
-			if (type === "comment" && !prefs.comments) shouldDeliver = false;
-			if (type === "invitation" && !prefs.invitations) shouldDeliver = false;
-			if (type === "dueDate" && !prefs.dueDates) shouldDeliver = false;
-
-			if (prefs.muteDuringFocus) {
-				const { focusSessions } = await import("@/lib/db/schema");
-				const activeFocus = await db.query.focusSessions.findFirst({
-					where: and(
-						eq(focusSessions.userId, userId),
-						eq(focusSessions.status, "active"),
-					),
-				});
-				if (activeFocus) shouldDeliver = false;
-			}
-		}
-
-		if (shouldDeliver && recipient) {
-			await publishUserEvent(recipient.clerkId, {
-				type: "notification.received",
-				payload: newNotification[0],
+		if (recipient) {
+			const hydratedNotification = await db.query.notifications.findFirst({
+				where: eq(notifications.id, newNotification[0].id),
+				with: {
+					actor: {
+						columns: { id: true, name: true, email: true },
+					},
+					project: {
+						columns: { id: true, name: true, slug: true },
+					},
+				},
 			});
+
+			if (hydratedNotification) {
+				await publishUserEvent(recipient.clerkId, {
+					type: "notification.received",
+					payload: hydratedNotification,
+				});
+			}
 		}
 
 		return { success: true, data: newNotification[0] };
