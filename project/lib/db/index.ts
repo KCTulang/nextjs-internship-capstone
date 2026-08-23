@@ -266,7 +266,7 @@ export const queries = {
 		getByTask: async (taskId: string) => {
 			return await db.query.activityLogs.findMany({
 				where: eq(schema.activityLogs.taskId, taskId),
-				orderBy: (logs, { asc }) => [asc(logs.createdAt)],
+				orderBy: (logs, { desc }) => [desc(logs.createdAt), desc(logs.id)],
 				with: {
 					user: true,
 				},
