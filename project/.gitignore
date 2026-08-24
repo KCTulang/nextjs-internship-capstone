@@ -29,3 +29,11 @@ next-env.d.ts
 
 # OS files
 .DS_Store
+
+# testing
+coverage/
+playwright-report/
+test-results/
+playwright/.auth/
+test_output.txt
+stderr.log

@@ -1,39 +1,3 @@
-// TODO: Task 4.5 - Design and implement project cards and layouts
-
-/*
-TODO: Implementation Notes for Interns:
-
-This component should display:
-- Project name and description
-- Progress indicator
-- Team member count
-- Due date
-- Status badge
-- Actions menu (edit, delete, etc.)
-
-Props interface:
-interface ProjectCardProps {
-  project: {
-    id: string
-    name: string
-    description?: string
-    progress: number
-    memberCount: number
-    dueDate?: Date
-    status: 'active' | 'completed' | 'on-hold'
-  }
-  onEdit?: (id: string) => void
-  onDelete?: (id: string) => void
-}
-
-Features to implement:
-- Hover effects
-- Click to navigate to project board
-- Responsive design
-- Loading states
-- Error states
-*/
-
 "use client";
 
 import { Calendar, Edit, Folder, Trash, Users } from "lucide-react";
@@ -86,6 +50,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 				<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 					<button
 						type="button"
+						title="Edit Project"
 						className="relative z-20 p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
 						onClick={(e) => {
 							e.preventDefault();
@@ -96,6 +61,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 					</button>
 					<button
 						type="button"
+						title="Delete Project"
 						className="relative z-20 p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-md transition-colors"
 						onClick={(e) => {
 							e.preventDefault();
