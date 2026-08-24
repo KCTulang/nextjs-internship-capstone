@@ -72,7 +72,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
 	fetchProjects: async (reset = false) => {
 		const { page, projects } = get();
-		const limit = 10;
+		const limit = 100;
 		const offset = reset ? 0 : page * limit;
 
 		set({ isLoading: true, error: null });
