@@ -28,7 +28,7 @@ export default function DashboardLayout({
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	return (
-		<div className="min-h-screen">
+		<div className="min-h-screen w-full min-w-0 max-w-full">
 			<Sidebar
 				mobileOpen={mobileOpen}
 				setMobileOpen={setMobileOpen}
@@ -37,11 +37,11 @@ export default function DashboardLayout({
 			/>
 
 			<div
-				className={`transition-all duration-300 ease-in-out ${
+				className={`w-full min-w-0 max-w-full transition-all duration-300 ease-in-out ${
 					isCollapsed ? "lg:pl-20" : "lg:pl-64"
 				}`}
 			>
-				<div className="sticky top-0 z-30 flex h-20 items-center gap-x-4 border-b border-border bg-background/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8">
+				<div className="sticky top-0 z-30 flex h-20 min-w-0 items-center gap-x-4 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:gap-x-6 sm:px-6 lg:px-8">
 					<button
 						type="button"
 						onClick={() => setMobileOpen(true)}
@@ -50,7 +50,7 @@ export default function DashboardLayout({
 						<Menu size={20} />
 					</button>
 
-					<div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+					<div className="flex min-w-0 flex-1 gap-x-4 self-stretch lg:gap-x-6">
 						<div className="flex flex-1 items-center"></div>
 
 						<div className="flex items-center gap-x-4 lg:gap-x-6">
@@ -70,7 +70,7 @@ export default function DashboardLayout({
 					</div>
 				</div>
 
-				<main className="py-8 px-4 sm:px-6 lg:px-8">
+				<main className="w-full min-w-0 max-w-full px-4 py-8 sm:px-6 lg:px-8">
 					<Suspense>{children}</Suspense>
 				</main>
 			</div>

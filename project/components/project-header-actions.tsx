@@ -12,10 +12,10 @@ export function ProjectHeaderActions({ project }: { project: Project }) {
 	} = useUIStore();
 	const canEditProject = project.capabilities?.canEditProject === true;
 	const controlClass =
-		"inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[430px]:px-3";
+		"inline-flex min-h-11 min-w-0 w-full items-center justify-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm lg:min-h-10 lg:w-auto lg:px-3";
 
 	return (
-		<div className="flex w-full items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm sm:w-auto">
+		<div className="grid w-full min-w-0 basis-full grid-cols-2 items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm min-[390px]:grid-cols-3 lg:flex lg:w-auto lg:basis-auto">
 			<button
 				type="button"
 				onClick={openProjectMembersModal}
@@ -23,7 +23,7 @@ export function ProjectHeaderActions({ project }: { project: Project }) {
 				title="Project members"
 			>
 				<Users size={18} />
-				<span className="hidden min-[430px]:inline">Members</span>
+				<span>Members</span>
 			</button>
 			<button
 				type="button"
@@ -32,17 +32,17 @@ export function ProjectHeaderActions({ project }: { project: Project }) {
 				title="Project deadlines"
 			>
 				<CalendarDays size={18} />
-				<span className="hidden min-[430px]:inline">Deadlines</span>
+				<span>Deadlines</span>
 			</button>
 			{canEditProject && (
 				<button
 					type="button"
 					onClick={() => openEditProjectModal(project)}
-					className={controlClass}
+					className={`${controlClass} col-span-2 min-[390px]:col-span-1 lg:col-auto`}
 					title="Project settings"
 				>
 					<Settings size={18} />
-					<span className="hidden min-[430px]:inline">Settings</span>
+					<span>Settings</span>
 				</button>
 			)}
 		</div>

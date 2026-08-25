@@ -269,12 +269,12 @@ export function MobileKanbanBoard({
 	}
 
 	return (
-		<div className="flex flex-col h-[calc(100vh-140px)] w-full overflow-hidden bg-background">
-			<div className="flex items-center justify-between border-b border-border bg-card sticky top-0 z-10 shadow-sm">
-				<div className="relative flex-1 min-w-0 flex items-center">
+		<div className="flex h-[calc(100vh-140px)] w-full min-w-0 max-w-full flex-col overflow-hidden bg-background">
+			<div className="sticky top-0 z-10 flex w-full min-w-0 flex-col border-b border-border bg-card shadow-sm">
+				<div className="relative flex w-full min-w-0 items-center">
 					<div className="absolute left-0 top-0 bottom-0 w-6 bg-linear-to-r from-card to-transparent pointer-events-none z-10" />
 
-					<div className="w-full overflow-x-auto scrollbar-none flex items-center space-x-2 py-2 px-4 snap-x scroll-smooth">
+					<div className="scrollbar-none flex w-full min-w-0 max-w-full items-center space-x-2 overflow-x-auto px-4 py-2 snap-x scroll-smooth">
 						{lists.map((list, idx) => {
 							const isActive = idx === activeListIndex;
 							return (
@@ -294,7 +294,7 @@ export function MobileKanbanBoard({
 											setActiveListIndex(idx);
 										}
 									}}
-									className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all snap-center shrink-0 ${
+									className={`min-h-11 shrink-0 snap-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all ${
 										isActive
 											? "bg-primary text-primary-foreground shadow-sm"
 											: "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -313,22 +313,22 @@ export function MobileKanbanBoard({
 				</div>
 
 				{canManageColumns && (
-					<div className="z-10 flex shrink-0 items-center justify-center border-l border-border/50 bg-card px-2">
+					<div className="z-10 border-t border-border/50 bg-card p-2">
 						<button
 							type="button"
 							onClick={() => setIsManageColumnsOpen(true)}
-							className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-2 min-[430px]:px-2.5 min-[430px]:py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							aria-label="Add column"
 							title="Add column"
 						>
 							<Plus size={16} className="shrink-0" />
-							<span className="hidden min-[430px]:inline">Add column</span>
+							<span>Add column</span>
 						</button>
 					</div>
 				)}
 			</div>
 
-			<div className="flex-1 relative overflow-hidden bg-background">
+			<div className="relative min-w-0 flex-1 overflow-hidden bg-background">
 				<DndContext
 					sensors={sensors}
 					collisionDetection={closestCenter}
@@ -369,9 +369,9 @@ export function MobileKanbanBoard({
 								if (swipe < -swipeConfidenceThreshold) paginate(1);
 								if (swipe > swipeConfidenceThreshold) paginate(-1);
 							}}
-							className="absolute inset-0 flex flex-col pt-4"
+							className="absolute inset-0 flex min-w-0 flex-col pt-3"
 						>
-							<div className="flex-1 overflow-y-auto px-4 pb-20">
+							<div className="w-full min-w-0 max-w-full flex-1 overflow-y-auto px-3 pb-20 sm:px-4">
 								<KanbanColumn
 									list={activeList}
 									projectId={projectId}

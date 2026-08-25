@@ -159,7 +159,7 @@ export function KanbanColumn({
 				bg-card dark:bg-white/3 border
 				${isOver ? "border-primary/50 shadow-lg shadow-primary/10" : "border-border/60"}
 				backdrop-blur-sm shadow-sm group/column
-				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-68.75 self-start rounded-2xl sm:w-75"}
+				${isMobileView ? "w-full min-w-0 max-w-full rounded-none border-x-0 border-t-0" : "w-68.75 self-start rounded-2xl sm:w-75"}
 			`}
 		>
 			<div
@@ -167,7 +167,7 @@ export function KanbanColumn({
 				style={{ background: color.accent }}
 			/>
 
-			<div className="flex items-center justify-between gap-2 border-b border-border/50 px-4 pt-3 pb-3">
+			<div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5 sm:px-4 sm:pt-3 sm:pb-3">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					{!isMobileView && canManageColumns && (
 						<div
@@ -224,7 +224,7 @@ export function KanbanColumn({
 					</span>
 				</div>
 
-				<div className="flex items-center gap-1 shrink-0">
+				<div className="flex shrink-0 items-center gap-1">
 					<button
 						type="button"
 						onClick={() =>
@@ -236,7 +236,8 @@ export function KanbanColumn({
 							})
 						}
 						title="Add task"
-						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+						className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label={`Add task to ${list.name}`}
 					>
 						<Plus size={15} />
 					</button>
@@ -252,7 +253,7 @@ export function KanbanColumn({
 								title="Column options"
 								aria-label={`Manage ${list.name} column`}
 								aria-expanded={menuOpen}
-								className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								className="inline-flex size-11 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<MoreHorizontal size={15} />
 							</button>
@@ -380,7 +381,7 @@ export function KanbanColumn({
 							source: "column",
 						})
 					}
-					className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
+					className="mx-3 mb-3 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-border/50 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
 				>
 					<Plus size={14} />
 					Add task
