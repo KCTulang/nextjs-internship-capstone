@@ -139,7 +139,7 @@ export function TaskCard({
 			/>
 
 			<div
-				className={`absolute top-2 left-2 z-20 ${isSelected || hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
+				className={`absolute top-0 left-0 z-20 ${isSelected || hasSelection || isMobileView ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
 			>
 				<button
 					type="button"
@@ -148,22 +148,27 @@ export function TaskCard({
 						e.preventDefault();
 						toggleTaskSelection(task.id);
 					}}
-					className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 hover:border-foreground bg-background"}`}
+					aria-label={isSelected ? "Deselect task" : "Select task"}
+					className="p-2 cursor-pointer"
 				>
-					{isSelected && (
-						<svg
-							aria-hidden="true"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="3"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="w-3 h-3"
-						>
-							<polyline points="20 6 9 17 4 12"></polyline>
-						</svg>
-					)}
+					<div
+						className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 group-hover:border-foreground bg-background"}`}
+					>
+						{isSelected && (
+							<svg
+								aria-hidden="true"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="3"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								className="w-3 h-3"
+							>
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						)}
+					</div>
 				</button>
 			</div>
 
