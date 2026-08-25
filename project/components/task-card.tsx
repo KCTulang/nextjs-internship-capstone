@@ -8,7 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Task } from "@/stores/board-store";
 import { useTasksStore } from "@/stores/board-store";
-import { priorityClass } from "@/utils";
+import { priorityAccentClass, priorityClass } from "@/utils";
 import { formatDateOnly } from "@/utils/date-only";
 
 interface TaskCardProps {
@@ -114,6 +114,7 @@ export function TaskCard({
 	};
 
 	const pColor = priorityClass(task.priority);
+	const priorityAccent = priorityAccentClass(task.priority);
 
 	let stateClasses = "shadow-sm hover:shadow-md active:scale-[0.98]";
 	if (isDragging && !isOverlay) {
@@ -135,7 +136,7 @@ export function TaskCard({
 			className={`relative w-full group transition-all duration-200 ease-out z-0 ${stateClasses}`}
 		>
 			<div
-				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${pColor.split(" ")[1].replace("text-", "bg-")}`}
+				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${priorityAccent}`}
 			/>
 
 			<div
