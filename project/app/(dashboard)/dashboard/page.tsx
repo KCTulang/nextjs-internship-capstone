@@ -15,10 +15,8 @@ export default async function DashboardPage() {
 
 	const analytics = analyticsRes.success ? analyticsRes.data : null;
 	const completionError = analyticsRes.success
-		? undefined
-		: "guidance" in analyticsRes
-			? `${analyticsRes.error} ${analyticsRes.guidance}`
-			: analyticsRes.error;
+		? (analyticsRes.data.completionWarning ?? undefined)
+		: analyticsRes.error;
 
 	const teamSize = teamRes.success && teamRes.data ? teamRes.data.length : 0;
 
@@ -28,11 +26,7 @@ export default async function DashboardPage() {
 		pendingTasks: analytics
 			? analytics.totalTasks - analytics.completedTasks
 			: null,
-		projectCount:
-			analytics?.projectCount ??
-			(!analyticsRes.success && "projectCount" in analyticsRes
-				? (analyticsRes.projectCount ?? 0)
-				: 0),
+		projectCount: analytics?.projectCount ?? 0,
 	};
 
 	return (

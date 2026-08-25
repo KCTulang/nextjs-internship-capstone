@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/project-column-guards";
 import { requireProjectCapability } from "@/lib/db/project-permissions";
 import {
+	focusSessions,
 	lists,
 	projectMembers,
 	projects,
@@ -596,7 +597,150 @@ export async function getAllUserTasksAction() {
 	}
 }
 
-export async function getAnalyticsAction() {
+export type AnalyticsRange = "7d" | "30d" | "month" | "all";
+
+export interface AnalyticsData {
+	range: AnalyticsRange;
+	rangeLabel: string;
+	totalTasks: number;
+	completedTasks: number;
+	completionRate: number;
+	projectCount: number;
+	teamMemberCount: number;
+	completionWarning: string | null;
+	trend: { label: string; created: number; completed: number }[];
+	statuses: { label: string; count: number; isCompleted: boolean }[];
+	workload: {
+		id: string;
+		name: string | null;
+		email: string;
+		activeTasks: number;
+	}[];
+	deadlines: { overdue: number; dueSoon: number; upcoming: number };
+	focus: {
+		totalSeconds: number;
+		sessionCount: number;
+		averageSeconds: number;
+		todaySeconds: number;
+	};
+}
+
+const ANALYTICS_RANGE_LABELS: Record<AnalyticsRange, string> = {
+	"7d": "Last 7 days",
+	"30d": "Last 30 days",
+	month: "This month",
+	all: "All time",
+};
+
+function startOfLocalDay(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addLocalDays(date: Date, days: number) {
+	const next = new Date(date);
+	next.setDate(next.getDate() + days);
+	return next;
+}
+
+function getAnalyticsPeriod(range: AnalyticsRange, now: Date) {
+	const today = startOfLocalDay(now);
+	if (range === "7d") return { start: addLocalDays(today, -6), end: now };
+	if (range === "30d") return { start: addLocalDays(today, -29), end: now };
+	if (range === "month") {
+		return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+	}
+	return { start: null, end: now };
+}
+
+function buildAnalyticsTrend(
+	taskRows: {
+		createdAt: Date | null;
+		listIsCompleted: boolean;
+	}[],
+	range: AnalyticsRange,
+	periodStart: Date | null,
+	now: Date,
+) {
+	const today = startOfLocalDay(now);
+	let bucketStarts: Date[] = [];
+	let labelOptions: Intl.DateTimeFormatOptions = {
+		month: "short",
+		day: "numeric",
+	};
+
+	if (range === "7d") {
+		bucketStarts = Array.from({ length: 7 }, (_, index) =>
+			addLocalDays(today, index - 6),
+		);
+		labelOptions = { weekday: "short" };
+	} else if (range === "30d") {
+		const start = periodStart ?? addLocalDays(today, -29);
+		bucketStarts = Array.from({ length: 6 }, (_, index) =>
+			addLocalDays(start, index * 5),
+		);
+	} else if (range === "month") {
+		const start = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
+		for (
+			let cursor = new Date(start);
+			cursor <= now;
+			cursor = addLocalDays(cursor, 7)
+		) {
+			bucketStarts.push(cursor);
+		}
+	} else {
+		const datedTasks = taskRows.filter(
+			(task): task is { createdAt: Date; listIsCompleted: boolean } =>
+				task.createdAt instanceof Date,
+		);
+		const earliest = datedTasks.reduce<Date>(
+			(current, task) => (task.createdAt < current ? task.createdAt : current),
+			now,
+		);
+		const monthCount =
+			(now.getFullYear() - earliest.getFullYear()) * 12 +
+			now.getMonth() -
+			earliest.getMonth() +
+			1;
+		if (monthCount <= 12) {
+			for (let index = 0; index < monthCount; index += 1) {
+				bucketStarts.push(
+					new Date(earliest.getFullYear(), earliest.getMonth() + index, 1),
+				);
+			}
+			labelOptions = { month: "short" };
+		} else {
+			for (
+				let year = earliest.getFullYear();
+				year <= now.getFullYear();
+				year += 1
+			) {
+				bucketStarts.push(new Date(year, 0, 1));
+			}
+			labelOptions = { year: "numeric" };
+		}
+	}
+
+	if (bucketStarts.length === 0) bucketStarts = [today];
+
+	return bucketStarts.map((start, index) => {
+		const end = bucketStarts[index + 1] ?? addLocalDays(today, 1);
+		const tasksInBucket = taskRows.filter(
+			(task) =>
+				task.createdAt && task.createdAt >= start && task.createdAt < end,
+		);
+		return {
+			label: new Intl.DateTimeFormat("en-US", labelOptions).format(start),
+			created: tasksInBucket.length,
+			completed: tasksInBucket.filter((task) => task.listIsCompleted).length,
+		};
+	});
+}
+
+export async function getAnalyticsAction(
+	range: AnalyticsRange = "30d",
+): Promise<
+	{ success: true; data: AnalyticsData } | { success: false; error: string }
+> {
 	try {
 		const clerkId = await requireAuth();
 		const user = await queries.users.getByClerkId(clerkId);
@@ -619,63 +763,203 @@ export async function getAnalyticsAction() {
 			]),
 		);
 
+		const now = new Date();
+		const normalizedRange: AnalyticsRange =
+			range in ANALYTICS_RANGE_LABELS ? range : "30d";
+		const period = getAnalyticsPeriod(normalizedRange, now);
+
 		if (projectIds.length === 0) {
 			return {
 				success: true,
 				data: {
+					range: normalizedRange,
+					rangeLabel: ANALYTICS_RANGE_LABELS[normalizedRange],
 					totalTasks: 0,
 					completedTasks: 0,
 					completionRate: 0,
 					projectCount: 0,
+					teamMemberCount: 0,
+					completionWarning: null,
+					trend: [],
+					statuses: [],
+					workload: [],
+					deadlines: { overdue: 0, dueSoon: 0, upcoming: 0 },
+					focus: {
+						totalSeconds: 0,
+						sessionCount: 0,
+						averageSeconds: 0,
+						todaySeconds: 0,
+					},
 				},
 			};
 		}
 
-		const allTasks = await db
-			.select({
-				id: tasks.id,
-				listId: tasks.listId,
-				projectId: lists.projectId,
-				listIsCompleted: lists.isCompleted,
-			})
-			.from(tasks)
-			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.where(inArray(lists.projectId, projectIds));
-
-		const allLists = await db
-			.select({
-				id: lists.id,
-				projectId: lists.projectId,
-				isCompleted: lists.isCompleted,
-			})
-			.from(lists)
-			.where(inArray(lists.projectId, projectIds));
+		const [allTasks, allLists, focusRows, memberRows, ownerRows] =
+			await Promise.all([
+				db
+					.select({
+						id: tasks.id,
+						projectId: lists.projectId,
+						listName: lists.name,
+						listIsCompleted: lists.isCompleted,
+						dueDate: tasks.dueDate,
+						createdAt: tasks.createdAt,
+						assigneeId: tasks.assigneeId,
+					})
+					.from(tasks)
+					.innerJoin(lists, eq(tasks.listId, lists.id))
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({
+						id: lists.id,
+						projectId: lists.projectId,
+						isCompleted: lists.isCompleted,
+					})
+					.from(lists)
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({
+						duration: focusSessions.duration,
+						startTime: focusSessions.startTime,
+						status: focusSessions.status,
+					})
+					.from(focusSessions)
+					.innerJoin(tasks, eq(focusSessions.taskId, tasks.id))
+					.innerJoin(lists, eq(tasks.listId, lists.id))
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({ id: users.id, name: users.name, email: users.email })
+					.from(projectMembers)
+					.innerJoin(users, eq(projectMembers.userId, users.id))
+					.where(inArray(projectMembers.projectId, projectIds)),
+				db
+					.select({ id: users.id, name: users.name, email: users.email })
+					.from(projects)
+					.innerJoin(users, eq(projects.ownerId, users.id))
+					.where(inArray(projects.id, projectIds)),
+			]);
 
 		const destinations = resolveCompletionDestinations(projectIds, allLists);
-		if (!destinations.success) {
-			return {
-				success: false,
-				code: destinations.code,
-				error: destinations.error,
-				guidance: destinations.guidance,
-				projectCount: projectIds.length,
-			};
-		}
-
-		const totalTasks = allTasks.length;
-		const completedTasks = allTasks.filter(
+		const completionWarning = destinations.success
+			? null
+			: `${destinations.error} ${destinations.guidance}`;
+		const periodTasks = allTasks.filter(
+			(task) =>
+				!period.start || (task.createdAt && task.createdAt >= period.start),
+		);
+		const totalTasks = periodTasks.length;
+		const completedTasks = periodTasks.filter(
 			(task) => task.listIsCompleted,
 		).length;
 		const completionRate =
 			totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+		const statusMap = new Map<
+			string,
+			{ label: string; count: number; isCompleted: boolean }
+		>();
+		for (const task of periodTasks) {
+			const key = `${task.listIsCompleted}:${task.listName}`;
+			const existing = statusMap.get(key);
+			if (existing) existing.count += 1;
+			else {
+				statusMap.set(key, {
+					label: task.listName,
+					count: 1,
+					isCompleted: task.listIsCompleted,
+				});
+			}
+		}
+
+		const members = new Map(
+			[...ownerRows, ...memberRows].map((member) => [member.id, member]),
+		);
+		const activeTaskCounts = new Map<string, number>();
+		for (const task of allTasks) {
+			if (task.assigneeId && !task.listIsCompleted) {
+				activeTaskCounts.set(
+					task.assigneeId,
+					(activeTaskCounts.get(task.assigneeId) ?? 0) + 1,
+				);
+			}
+		}
+		const workload = Array.from(members.values())
+			.map((member) => ({
+				...member,
+				activeTasks: activeTaskCounts.get(member.id) ?? 0,
+			}))
+			.sort(
+				(a, b) =>
+					b.activeTasks - a.activeTasks ||
+					(a.name ?? a.email).localeCompare(b.name ?? b.email),
+			);
+
+		const today = startOfLocalDay(now);
+		const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+		const dueSoonKey = (() => {
+			const dueSoonDate = addLocalDays(today, 7);
+			return `${dueSoonDate.getFullYear()}-${String(dueSoonDate.getMonth() + 1).padStart(2, "0")}-${String(dueSoonDate.getDate()).padStart(2, "0")}`;
+		})();
+		const openDueDates = allTasks.flatMap((task) =>
+			task.dueDate && !task.listIsCompleted ? [task.dueDate] : [],
+		);
+		const deadlines = {
+			overdue: openDueDates.filter((dueDate) => dueDate < todayKey).length,
+			dueSoon: openDueDates.filter(
+				(dueDate) => dueDate >= todayKey && dueDate <= dueSoonKey,
+			).length,
+			upcoming: openDueDates.filter((dueDate) => dueDate > dueSoonKey).length,
+		};
+
+		const periodFocusRows = focusRows.filter(
+			(session) =>
+				session.status === "completed" &&
+				session.duration !== null &&
+				(!period.start || session.startTime >= period.start),
+		);
+		const totalFocusSeconds = periodFocusRows.reduce(
+			(total, session) => total + (session.duration ?? 0),
+			0,
+		);
+		const todayFocusSeconds = focusRows
+			.filter(
+				(session) =>
+					session.status === "completed" && session.startTime >= today,
+			)
+			.reduce((total, session) => total + (session.duration ?? 0), 0);
+
 		return {
 			success: true,
 			data: {
+				range: normalizedRange,
+				rangeLabel: ANALYTICS_RANGE_LABELS[normalizedRange],
 				totalTasks,
 				completedTasks,
 				completionRate,
 				projectCount: projectIds.length,
+				teamMemberCount: members.size,
+				completionWarning,
+				trend: buildAnalyticsTrend(
+					periodTasks,
+					normalizedRange,
+					period.start,
+					now,
+				),
+				statuses: Array.from(statusMap.values()).sort(
+					(a, b) =>
+						Number(a.isCompleted) - Number(b.isCompleted) || b.count - a.count,
+				),
+				workload,
+				deadlines,
+				focus: {
+					totalSeconds: totalFocusSeconds,
+					sessionCount: periodFocusRows.length,
+					averageSeconds:
+						periodFocusRows.length > 0
+							? Math.round(totalFocusSeconds / periodFocusRows.length)
+							: 0,
+					todaySeconds: todayFocusSeconds,
+				},
 			},
 		};
 	} catch (error) {
