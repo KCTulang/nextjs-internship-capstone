@@ -142,7 +142,7 @@ function DesktopKanbanBoard({
 		moveSelectedTasks,
 	} = useTasksStore();
 	const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
-	const { openCreateTaskModal } = useUIStore();
+	const { openCreateTaskModal, openConfirmModal } = useUIStore();
 
 	useEffect(() => {
 		fetchBoard(projectId);
@@ -177,11 +177,15 @@ function DesktopKanbanBoard({
 				(e.key === "Delete" || e.key === "Backspace") &&
 				selectedTaskIds.length > 0
 			) {
-				if (
-					window.confirm(`Delete ${selectedTaskIds.length} selected task(s)?`)
-				) {
-					deleteSelectedTasks(projectId);
-				}
+				const count = selectedTaskIds.length;
+				openConfirmModal({
+					title: "Delete tasks?",
+					description: `This will permanently delete ${count} selected task${count === 1 ? "" : "s"}. This action cannot be undone.`,
+					confirmText: "Delete Tasks",
+					onConfirm: async () => {
+						await deleteSelectedTasks(projectId);
+					},
+				});
 			} else if (e.key.toLowerCase() === "n") {
 				if (lists.length > 0) {
 					e.preventDefault();
@@ -204,6 +208,7 @@ function DesktopKanbanBoard({
 		clearSelection,
 		deleteSelectedTasks,
 		openCreateTaskModal,
+		openConfirmModal,
 	]);
 
 	const sensors = useSensors(
@@ -404,13 +409,15 @@ function DesktopKanbanBoard({
 						<button
 							type="button"
 							onClick={() => {
-								if (
-									window.confirm(
-										`Delete ${selectedTaskIds.length} selected task(s)?`,
-									)
-								) {
-									deleteSelectedTasks(projectId);
-								}
+								const count = selectedTaskIds.length;
+								openConfirmModal({
+									title: "Delete tasks?",
+									description: `This will permanently delete ${count} selected task${count === 1 ? "" : "s"}. This action cannot be undone.`,
+									confirmText: "Delete Tasks",
+									onConfirm: async () => {
+										await deleteSelectedTasks(projectId);
+									},
+								});
 							}}
 							className="text-sm px-3 py-1.5 hover:bg-destructive hover:text-destructive-foreground text-destructive/90 rounded-lg transition-colors"
 						>

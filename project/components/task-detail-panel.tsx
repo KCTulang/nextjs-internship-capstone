@@ -14,6 +14,7 @@ import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { type Task, useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
+import { useUIStore } from "@/stores/ui-store";
 import { formatFocusDuration } from "@/utils";
 
 interface TaskDetailPanelProps {
@@ -35,6 +36,7 @@ export function TaskDetailPanel({
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
+	const { openConfirmModal } = useUIStore();
 	const { startLockIn, isLockedIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const [mounted, setMounted] = useState(false);
@@ -330,10 +332,15 @@ export function TaskDetailPanel({
 
 	const handleDelete = async () => {
 		if (!task) return;
-		setIsConfirmingDelete(true);
+		openConfirmModal({
+			title: "Delete task?",
+			description: `This will permanently delete "${task.title}". This action cannot be undone.`,
+			confirmText: "Delete Task",
+			onConfirm: async () => {
+				await confirmDelete();
+			},
+		});
 	};
-
-	const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
 	const confirmDelete = async () => {
 		if (!task) return;
@@ -483,35 +490,6 @@ export function TaskDetailPanel({
 
 					{!isDesktop && (
 						<div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-border rounded-full z-20" />
-					)}
-
-					{isConfirmingDelete && (
-						<div className="absolute inset-0 z-50 bg-background/95 backdrop-blur flex items-center justify-center p-6">
-							<div className="bg-card border border-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-								<h4 className="text-lg font-semibold text-foreground mb-2">
-									Delete Task?
-								</h4>
-								<p className="text-muted-foreground text-sm mb-6">
-									This action cannot be undone.
-								</p>
-								<div className="flex gap-3 justify-center">
-									<button
-										type="button"
-										onClick={() => setIsConfirmingDelete(false)}
-										className="px-4 py-2 rounded-lg bg-muted text-foreground font-medium hover:bg-muted/80"
-									>
-										Cancel
-									</button>
-									<button
-										type="button"
-										onClick={confirmDelete}
-										className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90"
-									>
-										Yes, Delete
-									</button>
-								</div>
-							</div>
-						</div>
 					)}
 
 					<div className="flex flex-col min-h-full pb-20 relative z-10">

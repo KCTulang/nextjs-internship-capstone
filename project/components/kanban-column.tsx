@@ -111,7 +111,7 @@ export function KanbanColumn({
 	onMoveTaskClick,
 }: KanbanColumnProps) {
 	const { renameList, removeList, setCompletedList } = useTasksStore();
-	const { addToast, openCreateTaskModal } = useUIStore();
+	const { addToast, openCreateTaskModal, openConfirmModal } = useUIStore();
 
 	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
 		id: `drop-${list.id}`,
@@ -195,10 +195,15 @@ export function KanbanColumn({
 			setMenuOpen(false);
 			return;
 		}
-		if (window.confirm(`Delete column "${list.name}" and all its tasks?`)) {
-			removeList(list.id, projectId);
-		}
 		setMenuOpen(false);
+		openConfirmModal({
+			title: "Delete column?",
+			description: `This will permanently delete "${list.name}" and all its tasks. This action cannot be undone.`,
+			confirmText: "Delete Column",
+			onConfirm: async () => {
+				await removeList(list.id, projectId);
+			},
+		});
 	};
 
 	if (isDragging && !isOverlay) {

@@ -13,7 +13,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
 	const { deleteProject } = useProjectStore();
-	const { openEditProjectModal } = useUIStore();
+	const { openEditProjectModal, openConfirmModal } = useUIStore();
 
 	const realMemberCount = project.members ? project.members.length : 1;
 
@@ -65,11 +65,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
 						className="relative z-20 p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-md transition-colors"
 						onClick={(e) => {
 							e.preventDefault();
-							if (
-								window.confirm("Are you sure you want to delete this project?")
-							) {
-								deleteProject(project.id);
-							}
+							openConfirmModal({
+								title: "Delete project?",
+								description: `This will permanently delete "${project.name}" and its related project data. This action cannot be undone.`,
+								confirmText: "Delete Project",
+								onConfirm: async () => {
+									await deleteProject(project.id);
+								},
+							});
 						}}
 					>
 						<Trash size={16} />

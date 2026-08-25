@@ -14,7 +14,7 @@ import { useProjectStore } from "@/hooks/use-projects";
 import { useUIStore } from "@/stores/ui-store";
 
 export function ProjectHeaderActions({ project }: { project: Project }) {
-	const { openEditProjectModal } = useUIStore();
+	const { openEditProjectModal, openConfirmModal } = useUIStore();
 	const { deleteProject } = useProjectStore();
 	const router = useRouter();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,14 +32,15 @@ export function ProjectHeaderActions({ project }: { project: Project }) {
 
 	const handleDelete = async () => {
 		setIsMenuOpen(false);
-		if (
-			window.confirm(
-				"Are you sure you want to delete this project? This action cannot be undone.",
-			)
-		) {
-			await deleteProject(project.id);
-			router.push("/dashboard");
-		}
+		openConfirmModal({
+			title: "Delete project?",
+			description: `This will permanently delete "${project.name}" and its related project data. This action cannot be undone.`,
+			confirmText: "Delete Project",
+			onConfirm: async () => {
+				await deleteProject(project.id);
+				router.push("/dashboard");
+			},
+		});
 	};
 
 	return (
