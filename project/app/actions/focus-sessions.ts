@@ -3,6 +3,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import {
+	requireProjectCapability,
+	requireTaskCapability,
+} from "@/lib/db/project-permissions";
 import * as schema from "@/lib/db/schema";
 import { publishProjectEvent } from "@/services/realtime/events";
 
@@ -15,7 +19,7 @@ async function requireAuth() {
 	});
 
 	if (!user) throw new Error("User not found");
-	return user.id;
+	return user;
 }
 
 export async function saveFocusSession(data: {
@@ -25,10 +29,11 @@ export async function saveFocusSession(data: {
 	duration: number; // in seconds
 }) {
 	try {
-		const userId = await requireAuth();
+		const user = await requireAuth();
+		await requireTaskCapability(user.clerkId, data.taskId, "canMutateTasks");
 
 		await db.insert(schema.focusSessions).values({
-			userId,
+			userId: user.id,
 			taskId: data.taskId,
 			startTime: data.startTime,
 			endTime: data.endTime,
@@ -49,7 +54,8 @@ export async function broadcastFocusStateAction(
 	state: "started" | "completed" | "cancelled",
 ) {
 	try {
-		const userId = await requireAuth();
+		const user = await requireAuth();
+		await requireProjectCapability(user.clerkId, projectId, "canMutateTasks");
 
 		await publishProjectEvent({
 			type: `focus.${state}` as
@@ -57,7 +63,7 @@ export async function broadcastFocusStateAction(
 				| "focus.completed"
 				| "focus.cancelled",
 			projectId,
-			actorId: userId,
+			actorId: user.id,
 			entityId: taskId,
 			timestamp: new Date().toISOString(),
 		});
@@ -71,7 +77,8 @@ export async function broadcastFocusStateAction(
 
 export async function getFocusSessionsByTaskAction(taskId: string) {
 	try {
-		await requireAuth();
+		const user = await requireAuth();
+		await requireTaskCapability(user.clerkId, taskId, "canViewProject");
 
 		const sessions = await db.query.focusSessions.findMany({
 			where: eq(schema.focusSessions.taskId, taskId),

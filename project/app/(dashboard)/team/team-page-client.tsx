@@ -526,6 +526,15 @@ export function TeamPageClient({
 	const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
 	const currentUser = members.find((m) => m.id === currentUserId) || null;
+	const canManageAnyMembers =
+		currentUser?.roles.some(
+			(role) => role.role === "owner" || role.role === "admin",
+		) ?? false;
+	useEffect(() => {
+		if (!canManageAnyMembers && activeTab === "invitations") {
+			setActiveTab("members");
+		}
+	}, [activeTab, canManageAnyMembers]);
 
 	const filteredMembers = members.filter((m) => {
 		const q = search.toLowerCase();
@@ -624,12 +633,16 @@ export function TeamPageClient({
 			icon: <Users size={14} />,
 			count: members.length,
 		},
-		{
-			id: "invitations",
-			label: "Sent Invitations",
-			icon: <SendHorizontal size={14} />,
-			count: initialSentInvites.length,
-		},
+		...(canManageAnyMembers
+			? [
+					{
+						id: "invitations",
+						label: "Sent Invitations",
+						icon: <SendHorizontal size={14} />,
+						count: initialSentInvites.length,
+					} as const,
+				]
+			: []),
 		{
 			id: "my-invitations",
 			label: "My Invitations",
@@ -649,14 +662,16 @@ export function TeamPageClient({
 						Manage members, roles, and invitations
 					</p>
 				</div>
-				<button
-					type="button"
-					onClick={openInviteMemberModal}
-					className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shrink-0"
-				>
-					<UserPlus size={15} />
-					Invite Member
-				</button>
+				{canManageAnyMembers && (
+					<button
+						type="button"
+						onClick={openInviteMemberModal}
+						className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shrink-0"
+					>
+						<UserPlus size={15} />
+						Invite Member
+					</button>
+				)}
 			</div>
 
 			<div className="flex items-center gap-0.5 border-b border-border">
@@ -725,15 +740,17 @@ export function TeamPageClient({
 							))}
 						</select>
 						<div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-background shrink-0">
-							<button
-								type="button"
-								onClick={() => setViewMode("card")}
-								aria-label="Card view"
-								aria-pressed={viewMode === "card"}
-								className={`p-1.5 rounded transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-							>
-								<LayoutGrid size={15} />
-							</button>
+							{canManageAnyMembers && (
+								<button
+									type="button"
+									onClick={() => setViewMode("card")}
+									aria-label="Card view"
+									aria-pressed={viewMode === "card"}
+									className={`p-1.5 rounded transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+								>
+									<LayoutGrid size={15} />
+								</button>
+							)}
 							<button
 								type="button"
 								onClick={() => setViewMode("list")}

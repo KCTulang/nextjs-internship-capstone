@@ -64,6 +64,7 @@ export default async function ProjectPage({
 					projectId={project.id}
 					projectName={project.name}
 					canManageColumns={project.canManageColumns}
+					canMutateTasks={project.capabilities.canMutateTasks}
 					members={Array.from(
 						new Map(
 							[

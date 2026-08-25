@@ -98,6 +98,7 @@ interface KanbanColumnProps {
 	isOverlay?: boolean;
 	isMobileView?: boolean;
 	canManageColumns?: boolean;
+	canMutateTasks?: boolean;
 	onMoveTaskClick?: (task: Task) => void;
 }
 
@@ -108,6 +109,7 @@ export function KanbanColumn({
 	isOverlay = false,
 	isMobileView = false,
 	canManageColumns = false,
+	canMutateTasks = true,
 	onMoveTaskClick,
 }: KanbanColumnProps) {
 	const { renameList, removeList, setCompletedList } = useTasksStore();
@@ -116,6 +118,7 @@ export function KanbanColumn({
 	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
 		id: `drop-${list.id}`,
 		data: { type: "Column", list },
+		disabled: !canMutateTasks,
 	});
 
 	const {
@@ -414,6 +417,7 @@ export function KanbanColumn({
 								key={task.id}
 								task={task}
 								isMobileView={isMobileView}
+								canMutateTasks={canMutateTasks}
 								onMoveClick={onMoveTaskClick}
 							/>
 						))}
@@ -426,26 +430,30 @@ export function KanbanColumn({
 							isOver ? `${color.border} ${color.bg}` : "border-border/40"
 						}`}
 					>
-						<p className="text-xs text-muted-foreground">Drop tasks here</p>
+						<p className="text-xs text-muted-foreground">
+							{canMutateTasks ? "Drop tasks here" : "No tasks"}
+						</p>
 					</div>
 				)}
 			</div>
 
-			<button
-				type="button"
-				onClick={() =>
-					openCreateTaskModal({
-						listId: list.id,
-						projectId,
-						projectName,
-						source: "column",
-					})
-				}
-				className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
-			>
-				<Plus size={14} />
-				Add task
-			</button>
+			{canMutateTasks && (
+				<button
+					type="button"
+					onClick={() =>
+						openCreateTaskModal({
+							listId: list.id,
+							projectId,
+							projectName,
+							source: "column",
+						})
+					}
+					className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
+				>
+					<Plus size={14} />
+					Add task
+				</button>
+			)}
 		</div>
 	);
 }

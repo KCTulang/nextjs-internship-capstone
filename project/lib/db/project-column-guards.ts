@@ -74,6 +74,33 @@ export function canAccessProject(
 	)`;
 }
 
+export function canMutateProjectTasks(
+	clerkId: string,
+	projectId: string | SQL,
+): SQL<boolean> {
+	const projectIdExpression =
+		typeof projectId === "string"
+			? sql`${validateProjectId(projectId)}::uuid`
+			: projectId;
+
+	return sql<boolean>`exists (
+		select 1
+		from "users" actor
+		join "projects" project on project."id" = ${projectIdExpression}
+		where actor."clerk_id" = ${clerkId}
+			and (
+				project."owner_id" = actor."id"
+				or exists (
+					select 1
+					from "project_members" membership
+					where membership."project_id" = project."id"
+						and membership."user_id" = actor."id"
+						and membership."role" in ('admin', 'member')
+				)
+			)
+	)`;
+}
+
 export function validProjectListTarget(
 	projectId: string,
 	listId: string,

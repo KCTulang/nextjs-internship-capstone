@@ -5,6 +5,10 @@ import {
 	getProjectsAction,
 	updateProjectAction,
 } from "@/app/actions/projects";
+import type {
+	ProjectCapabilities,
+	ProjectPermission,
+} from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
 
 export interface Project {
@@ -16,6 +20,8 @@ export interface Project {
 	createdAt: Date | null;
 	updatedAt: Date | null;
 	dueDate?: Date | null;
+	permission?: ProjectPermission | null;
+	capabilities?: ProjectCapabilities;
 	members?: unknown[];
 	lists?: {
 		id: string;
@@ -79,7 +85,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
 		const res = await getProjectsAction(limit, offset);
 		if (res.success && res.data) {
-			const newProjects = res.data as unknown as Project[];
+			const newProjects: Project[] = res.data;
 			set({
 				projects: reset ? newProjects : [...projects, ...newProjects],
 				page: reset ? 1 : page + 1,
@@ -95,7 +101,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		const res = await createProjectAction(data);
 		if (res.success && res.data) {
 			set((state) => ({
-				projects: [res.data as unknown as Project, ...state.projects],
+				projects: [res.data, ...state.projects],
 			}));
 			useUIStore.getState().addToast({
 				type: "success",

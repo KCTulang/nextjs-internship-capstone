@@ -1,19 +1,33 @@
 "use client";
 
 import { Loader2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { inviteMemberAction } from "@/app/actions/members";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectStore } from "@/hooks/use-projects";
+import {
+	isMembershipPermission,
+	type MembershipPermission,
+} from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
 import { PROJECT_ROLES } from "@/utils/roles";
 
 export function InviteMemberModal() {
 	const { isInviteMemberModalOpen, closeInviteMemberModal } = useUIStore();
-	const { projects, fetchProjects } = useProjectStore();
+	const {
+		projects,
+		fetchProjects,
+		isLoading: isLoadingProjects,
+		error: projectsError,
+	} = useProjectStore();
+	const manageableProjects = useMemo(
+		() => projects.filter((project) => project.capabilities?.canManageMembers),
+		[projects],
+	);
 
 	const [email, setEmail] = useState("");
 	const [projectId, setProjectId] = useState("");
-	const [role, setRole] = useState<"admin" | "member">("member");
+	const [role, setRole] = useState<MembershipPermission>("member");
 	const [projectRole, setProjectRole] = useState(PROJECT_ROLES[0].toString());
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -25,10 +39,10 @@ export function InviteMemberModal() {
 	}, [isInviteMemberModalOpen, fetchProjects, projects.length]);
 
 	useEffect(() => {
-		if (projects.length > 0 && !projectId) {
-			setProjectId(projects[0].id);
+		if (manageableProjects.length > 0 && !projectId) {
+			setProjectId(manageableProjects[0].id);
 		}
-	}, [projects, projectId]);
+	}, [manageableProjects, projectId]);
 
 	if (!isInviteMemberModalOpen) return null;
 
@@ -128,22 +142,40 @@ export function InviteMemberModal() {
 						<label htmlFor="project" className="block text-sm font-medium">
 							Select Project
 						</label>
-						<select
-							id="project"
-							value={projectId}
-							onChange={(e) => setProjectId(e.target.value)}
-							className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-							required
-						>
-							<option value="" disabled>
-								Select a project
-							</option>
-							{projects.map((p) => (
-								<option key={p.id} value={p.id}>
-									{p.name}
+						{isLoadingProjects && projects.length === 0 ? (
+							<div role="status" aria-busy="true">
+								<span className="sr-only">Loading available projects</span>
+								<Skeleton className="h-10 w-full rounded-lg" />
+							</div>
+						) : projectsError && projects.length === 0 ? (
+							<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+								<p className="text-xs text-destructive">{projectsError}</p>
+								<button
+									type="button"
+									onClick={() => void fetchProjects(true)}
+									className="mt-2 text-xs font-semibold text-destructive underline underline-offset-2"
+								>
+									Try again
+								</button>
+							</div>
+						) : (
+							<select
+								id="project"
+								value={projectId}
+								onChange={(e) => setProjectId(e.target.value)}
+								className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+								required
+							>
+								<option value="" disabled>
+									Select a project
 								</option>
-							))}
-						</select>
+								{manageableProjects.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+						)}
 					</div>
 
 					<div className="space-y-2">
@@ -153,11 +185,15 @@ export function InviteMemberModal() {
 						<select
 							id="role"
 							value={role}
-							onChange={(e) => setRole(e.target.value as "admin" | "member")}
+							onChange={(e) => {
+								if (isMembershipPermission(e.target.value))
+									setRole(e.target.value);
+							}}
 							className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
 						>
 							<option value="member">Member</option>
 							<option value="admin">Admin</option>
+							<option value="viewer">Viewer</option>
 						</select>
 					</div>
 
@@ -189,7 +225,7 @@ export function InviteMemberModal() {
 						</button>
 						<button
 							type="submit"
-							disabled={isSubmitting || projects.length === 0}
+							disabled={isSubmitting || manageableProjects.length === 0}
 							className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
 						>
 							{isSubmitting ? (

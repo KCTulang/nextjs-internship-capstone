@@ -42,6 +42,7 @@ interface KanbanBoardProps {
 	projectName: string;
 	members?: Member[];
 	canManageColumns?: boolean;
+	canMutateTasks?: boolean;
 }
 
 export function KanbanBoard({
@@ -49,6 +50,7 @@ export function KanbanBoard({
 	projectName,
 	members,
 	canManageColumns = false,
+	canMutateTasks = true,
 }: KanbanBoardProps) {
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const searchParams = useSearchParams();
@@ -94,20 +96,26 @@ export function KanbanBoard({
 					projectId={projectId}
 					projectName={projectName}
 					canManageColumns={canManageColumns}
+					canMutateTasks={canMutateTasks}
 				/>
 			) : (
 				<MobileKanbanBoard
 					projectId={projectId}
 					projectName={projectName}
 					canManageColumns={canManageColumns}
+					canMutateTasks={canMutateTasks}
 				/>
 			)}
 			<TaskDetailPanel
 				key={taskId ?? "empty"}
 				taskId={taskId}
 				projectId={projectId}
+				readOnly={!canMutateTasks}
 			/>
-			<BulkSelectionToolbar projectId={projectId} />
+			<BulkSelectionToolbar
+				projectId={projectId}
+				canMutateTasks={canMutateTasks}
+			/>
 		</>
 	);
 }
@@ -116,6 +124,7 @@ function DesktopKanbanBoard({
 	projectId,
 	projectName,
 	canManageColumns = false,
+	canMutateTasks = true,
 }: KanbanBoardProps) {
 	const {
 		lists,
@@ -170,6 +179,7 @@ function DesktopKanbanBoard({
 			if (e.key === "Escape" && selectedTaskIds.length > 0) {
 				clearSelection();
 			} else if (
+				canMutateTasks &&
 				(e.key === "Delete" || e.key === "Backspace") &&
 				selectedTaskIds.length > 0
 			) {
@@ -182,7 +192,7 @@ function DesktopKanbanBoard({
 						await deleteSelectedTasks(projectId);
 					},
 				});
-			} else if (e.key.toLowerCase() === "n") {
+			} else if (canMutateTasks && e.key.toLowerCase() === "n") {
 				if (lists.length > 0) {
 					e.preventDefault();
 					openCreateTaskModal({
@@ -205,6 +215,7 @@ function DesktopKanbanBoard({
 		deleteSelectedTasks,
 		openCreateTaskModal,
 		openConfirmModal,
+		canMutateTasks,
 	]);
 
 	const sensors = useSensors(
@@ -288,6 +299,7 @@ function DesktopKanbanBoard({
 	}
 
 	function handleDragStart(event: DragStartEvent) {
+		if (!canMutateTasks) return;
 		const { active } = event;
 		if (active.data.current?.type === "Task") {
 			setActiveTask(active.data.current.task);
@@ -297,6 +309,7 @@ function DesktopKanbanBoard({
 	}
 
 	function handleDragEnd(event: DragEndEvent) {
+		if (!canMutateTasks) return;
 		const { active, over } = event;
 		setActiveTask(null);
 		setActiveColumn(null);
@@ -386,6 +399,7 @@ function DesktopKanbanBoard({
 								projectId={projectId}
 								projectName={projectName}
 								canManageColumns={canManageColumns}
+								canMutateTasks={canMutateTasks}
 							/>
 						))}
 					</SortableContext>
@@ -452,12 +466,17 @@ function DesktopKanbanBoard({
 								projectId={projectId}
 								projectName={projectName}
 								canManageColumns={canManageColumns}
+								canMutateTasks={canMutateTasks}
 								isOverlay
 							/>
 						</div>
 					) : activeTask ? (
 						<div className="cursor-grabbing pointer-events-none">
-							<TaskCard task={activeTask} isOverlay />
+							<TaskCard
+								task={activeTask}
+								isOverlay
+								canMutateTasks={canMutateTasks}
+							/>
 						</div>
 					) : null}
 				</DragOverlay>

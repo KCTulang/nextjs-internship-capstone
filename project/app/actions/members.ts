@@ -5,12 +5,19 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db, queries } from "@/lib/db";
+import { requireProjectCapability } from "@/lib/db/project-permissions";
 import {
 	projectInvitations,
 	projectMembers,
 	projects,
 	users,
 } from "@/lib/db/schema";
+import {
+	isMembershipPermission,
+	MEMBERSHIP_PERMISSIONS,
+	type MembershipPermission,
+	type ProjectPermission,
+} from "@/lib/project-permissions";
 import { publishProjectEvent } from "@/services/realtime/events";
 
 async function requireAuth() {
@@ -22,14 +29,14 @@ async function requireAuth() {
 const inviteMemberSchema = z.object({
 	projectId: z.string().uuid(),
 	email: z.string().email("Invalid email address"),
-	role: z.string().default("member"),
+	role: z.enum(MEMBERSHIP_PERMISSIONS).default("member"),
 	projectRole: z.string().default("Other"),
 });
 
 export async function inviteMemberAction(rawData: {
 	projectId: string;
 	email: string;
-	role?: "admin" | "member";
+	role?: MembershipPermission;
 	projectRole?: string;
 }) {
 	try {
@@ -39,18 +46,7 @@ export async function inviteMemberAction(rawData: {
 		const caller = await queries.users.getByClerkId(clerkId);
 		if (!caller) return { success: false, error: "Unauthorized" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, data.projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can invite members",
-			};
-		}
+		await requireProjectCapability(clerkId, data.projectId, "canManageMembers");
 
 		const user = await db.query.users.findFirst({
 			where: eq(users.email, data.email),
@@ -91,7 +87,7 @@ export async function inviteMemberAction(rawData: {
 			.values({
 				projectId: data.projectId,
 				email: data.email,
-				role: data.role as "admin" | "member",
+				role: data.role,
 				projectRole: data.projectRole,
 				status: "pending",
 				inviterId: caller.id,
@@ -172,7 +168,7 @@ export async function respondToInvitationAction(
 				db.insert(projectMembers).values({
 					projectId: invitation.projectId,
 					userId: user.id,
-					role: invitation.role as "admin" | "member",
+					role: z.enum(MEMBERSHIP_PERMISSIONS).parse(invitation.role),
 					projectRole: invitation.projectRole,
 				}),
 				db
@@ -211,8 +207,6 @@ export async function respondToInvitationAction(
 export async function revokeInvitationAction(invitationId: string) {
 	try {
 		const clerkId = await requireAuth();
-		const caller = await queries.users.getByClerkId(clerkId);
-		if (!caller) return { success: false, error: "Unauthorized" };
 
 		const invitation = await db.query.projectInvitations.findFirst({
 			where: eq(projectInvitations.id, invitationId),
@@ -220,19 +214,11 @@ export async function revokeInvitationAction(invitationId: string) {
 
 		if (!invitation) return { success: false, error: "Invitation not found" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, invitation.projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can revoke invitations",
-			};
-		}
+		await requireProjectCapability(
+			clerkId,
+			invitation.projectId,
+			"canManageMembers",
+		);
 
 		await db
 			.delete(projectInvitations)
@@ -282,22 +268,8 @@ export async function getPendingInvitationsForUserAction() {
 export async function getPendingInvitationsByProjectAction(projectId: string) {
 	try {
 		const clerkId = await requireAuth();
-		const caller = await queries.users.getByClerkId(clerkId);
-		if (!caller) return { success: false, error: "Unauthorized" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can view invitations",
-			};
-		}
+		await requireProjectCapability(clerkId, projectId, "canManageMembers");
 
 		const invites = await db
 			.select({
@@ -329,21 +301,30 @@ export async function removeMemberAction(projectId: string, userId: string) {
 		const caller = await queries.users.getByClerkId(clerkId);
 		if (!caller) return { success: false, error: "Unauthorized" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
+		const project = await db.query.projects.findFirst({
+			where: eq(projects.id, projectId),
+			columns: { ownerId: true },
+		});
+		if (!project) return { success: false, error: "Project not found" };
+		if (project.ownerId === userId) {
+			return {
+				success: false,
+				error: "The project owner cannot be removed or leave the project.",
+			};
+		}
+		if (caller.id === userId) {
+			await requireProjectCapability(clerkId, projectId, "canLeaveProject");
+		} else {
+			await requireProjectCapability(clerkId, projectId, "canManageMembers");
+		}
+		const targetMembership = await db.query.projectMembers.findFirst({
 			where: and(
 				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, caller.id),
+				eq(projectMembers.userId, userId),
 			),
+			columns: { id: true },
 		});
-
-		if (caller.id !== userId) {
-			if (callerMembership?.role !== "admin") {
-				return {
-					success: false,
-					error: "Only project owners or admins can remove members",
-				};
-			}
-		}
+		if (!targetMembership) return { success: false, error: "Member not found" };
 
 		await queries.projectMembers.removeMember(projectId, userId);
 
@@ -363,10 +344,22 @@ export async function removeMemberAction(projectId: string, userId: string) {
 	}
 }
 
+export async function leaveProjectAction(projectId: string) {
+	try {
+		const clerkId = await requireAuth();
+		const caller = await queries.users.getByClerkId(clerkId);
+		if (!caller) return { success: false, error: "Unauthorized" };
+		return await removeMemberAction(projectId, caller.id);
+	} catch (error) {
+		console.error("Failed to leave project:", error);
+		return { success: false, error: "Failed to leave project" };
+	}
+}
+
 export async function updateMemberRoleAction(
 	projectId: string,
 	userId: string,
-	role: string,
+	role: MembershipPermission,
 	projectRole?: string,
 ) {
 	try {
@@ -374,22 +367,21 @@ export async function updateMemberRoleAction(
 		const caller = await queries.users.getByClerkId(clerkId);
 		if (!caller) return { success: false, error: "Unauthorized" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, caller.id),
-			),
+		await requireProjectCapability(clerkId, projectId, "canManageMembers");
+		const validatedRole = z.enum(MEMBERSHIP_PERMISSIONS).parse(role);
+		const project = await db.query.projects.findFirst({
+			where: eq(projects.id, projectId),
+			columns: { ownerId: true },
 		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can change roles",
-			};
+		if (project?.ownerId === userId) {
+			return { success: false, error: "Cannot change the project owner." };
 		}
 
-		const updateData: { role?: "admin" | "member"; projectRole?: string } = {
-			role: role as "admin" | "member",
+		const updateData: {
+			role?: MembershipPermission;
+			projectRole?: string;
+		} = {
+			role: validatedRole,
 		};
 		if (projectRole) {
 			updateData.projectRole = projectRole;
@@ -457,13 +449,36 @@ export async function getTeamMembersAction() {
 				projectRole: projectMembers.projectRole,
 				projectName: projects.name,
 				projectId: projects.id,
+				ownerId: projects.ownerId,
 			})
 			.from(projectMembers)
 			.innerJoin(users, eq(projectMembers.userId, users.id))
 			.innerJoin(projects, eq(projectMembers.projectId, projects.id))
 			.where(inArray(projectMembers.projectId, projectIds));
+		const ownerRows = await db
+			.select({
+				id: users.id,
+				name: users.name,
+				email: users.email,
+				projectName: projects.name,
+				projectId: projects.id,
+			})
+			.from(projects)
+			.innerJoin(users, eq(projects.ownerId, users.id))
+			.where(inArray(projects.id, projectIds));
 
-		const teamMap = new Map();
+		type TeamMemberRow = {
+			id: string;
+			name: string;
+			email: string;
+			roles: Array<{
+				role: ProjectPermission;
+				projectRole: string;
+				projectName: string;
+				projectId: string;
+			}>;
+		};
+		const teamMap = new Map<string, TeamMemberRow>();
 		for (const m of membersList) {
 			if (!teamMap.has(m.id)) {
 				teamMap.set(m.id, {
@@ -472,7 +487,12 @@ export async function getTeamMembersAction() {
 					email: m.email,
 					roles: [
 						{
-							role: m.role,
+							role:
+								m.ownerId === m.id
+									? "owner"
+									: isMembershipPermission(m.role)
+										? m.role
+										: "member",
 							projectRole: m.projectRole,
 							projectName: m.projectName,
 							projectId: m.projectId,
@@ -480,12 +500,33 @@ export async function getTeamMembersAction() {
 					],
 				});
 			} else {
-				teamMap.get(m.id).roles.push({
-					role: m.role,
+				teamMap.get(m.id)?.roles.push({
+					role:
+						m.ownerId === m.id
+							? "owner"
+							: isMembershipPermission(m.role)
+								? m.role
+								: "member",
 					projectRole: m.projectRole,
 					projectName: m.projectName,
 					projectId: m.projectId,
 				});
+			}
+		}
+		for (const owner of ownerRows) {
+			const existing = teamMap.get(owner.id);
+			const ownerRole: TeamMemberRow["roles"][number] = {
+				role: "owner",
+				projectRole: "Project Owner",
+				projectName: owner.projectName,
+				projectId: owner.projectId,
+			};
+			if (!existing) {
+				teamMap.set(owner.id, { ...owner, roles: [ownerRole] });
+			} else if (
+				!existing.roles.some((role) => role.projectId === owner.projectId)
+			) {
+				existing.roles.push(ownerRole);
 			}
 		}
 
@@ -509,7 +550,16 @@ export async function getSentInvitationsAction() {
 			),
 		});
 
-		const projectIds = callerMemberships.map((m) => m.projectId);
+		const ownedProjects = await db.query.projects.findMany({
+			where: eq(projects.ownerId, user.id),
+			columns: { id: true },
+		});
+		const projectIds = Array.from(
+			new Set([
+				...callerMemberships.map((membership) => membership.projectId),
+				...ownedProjects.map((project) => project.id),
+			]),
+		);
 		if (projectIds.length === 0) return { success: true, data: [] };
 
 		const invites = await db
@@ -540,8 +590,6 @@ export async function getSentInvitationsAction() {
 export async function cancelInvitationAction(invitationId: string) {
 	try {
 		const clerkId = await requireAuth();
-		const caller = await queries.users.getByClerkId(clerkId);
-		if (!caller) return { success: false, error: "Unauthorized" };
 
 		const invitation = await db.query.projectInvitations.findFirst({
 			where: eq(projectInvitations.id, invitationId),
@@ -554,19 +602,11 @@ export async function cancelInvitationAction(invitationId: string) {
 				error: "Only pending invitations can be cancelled",
 			};
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, invitation.projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can cancel invitations",
-			};
-		}
+		await requireProjectCapability(
+			clerkId,
+			invitation.projectId,
+			"canManageMembers",
+		);
 
 		await db
 			.delete(projectInvitations)
@@ -583,8 +623,6 @@ export async function cancelInvitationAction(invitationId: string) {
 export async function resendInvitationAction(invitationId: string) {
 	try {
 		const clerkId = await requireAuth();
-		const caller = await queries.users.getByClerkId(clerkId);
-		if (!caller) return { success: false, error: "Unauthorized" };
 
 		const invitation = await db.query.projectInvitations.findFirst({
 			where: eq(projectInvitations.id, invitationId),
@@ -597,19 +635,11 @@ export async function resendInvitationAction(invitationId: string) {
 				error: "Only pending invitations can be resent",
 			};
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, invitation.projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can resend invitations",
-			};
-		}
+		await requireProjectCapability(
+			clerkId,
+			invitation.projectId,
+			"canManageMembers",
+		);
 
 		await db
 			.update(projectInvitations)
@@ -627,26 +657,14 @@ export async function resendInvitationAction(invitationId: string) {
 export async function updateProjectMemberAction(
 	projectId: string,
 	userId: string,
-	data: { role?: "admin" | "member"; projectRole?: string },
+	data: { role?: MembershipPermission; projectRole?: string },
 ) {
 	try {
 		const clerkId = await requireAuth();
 		const caller = await queries.users.getByClerkId(clerkId);
 		if (!caller) return { success: false, error: "Unauthorized" };
 
-		const callerMembership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, projectId),
-				eq(projectMembers.userId, caller.id),
-			),
-		});
-
-		if (callerMembership?.role !== "admin") {
-			return {
-				success: false,
-				error: "Only project owners or admins can update member details",
-			};
-		}
+		await requireProjectCapability(clerkId, projectId, "canManageMembers");
 
 		const targetMembership = await db.query.projectMembers.findFirst({
 			where: and(
@@ -666,8 +684,13 @@ export async function updateProjectMemberAction(
 			};
 		}
 
-		const updateData: { role?: "admin" | "member"; projectRole?: string } = {};
-		if (data.role) updateData.role = data.role;
+		const updateData: {
+			role?: MembershipPermission;
+			projectRole?: string;
+		} = {};
+		if (data.role) {
+			updateData.role = z.enum(MEMBERSHIP_PERMISSIONS).parse(data.role);
+		}
 		if (data.projectRole) updateData.projectRole = data.projectRole;
 
 		if (Object.keys(updateData).length === 0) {

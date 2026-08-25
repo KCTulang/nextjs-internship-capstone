@@ -5,7 +5,12 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, queries } from "@/lib/db";
 import { projectCompletionAdvisoryLock } from "@/lib/db/project-column-guards";
+import { requireProjectCapability } from "@/lib/db/project-permissions";
 import { lists, projectMembers, projects } from "@/lib/db/schema";
+import {
+	getEffectiveProjectPermission,
+	getProjectCapabilities,
+} from "@/lib/project-permissions";
 import { hasExactlyOneCompletedList } from "@/lib/tasks/completion";
 import { createProjectSchema, updateProjectSchema } from "@/utils/validations";
 
@@ -39,8 +44,22 @@ export async function getProjectsAction(
 ) {
 	try {
 		const user = await requireAuth();
-		const projects = await queries.projects.getAll(user.id, limit, offset);
-		return { success: true, data: projects };
+		const projectRows = await queries.projects.getAll(user.id, limit, offset);
+		return {
+			success: true,
+			data: projectRows.map((project) => {
+				const permission = getEffectiveProjectPermission(
+					project.ownerId,
+					user.id,
+					project.members.find((member) => member.userId === user.id)?.role,
+				);
+				return {
+					...project,
+					permission,
+					capabilities: getProjectCapabilities(permission),
+				};
+			}),
+		};
 	} catch (error) {
 		console.error("Failed to fetch projects:", error);
 		return { success: false, error: "Failed to fetch projects" };
@@ -114,7 +133,14 @@ export async function createProjectAction(rawData: {
 		}
 
 		revalidatePath("/dashboard");
-		return { success: true, data: newProject[0] };
+		return {
+			success: true,
+			data: {
+				...newProject[0],
+				permission: "owner" as const,
+				capabilities: getProjectCapabilities("owner"),
+			},
+		};
 	} catch (error) {
 		console.error("Failed to create project:", error);
 		return { success: false, error: "Failed to create project" };
@@ -123,7 +149,8 @@ export async function createProjectAction(rawData: {
 
 export async function deleteProjectAction(projectId: string) {
 	try {
-		await requireAuth();
+		const user = await requireAuth();
+		await requireProjectCapability(user.clerkId, projectId, "canDeleteProject");
 		await queries.projects.delete(projectId);
 		revalidatePath("/dashboard");
 		return { success: true };
@@ -138,7 +165,8 @@ export async function updateProjectAction(
 	rawData: { name?: string; description?: string; dueDate?: Date | null },
 ) {
 	try {
-		await requireAuth();
+		const user = await requireAuth();
+		await requireProjectCapability(user.clerkId, id, "canEditProject");
 		const data = updateProjectSchema.parse(rawData);
 		const updatedProject = await queries.projects.update(id, data);
 		revalidatePath("/dashboard");
@@ -158,13 +186,26 @@ export async function getProjectBySlugAction(slug: string) {
 			return { success: false, error: "Unauthorized or project not found" };
 		}
 
-		const canManageColumns =
-			project.ownerId === user.id ||
-			project.members.some(
-				(member) => member.userId === user.id && member.role === "admin",
-			);
+		const permission = getEffectiveProjectPermission(
+			project.ownerId,
+			user.id,
+			project.members.find((member) => member.userId === user.id)?.role,
+		);
+		if (!permission) {
+			return { success: false, error: "Unauthorized or project not found" };
+		}
+		const capabilities = getProjectCapabilities(permission);
 
-		return { success: true, data: { ...project, canManageColumns } };
+		return {
+			success: true,
+			data: {
+				...project,
+				currentUserId: user.id,
+				permission,
+				capabilities,
+				canManageColumns: capabilities.canManageColumns,
+			},
+		};
 	} catch (error) {
 		console.error("Failed to fetch project by slug:", error);
 		return { success: false, error: "Failed to fetch project" };

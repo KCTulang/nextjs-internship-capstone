@@ -29,6 +29,7 @@ interface MobileKanbanBoardProps {
 	projectId: string;
 	projectName: string;
 	canManageColumns?: boolean;
+	canMutateTasks?: boolean;
 }
 
 const edgeThreshold = 40;
@@ -41,6 +42,7 @@ export function MobileKanbanBoard({
 	projectId,
 	projectName,
 	canManageColumns = false,
+	canMutateTasks = true,
 }: MobileKanbanBoardProps) {
 	const { lists, fetchBoard, isLoading, error, moveTask } = useTasksStore();
 	const [activeListIndex, setActiveListIndex] = useState(0);
@@ -154,6 +156,7 @@ export function MobileKanbanBoard({
 	};
 
 	function handleDragStart(event: DragStartEvent) {
+		if (!canMutateTasks) return;
 		const { active } = event;
 		if (active.data.current?.type === "Task") {
 			const task = active.data.current.task as Task;
@@ -182,6 +185,7 @@ export function MobileKanbanBoard({
 	}
 
 	function handleDragMove(event: DragMoveEvent) {
+		if (!canMutateTasks) return;
 		if (!dragTaskRef.current) return;
 		const rect = event.active.rect.current.translated;
 		if (!rect) return;
@@ -217,6 +221,7 @@ export function MobileKanbanBoard({
 	}
 
 	function handleDragEnd(event: DragEndEvent) {
+		if (!canMutateTasks) return;
 		const { active, over } = event;
 		const task = dragTaskRef.current;
 		const sourceListId = dragSourceListIdRef.current;
@@ -360,6 +365,7 @@ export function MobileKanbanBoard({
 									projectId={projectId}
 									projectName={projectName}
 									canManageColumns={canManageColumns}
+									canMutateTasks={canMutateTasks}
 									isMobileView={true}
 									onMoveTaskClick={(task) => {
 										setTaskToMove(task);
@@ -376,6 +382,7 @@ export function MobileKanbanBoard({
 								<TaskCard
 									task={activeTask}
 									isMobileView={true}
+									canMutateTasks={canMutateTasks}
 									isOverlay={true}
 								/>
 							</div>
@@ -384,7 +391,7 @@ export function MobileKanbanBoard({
 				</DndContext>
 			</div>
 
-			{taskToMove && (
+			{canMutateTasks && taskToMove && (
 				<StatusPickerSheet
 					isOpen={isStatusPickerOpen}
 					setIsOpen={setIsStatusPickerOpen}

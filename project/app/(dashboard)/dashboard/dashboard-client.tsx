@@ -24,6 +24,9 @@ export function DashboardClient({
 }: DashboardClientProps) {
 	const { openCreateProjectModal, openInviteMemberModal } = useUIStore();
 	const { projects, isLoading, fetchProjects } = useProjectStore();
+	const canManageAnyMembers = projects.some(
+		(project) => project.capabilities?.canManageMembers,
+	);
 
 	useEffect(() => {
 		fetchProjects(true);
@@ -104,14 +107,16 @@ export function DashboardClient({
 					Quick Actions
 				</h3>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<button
-						type="button"
-						onClick={openCreateProjectModal}
-						className="w-full flex items-center justify-center px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-					>
-						<Plus size={20} className="mr-2" />
-						Create New Project
-					</button>
+					{canManageAnyMembers && (
+						<button
+							type="button"
+							onClick={openCreateProjectModal}
+							className="w-full flex items-center justify-center px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+						>
+							<Plus size={20} className="mr-2" />
+							Create New Project
+						</button>
+					)}
 					<button
 						type="button"
 						onClick={openInviteMemberModal}

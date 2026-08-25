@@ -38,7 +38,7 @@ export const queries = {
 */
 
 import { neon } from "@neondatabase/serverless";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
@@ -89,12 +89,16 @@ export const queries = {
 			});
 			const projectIds = memberships.map((m) => m.projectId);
 
-			if (projectIds.length === 0) return [];
-
 			return await db.query.projects.findMany({
 				limit,
 				offset,
-				where: inArray(schema.projects.id, projectIds),
+				where:
+					projectIds.length > 0
+						? or(
+								eq(schema.projects.ownerId, userId),
+								inArray(schema.projects.id, projectIds),
+							)
+						: eq(schema.projects.ownerId, userId),
 				orderBy: (projects, { desc }) => [desc(projects.createdAt)],
 				with: {
 					members: true,

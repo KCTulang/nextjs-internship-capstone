@@ -176,4 +176,24 @@ describe("TaskDetailPanel", () => {
 			);
 		});
 	});
+
+	it("renders task details without mutation controls in read-only mode", async () => {
+		const { container } = render(
+			<TaskDetailPanel taskId="task-1" projectId="proj-1" readOnly />,
+		);
+
+		await waitFor(() => {
+			const title = container.querySelector(
+				'textarea[placeholder="Task Title"]',
+			);
+			expect(title).toHaveProperty("readOnly", true);
+		});
+		for (const select of container.querySelectorAll("select")) {
+			expect(select).toBeDisabled();
+		}
+		expect(container.querySelector('[title="Delete Task"]')).toBeNull();
+		expect(
+			container.querySelector('textarea[placeholder="Write a comment..."]'),
+		).toBeNull();
+	});
 });

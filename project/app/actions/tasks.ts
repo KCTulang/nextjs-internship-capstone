@@ -7,11 +7,12 @@ import { ZodError } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
 import {
-	canAccessProject,
+	canMutateProjectTasks,
 	projectCompletionAdvisoryLock,
 	projectCompletionAdvisoryLocks,
 	validateProjectId,
 } from "@/lib/db/project-column-guards";
+import { requireProjectCapability } from "@/lib/db/project-permissions";
 import {
 	lists,
 	projectMembers,
@@ -44,9 +45,17 @@ export async function getTaskCreationOptionsAction() {
 		if (!currentUser) return { success: false, error: "User not found" };
 
 		const memberships = await db
-			.select({ projectId: projectMembers.projectId })
+			.select({
+				projectId: projectMembers.projectId,
+				role: projectMembers.role,
+			})
 			.from(projectMembers)
-			.where(eq(projectMembers.userId, currentUser.id));
+			.where(
+				and(
+					eq(projectMembers.userId, currentUser.id),
+					inArray(projectMembers.role, ["admin", "member"]),
+				),
+			);
 		const ownedProjects = await db
 			.select({ projectId: projects.id })
 			.from(projects)
@@ -192,18 +201,17 @@ export async function createTaskAction(
 		const project = await db.query.projects.findFirst({
 			where: eq(projects.id, destinationList.projectId),
 		});
-		const membership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, destinationList.projectId),
-				eq(projectMembers.userId, currentUser.id),
-			),
-		});
-		if (!project || (project.ownerId !== currentUser.id && !membership)) {
+		if (!project) {
 			return {
 				success: false,
-				error: "You do not have access to this project.",
+				error: "The selected project no longer exists.",
 			};
 		}
+		await requireProjectCapability(
+			clerkId,
+			destinationList.projectId,
+			"canMutateTasks",
+		);
 
 		if (data.assigneeId) {
 			const assigneeMembership = await db.query.projectMembers.findFirst({
@@ -295,47 +303,85 @@ export async function updateTaskAction(
 	projectId?: string | null,
 ) {
 	try {
-		await requireAuth();
+		const clerkId = await requireAuth();
 		const data = updateTaskSchema.parse(rawData);
 
 		const [currentTask] = await db
-			.select()
+			.select({ task: tasks, projectId: lists.projectId })
 			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
 			.where(eq(tasks.id, taskId));
 
 		if (!currentTask) {
 			return { success: false, error: "Task not found" };
 		}
+		if (projectId && projectId !== currentTask.projectId) {
+			return { success: false, error: "Task does not belong to this project." };
+		}
+		await requireProjectCapability(
+			clerkId,
+			currentTask.projectId,
+			"canMutateTasks",
+		);
+		if (data.listId) {
+			const destination = await db.query.lists.findFirst({
+				where: and(
+					eq(lists.id, data.listId),
+					eq(lists.projectId, currentTask.projectId),
+				),
+				columns: { id: true },
+			});
+			if (!destination) {
+				return { success: false, error: "Destination list is unavailable." };
+			}
+		}
+		if (data.assigneeId) {
+			const targetProject = await db.query.projects.findFirst({
+				where: eq(projects.id, currentTask.projectId),
+				columns: { ownerId: true },
+			});
+			const assigneeMembership = await db.query.projectMembers.findFirst({
+				where: and(
+					eq(projectMembers.projectId, currentTask.projectId),
+					eq(projectMembers.userId, data.assigneeId),
+				),
+				columns: { id: true },
+			});
+			if (targetProject?.ownerId !== data.assigneeId && !assigneeMembership) {
+				return { success: false, error: "Assignee is not a project member." };
+			}
+		}
 
 		await queries.tasks.update(taskId, data);
+		const taskBeforeUpdate = currentTask.task;
 
 		const logPromises = [];
-		if (data.title && data.title !== currentTask.title) {
+		if (data.title && data.title !== taskBeforeUpdate.title) {
 			logPromises.push(
-				logActivity(taskId, "task_updated", currentTask.title, data.title),
+				logActivity(taskId, "task_updated", taskBeforeUpdate.title, data.title),
 			);
 		}
 		if (
 			data.description !== undefined &&
-			data.description !== currentTask.description
+			data.description !== taskBeforeUpdate.description
 		) {
 			logPromises.push(logActivity(taskId, "task_updated"));
 		}
-		if (data.listId && data.listId !== currentTask.listId) {
+		if (data.listId && data.listId !== taskBeforeUpdate.listId) {
 			logPromises.push(logActivity(taskId, "task_moved"));
 		}
-		if (data.priority && data.priority !== currentTask.priority) {
+		if (data.priority && data.priority !== taskBeforeUpdate.priority) {
 			logPromises.push(
 				logActivity(
 					taskId,
 					"task_priority_changed",
-					currentTask.priority || "medium",
+					taskBeforeUpdate.priority || "medium",
 					data.priority,
 				),
 			);
 		}
 		if (data.dueDate !== undefined) {
-			const currentStr = currentTask.dueDate;
+			const currentStr = taskBeforeUpdate.dueDate;
 			const newStr = data.dueDate;
 			if (currentStr !== newStr) {
 				logPromises.push(
@@ -375,45 +421,27 @@ export async function updateTaskAction(
 				const addValues = toAdd.map((uid) => ({ taskId, userId: uid }));
 				await db.insert(taskAssignees).values(addValues);
 
-				const clerkId = await requireAuth();
 				const currentUser = await queries.users.getByClerkId(clerkId);
 
 				for (const uid of toAdd) {
 					logPromises.push(logActivity(taskId, "task_assigned", null, uid));
 
 					if (currentUser && uid !== currentUser.id) {
-						const notifProjectId = projectId;
-						if (!notifProjectId && currentTask.listId) {
-							const l = await db.query.lists.findFirst({
-								where: eq(lists.id, currentTask.listId),
-							});
-							if (l?.projectId) {
-								await createNotificationAction({
-									userId: uid,
-									actorId: currentUser.id,
-									type: "assignment",
-									taskId,
-									projectId: l.projectId,
-									message: "assigned you to a task",
-								});
-							}
-						} else if (notifProjectId) {
-							await createNotificationAction({
-								userId: uid,
-								actorId: currentUser.id,
-								type: "assignment",
-								taskId,
-								projectId: notifProjectId,
-								message: "assigned you to a task",
-							});
-						}
+						await createNotificationAction({
+							userId: uid,
+							actorId: currentUser.id,
+							type: "assignment",
+							taskId,
+							projectId: currentTask.projectId,
+							message: "assigned you to a task",
+						});
 					}
 				}
 			}
 		}
 
 		if (data.labels !== undefined) {
-			const oldLabels = currentTask.labels || [];
+			const oldLabels = taskBeforeUpdate.labels || [];
 			const newLabels = data.labels || [];
 
 			const added = newLabels.filter((l) => !oldLabels.includes(l));
@@ -432,19 +460,13 @@ export async function updateTaskAction(
 		if (!hydratedTask) throw new Error("Updated task could not be hydrated");
 		const taskDTO = toTaskDTO(hydratedTask);
 
-		let actualProjectId = projectId;
-		if (!actualProjectId && currentTask.listId) {
-			const list = await db.query.lists.findFirst({
-				where: eq(lists.id, currentTask.listId),
-			});
-			actualProjectId = list?.projectId || null;
-		}
+		const actualProjectId = currentTask.projectId;
 
 		if (actualProjectId) {
 			await publishProjectEvent({
 				type: "task.updated",
 				projectId: actualProjectId,
-				actorId: await auth().then((a) => a.userId as string),
+				actorId: clerkId,
 				entityId: taskId,
 				timestamp: new Date().toISOString(),
 				payload: { task: taskDTO },
@@ -464,30 +486,27 @@ export async function deleteTaskAction(
 	projectId?: string | null,
 ) {
 	try {
-		const userId = await requireAuth();
-
-		let actualProjectId = projectId;
-		if (!actualProjectId) {
-			const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
-			if (task?.listId) {
-				const list = await db.query.lists.findFirst({
-					where: eq(lists.id, task.listId),
-				});
-				actualProjectId = list?.projectId || null;
-			}
+		const clerkId = await requireAuth();
+		const [task] = await db
+			.select({ projectId: lists.projectId })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.where(eq(tasks.id, taskId));
+		if (!task) return { success: false, error: "Task not found" };
+		if (projectId && projectId !== task.projectId) {
+			return { success: false, error: "Task does not belong to this project." };
 		}
+		await requireProjectCapability(clerkId, task.projectId, "canMutateTasks");
 
 		await queries.tasks.delete(taskId);
 
-		if (actualProjectId) {
-			await publishProjectEvent({
-				type: "task.deleted",
-				projectId: actualProjectId,
-				actorId: userId,
-				entityId: taskId,
-				timestamp: new Date().toISOString(),
-			});
-		}
+		await publishProjectEvent({
+			type: "task.deleted",
+			projectId: task.projectId,
+			actorId: clerkId,
+			entityId: taskId,
+			timestamp: new Date().toISOString(),
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true };
@@ -539,6 +558,7 @@ export async function getAllUserTasksAction() {
 				assigneeId: tasks.assigneeId,
 				assigneeName: users.name,
 				assigneeEmail: users.email,
+				canMutateTasks: canMutateProjectTasks(clerkId, sql`${projects.id}`),
 			})
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -558,6 +578,7 @@ export async function getAllUserTasksAction() {
 			labels: t.labels,
 			listName: t.listName,
 			listIsCompleted: t.listIsCompleted,
+			canMutateTasks: t.canMutateTasks,
 			status: t.listName,
 			assignee: t.assigneeId
 				? {
@@ -666,23 +687,26 @@ export async function getAnalyticsAction() {
 export async function bulkDeleteTasksAction(taskIds: string[]) {
 	try {
 		const clerkId = await requireAuth();
-		const user = await queries.users.getByClerkId(clerkId);
-		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
 		const validTasks = await db
 			.select({ id: tasks.id })
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
 			.where(
 				and(
 					inArray(tasks.id, taskIds),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 				),
 			);
 
 		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length !== taskIds.length) {
+			return {
+				success: false,
+				error: "You do not have permission to delete one or more tasks.",
+			};
+		}
 		if (validTaskIds.length > 0) {
 			await db.delete(tasks).where(inArray(tasks.id, validTaskIds));
 		}
@@ -701,23 +725,26 @@ export async function bulkUpdateTasksPriorityAction(
 ) {
 	try {
 		const clerkId = await requireAuth();
-		const user = await queries.users.getByClerkId(clerkId);
-		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
 		const validTasks = await db
 			.select({ id: tasks.id, priority: tasks.priority })
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
 			.where(
 				and(
 					inArray(tasks.id, taskIds),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 				),
 			);
 
 		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length !== taskIds.length) {
+			return {
+				success: false,
+				error: "You do not have permission to update one or more tasks.",
+			};
+		}
 		if (validTaskIds.length > 0) {
 			await db
 				.update(tasks)
@@ -789,7 +816,7 @@ async function completeTasksAuthoritatively(
 		.select({
 			taskId: tasks.id,
 			projectId: lists.projectId,
-			allowed: canAccessProject(clerkId, sql`${lists.projectId}`),
+			allowed: canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 			actorId: sql<string>`(
 				select actor."id" from "users" actor
 				where actor."clerk_id" = ${clerkId}
@@ -821,7 +848,7 @@ async function completeTasksAuthoritatively(
 	);
 	const allRequestsValid = sql<boolean>`(
 		select count(*) = ${uniqueTaskIds.length}
-			and bool_and(${canAccessProject(clerkId, sql`source."project_id"`)})
+			and bool_and(${canMutateProjectTasks(clerkId, sql`source."project_id"`)})
 		from "tasks" requested_task
 		join "lists" source on source."id" = requested_task."list_id"
 		where requested_task."id" in (${taskIdSql})
@@ -1048,7 +1075,7 @@ export async function bulkUpdateTaskOrderAction(
 			...new Set(parsedUpdates.map((update) => update.listId)),
 		];
 		const relationshipsValid = sql<boolean>`
-			${canAccessProject(clerkId, parsedProjectId)}
+			${canMutateProjectTasks(clerkId, parsedProjectId)}
 			and (
 				select count(*) = ${taskIds.length}
 				from "tasks" requested_task

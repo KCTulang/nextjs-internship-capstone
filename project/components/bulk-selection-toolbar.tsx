@@ -5,7 +5,13 @@ import { useState } from "react";
 import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 
-export function BulkSelectionToolbar({ projectId }: { projectId: string }) {
+export function BulkSelectionToolbar({
+	projectId,
+	canMutateTasks = true,
+}: {
+	projectId: string;
+	canMutateTasks?: boolean;
+}) {
 	const {
 		lists,
 		selectedTaskIds,
@@ -16,7 +22,7 @@ export function BulkSelectionToolbar({ projectId }: { projectId: string }) {
 	const { openConfirmModal } = useUIStore();
 	const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
 
-	if (selectedTaskIds.length === 0) {
+	if (!canMutateTasks || selectedTaskIds.length === 0) {
 		return null;
 	}
 

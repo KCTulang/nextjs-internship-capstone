@@ -15,6 +15,7 @@ interface TaskCardProps {
 	task: Task;
 	isOverlay?: boolean;
 	isMobileView?: boolean;
+	canMutateTasks?: boolean;
 	onMoveClick?: (task: Task) => void;
 }
 
@@ -22,6 +23,7 @@ export function TaskCard({
 	task,
 	isOverlay = false,
 	isMobileView = false,
+	canMutateTasks = true,
 	onMoveClick,
 }: TaskCardProps) {
 	const router = useRouter();
@@ -43,7 +45,7 @@ export function TaskCard({
 			e.stopPropagation();
 			return;
 		}
-		if (hasSelection) {
+		if (canMutateTasks && hasSelection) {
 			e.preventDefault();
 			e.stopPropagation();
 			toggleTaskSelection(task.id);
@@ -66,7 +68,7 @@ export function TaskCard({
 			type: "Task",
 			task,
 		},
-		disabled: isOverlay,
+		disabled: isOverlay || !canMutateTasks,
 	});
 
 	useEffect(() => {
@@ -139,45 +141,51 @@ export function TaskCard({
 				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${priorityAccent}`}
 			/>
 
-			<div
-				className={`absolute top-0 left-0 z-20 ${isSelected || hasSelection || isMobileView ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
-			>
-				<button
-					type="button"
-					onClick={(e) => {
-						e.stopPropagation();
-						e.preventDefault();
-						toggleTaskSelection(task.id);
-					}}
-					aria-label={isSelected ? "Deselect task" : "Select task"}
-					className="p-2 cursor-pointer"
+			{canMutateTasks && (
+				<div
+					className={`absolute top-0 left-0 z-20 ${isSelected || hasSelection || isMobileView ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
 				>
-					<div
-						className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 group-hover:border-foreground bg-background"}`}
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							e.preventDefault();
+							toggleTaskSelection(task.id);
+						}}
+						aria-label={isSelected ? "Deselect task" : "Select task"}
+						className="p-2 cursor-pointer"
 					>
-						{isSelected && (
-							<svg
-								aria-hidden="true"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="3"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								className="w-3 h-3"
-							>
-								<polyline points="20 6 9 17 4 12"></polyline>
-							</svg>
-						)}
-					</div>
-				</button>
-			</div>
+						<div
+							className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 group-hover:border-foreground bg-background"}`}
+						>
+							{isSelected && (
+								<svg
+									aria-hidden="true"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="3"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									className="w-3 h-3"
+								>
+									<polyline points="20 6 9 17 4 12"></polyline>
+								</svg>
+							)}
+						</div>
+					</button>
+				</div>
+			)}
 
 			<button
 				type="button"
-				{...(isMobileView && !isOverlay ? { ...attributes, ...listeners } : {})}
+				{...(isMobileView && canMutateTasks && !isOverlay
+					? { ...attributes, ...listeners }
+					: {})}
 				onPointerDown={(event) => {
-					if (isMobileView && !isOverlay) event.stopPropagation();
+					if (isMobileView && canMutateTasks && !isOverlay) {
+						event.stopPropagation();
+					}
 				}}
 				onClick={handleCardClick}
 				className={`text-left w-full h-full bg-card dark:bg-white/2 border rounded-xl p-3.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
@@ -217,7 +225,7 @@ export function TaskCard({
 						)}
 					</div>
 
-					{!isMobileView && (
+					{!isMobileView && canMutateTasks && (
 						<div
 							{...attributes}
 							{...listeners}
@@ -277,7 +285,7 @@ export function TaskCard({
 				</div>
 			</button>
 
-			{isMobileView && (
+			{isMobileView && canMutateTasks && (
 				<button
 					type="button"
 					onClick={(e) => {

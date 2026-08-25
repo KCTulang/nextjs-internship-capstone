@@ -23,6 +23,7 @@ interface TaskDetailPanelProps {
 	initialTask?: Task | CalendarTask | null;
 	onClose?: () => void;
 	onUpdate?: () => void;
+	readOnly?: boolean;
 }
 
 export function TaskDetailPanel({
@@ -31,6 +32,7 @@ export function TaskDetailPanel({
 	initialTask,
 	onClose,
 	onUpdate,
+	readOnly = false,
 }: TaskDetailPanelProps) {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -210,7 +212,7 @@ export function TaskDetailPanel({
 	);
 
 	useEffect(() => {
-		if (!taskId) return;
+		if (!taskId || readOnly) return;
 
 		const handler = setTimeout(() => {
 			const currentTask = taskRef.current;
@@ -251,7 +253,7 @@ export function TaskDetailPanel({
 		}, 500);
 
 		return () => clearTimeout(handler);
-	}, [title, description, labelsString, taskId]);
+	}, [title, description, labelsString, taskId, readOnly]);
 
 	const handleClose = useCallback(() => {
 		if (onClose) {
@@ -499,27 +501,31 @@ export function TaskDetailPanel({
 								<span>{lists.find((l) => l.id === task.listId)?.name}</span>
 							</div>
 							<div className="flex items-center gap-1">
-								<button
-									type="button"
-									onClick={() => {
-										if (task) {
-											startLockIn(task);
-											window.dispatchEvent(new Event("prime-audio"));
-										}
-									}}
-									className="p-2 text-primary hover:text-primary-foreground hover:bg-primary rounded-xl transition-all"
-									title="Lock In"
-								>
-									<Target size={18} />
-								</button>
-								<button
-									type="button"
-									onClick={handleDelete}
-									className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
-									title="Delete Task"
-								>
-									<Trash2 size={18} />
-								</button>
+								{!readOnly && (
+									<button
+										type="button"
+										onClick={() => {
+											if (task) {
+												startLockIn(task);
+												window.dispatchEvent(new Event("prime-audio"));
+											}
+										}}
+										className="p-2 text-primary hover:text-primary-foreground hover:bg-primary rounded-xl transition-all"
+										title="Lock In"
+									>
+										<Target size={18} />
+									</button>
+								)}
+								{!readOnly && (
+									<button
+										type="button"
+										onClick={handleDelete}
+										className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+										title="Delete Task"
+									>
+										<Trash2 size={18} />
+									</button>
+								)}
 								<button
 									type="button"
 									onClick={handleClose}
@@ -534,6 +540,7 @@ export function TaskDetailPanel({
 							<textarea
 								ref={titleRef}
 								value={title}
+								readOnly={readOnly}
 								onChange={(e) => setTitle(e.target.value)}
 								placeholder="Task Title"
 								className="w-full text-2xl md:text-3xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 resize-none overflow-hidden text-foreground placeholder:text-muted-foreground/30 leading-tight tracking-tight mt-2"
@@ -554,6 +561,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.listId}
+										disabled={readOnly}
 										onChange={handleStatusChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10"
 									>
@@ -577,6 +585,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.priority}
+										disabled={readOnly}
 										onChange={handlePriorityChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10 capitalize"
 									>
@@ -614,6 +623,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.assigneeId || "unassigned"}
+										disabled={readOnly}
 										onChange={handleAssigneeChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10"
 									>
@@ -643,6 +653,7 @@ export function TaskDetailPanel({
 									</div>
 									<input
 										type="date"
+										disabled={readOnly}
 										value={task.dueDate || ""}
 										onChange={(e) => {
 											const date = e.target.value || null;
@@ -684,6 +695,7 @@ export function TaskDetailPanel({
 									</div>
 									<input
 										type="text"
+										readOnly={readOnly}
 										value={labelsString}
 										onChange={(e) => setLabelsString(e.target.value)}
 										placeholder="Comma-separated"
@@ -747,6 +759,7 @@ export function TaskDetailPanel({
 								<div className="absolute top-0 left-0 w-24 h-px bg-linear-to-r from-primary/40 to-transparent -translate-y-px" />
 								<textarea
 									value={description}
+									readOnly={readOnly}
 									onChange={(e) => setDescription(e.target.value)}
 									placeholder="Add a more detailed description..."
 									className="w-full min-h-37.5 text-[15px] leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 resize-none text-foreground/90 placeholder:text-muted-foreground/40"
@@ -808,37 +821,41 @@ export function TaskDetailPanel({
 														<p className="text-sm text-foreground/90 whitespace-pre-wrap">
 															{comment.content}
 														</p>
-														<button
-															type="button"
-															onClick={() => handleDeleteComment(comment.id)}
-															className="absolute top-2 right-2 p-1.5 bg-background rounded-md text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-															title="Delete comment"
-														>
-															<Trash2 size={14} />
-														</button>
+														{!readOnly && (
+															<button
+																type="button"
+																onClick={() => handleDeleteComment(comment.id)}
+																className="absolute top-2 right-2 p-1.5 bg-background rounded-md text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+																title="Delete comment"
+															>
+																<Trash2 size={14} />
+															</button>
+														)}
 													</div>
 												))
 											)}
 										</div>
 
-										<div className="flex flex-col gap-2">
-											<textarea
-												value={newComment}
-												onChange={(e) => setNewComment(e.target.value)}
-												placeholder="Write a comment..."
-												className="w-full min-h-20 p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-											/>
-											<div className="flex justify-end">
-												<button
-													type="button"
-													onClick={handleAddComment}
-													disabled={!newComment.trim()}
-													className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-												>
-													Comment
-												</button>
+										{!readOnly && (
+											<div className="flex flex-col gap-2">
+												<textarea
+													value={newComment}
+													onChange={(e) => setNewComment(e.target.value)}
+													placeholder="Write a comment..."
+													className="w-full min-h-20 p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+												/>
+												<div className="flex justify-end">
+													<button
+														type="button"
+														onClick={handleAddComment}
+														disabled={!newComment.trim()}
+														className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+													>
+														Comment
+													</button>
+												</div>
 											</div>
-										</div>
+										)}
 									</div>
 								)}
 
