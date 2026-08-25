@@ -1,4 +1,8 @@
 export const MEMBERSHIP_PERMISSIONS = ["admin", "member", "viewer"] as const;
+export const PROJECT_PERMISSIONS = [
+	"owner",
+	...MEMBERSHIP_PERMISSIONS,
+] as const;
 
 export type MembershipPermission = (typeof MEMBERSHIP_PERMISSIONS)[number];
 export type ProjectPermission = "owner" | MembershipPermission;

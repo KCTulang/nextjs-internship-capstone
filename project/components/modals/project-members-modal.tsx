@@ -20,6 +20,7 @@ import {
 	resendInvitationAction,
 	updateProjectMemberAction,
 } from "@/app/actions/members";
+import { ProjectRoleFields } from "@/components/project-role-fields";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	isMembershipPermission,
@@ -30,7 +31,13 @@ import {
 	type ProjectPermission,
 } from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
-import { PROJECT_ROLES } from "@/utils/roles";
+import {
+	CUSTOM_PROJECT_ROLE_ERROR,
+	getProjectRoleFormValues,
+	PROJECT_ROLES,
+	type ProjectRoleOption,
+	resolveProjectRole,
+} from "@/utils/roles";
 
 interface ProjectMemberSource {
 	userId: string;
@@ -98,7 +105,13 @@ export function ProjectMembersModal({
 	const [error, setError] = useState<string | null>(null);
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState<MembershipPermission>("member");
-	const [projectRole, setProjectRole] = useState("Other");
+	const [projectRole, setProjectRole] = useState<ProjectRoleOption>(
+		PROJECT_ROLES[0],
+	);
+	const [customProjectRole, setCustomProjectRole] = useState("");
+	const [customProjectRoleError, setCustomProjectRoleError] = useState<
+		string | null
+	>(null);
 
 	const roster = useMemo<RosterMember[]>(() => {
 		const membershipByUser = new Map(
@@ -148,6 +161,7 @@ export function ProjectMembersModal({
 		setView("roster");
 		setSelectedMember(null);
 		setError(null);
+		setCustomProjectRoleError(null);
 		if (!canManageMembers) return;
 		void loadPendingInvitations();
 	}, [canManageMembers, isProjectMembersModalOpen, loadPendingInvitations]);
@@ -158,19 +172,29 @@ export function ProjectMembersModal({
 		setView("roster");
 		setSelectedMember(null);
 		setError(null);
+		setCustomProjectRoleError(null);
 		setInvitationsError(null);
 		closeProjectMembersModal();
 	};
 
 	const submitInvite = async (event: React.FormEvent) => {
 		event.preventDefault();
+		const resolvedProjectRole = resolveProjectRole(
+			projectRole,
+			customProjectRole,
+		);
+		if (!resolvedProjectRole) {
+			setCustomProjectRoleError(CUSTOM_PROJECT_ROLE_ERROR);
+			return;
+		}
 		setIsSubmitting(true);
 		setError(null);
+		setCustomProjectRoleError(null);
 		const result = await inviteMemberAction({
 			projectId: project.id,
 			email: email.trim(),
 			role,
-			projectRole,
+			projectRole: resolvedProjectRole,
 		});
 		setIsSubmitting(false);
 		if (!result.success) {
@@ -182,7 +206,8 @@ export function ProjectMembersModal({
 		}
 		setEmail("");
 		setRole("member");
-		setProjectRole("Other");
+		setProjectRole(PROJECT_ROLES[0]);
+		setCustomProjectRole("");
 		setView("roster");
 		addToast({ type: "success", message: "Invitation sent." });
 	};
@@ -190,12 +215,21 @@ export function ProjectMembersModal({
 	const submitEdit = async (event: React.FormEvent) => {
 		event.preventDefault();
 		if (!selectedMember || selectedMember.permission === "owner") return;
+		const resolvedProjectRole = resolveProjectRole(
+			projectRole,
+			customProjectRole,
+		);
+		if (!resolvedProjectRole) {
+			setCustomProjectRoleError(CUSTOM_PROJECT_ROLE_ERROR);
+			return;
+		}
 		setIsSubmitting(true);
 		setError(null);
+		setCustomProjectRoleError(null);
 		const result = await updateProjectMemberAction(
 			project.id,
 			selectedMember.id,
-			{ role, projectRole },
+			{ role, projectRole: resolvedProjectRole },
 		);
 		setIsSubmitting(false);
 		if (!result.success) {
@@ -320,7 +354,12 @@ export function ProjectMembersModal({
 															if (isMembershipPermission(member.permission)) {
 																setRole(member.permission);
 															}
-															setProjectRole(member.projectRole);
+															const roleValues = getProjectRoleFormValues(
+																member.projectRole,
+															);
+															setProjectRole(roleValues.selectedRole);
+															setCustomProjectRole(roleValues.customRole);
+															setCustomProjectRoleError(null);
 															setView("edit");
 														}}
 														aria-label={`Edit ${member.name}`}
@@ -362,7 +401,11 @@ export function ProjectMembersModal({
 										</div>
 										<button
 											type="button"
-											onClick={() => setView("invite")}
+											onClick={() => {
+												setError(null);
+												setCustomProjectRoleError(null);
+												setView("invite");
+											}}
 											className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 										>
 											<UserPlus size={15} /> Add Member
@@ -540,23 +583,21 @@ export function ProjectMembersModal({
 									{PROJECT_PERMISSION_DESCRIPTIONS[role]}
 								</span>
 							</label>
-							<label className="block text-sm font-medium text-foreground">
-								Project Role / Job Title
-								<select
-									value={projectRole}
-									onChange={(event) => setProjectRole(event.target.value)}
-									className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-								>
-									{PROJECT_ROLES.map((item) => (
-										<option key={item} value={item}>
-											{item}
-										</option>
-									))}
-								</select>
-								<span className="mt-1.5 block text-xs text-muted-foreground">
-									Descriptive only; it does not grant access.
-								</span>
-							</label>
+							<ProjectRoleFields
+								idPrefix="project-invite-member"
+								selectedRole={projectRole}
+								customRole={customProjectRole}
+								onSelectedRoleChange={(nextRole) => {
+									setProjectRole(nextRole);
+									setCustomProjectRoleError(null);
+								}}
+								onCustomRoleChange={(nextRole) => {
+									setCustomProjectRole(nextRole);
+									setCustomProjectRoleError(null);
+								}}
+								error={customProjectRoleError}
+								description="Descriptive only; it does not grant access."
+							/>
 							<div className="flex justify-end gap-2 pt-2">
 								<button
 									type="button"
@@ -613,20 +654,21 @@ export function ProjectMembersModal({
 										{PROJECT_PERMISSION_DESCRIPTIONS[role]}
 									</span>
 								</label>
-								<label className="block text-sm font-medium text-foreground">
-									Project Role / Job Title
-									<select
-										value={projectRole}
-										onChange={(event) => setProjectRole(event.target.value)}
-										className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-									>
-										{PROJECT_ROLES.map((item) => (
-											<option key={item} value={item}>
-												{item}
-											</option>
-										))}
-									</select>
-								</label>
+								<ProjectRoleFields
+									idPrefix="project-edit-member"
+									selectedRole={projectRole}
+									customRole={customProjectRole}
+									onSelectedRoleChange={(nextRole) => {
+										setProjectRole(nextRole);
+										setCustomProjectRoleError(null);
+									}}
+									onCustomRoleChange={(nextRole) => {
+										setCustomProjectRole(nextRole);
+										setCustomProjectRoleError(null);
+									}}
+									error={customProjectRoleError}
+									description="Descriptive only; it does not grant access."
+								/>
 								<div className="flex justify-end gap-2">
 									<button
 										type="button"

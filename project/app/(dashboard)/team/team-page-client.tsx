@@ -31,10 +31,16 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	PROJECT_PERMISSION_LABELS,
+	PROJECT_PERMISSIONS,
+} from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
+import { PROJECT_ROLES } from "@/utils/roles";
 import { EditMemberDialog } from "./components/edit-member-dialog";
 import { RemoveMemberDialog } from "./components/remove-member-dialog";
-import type { ProjectInvitation, TeamMember } from "./types";
+import { filterTeamMembers, getProjectRoleOptions } from "./team-filters";
+import type { MemberRole, ProjectInvitation, TeamMember } from "./types";
 
 type Tab = "members" | "invitations" | "my-invitations";
 const VALID_TABS: Tab[] = ["members", "invitations", "my-invitations"];
@@ -61,6 +67,33 @@ function AccessBadge({ role }: { role: string }) {
 		>
 			{role.charAt(0).toUpperCase() + role.slice(1)}
 		</span>
+	);
+}
+
+function MembershipLine({ membership }: { membership: MemberRole }) {
+	const projectRole = membership.projectRole.trim();
+
+	return (
+		<div className="flex items-center gap-2 flex-wrap">
+			<span
+				className="text-xs text-muted-foreground font-medium truncate max-w-32"
+				title={membership.projectName}
+			>
+				{membership.projectName}
+			</span>
+			{projectRole && (
+				<>
+					<span className="text-muted-foreground/40 text-xs" aria-hidden>
+						·
+					</span>
+					<span className="text-xs text-foreground">{projectRole}</span>
+				</>
+			)}
+			<span className="text-muted-foreground/40 text-xs" aria-hidden>
+				·
+			</span>
+			<AccessBadge role={membership.role} />
+		</div>
 	);
 }
 
@@ -222,8 +255,6 @@ function MemberCard({
 
 	if (member.roles.length === 0) return null;
 
-	const _primary = member.roles[0];
-
 	return (
 		<>
 			<div className="bg-card rounded-xl border border-border p-5 flex flex-col gap-3 hover:border-border/80 transition-colors">
@@ -249,23 +280,7 @@ function MemberCard({
 
 				<div className="space-y-1">
 					{member.roles.map((r) => (
-						<div
-							key={r.projectId}
-							className="flex items-center gap-2 flex-wrap"
-						>
-							<span
-								className="text-xs text-muted-foreground font-medium truncate max-w-32"
-								title={r.projectName}
-							>
-								{r.projectName}
-							</span>
-							<span className="text-muted-foreground/40 text-xs">·</span>
-							<span className="text-xs text-foreground">
-								{r.projectRole || "Other"}
-							</span>
-							<span className="text-muted-foreground/40 text-xs">·</span>
-							<AccessBadge role={r.role} />
-						</div>
+						<MembershipLine key={r.projectId} membership={r} />
 					))}
 				</div>
 
@@ -345,21 +360,9 @@ function MemberRow({
 				</div>
 			</td>
 			<td className="px-4 py-3">
-				<div className="flex flex-col gap-0.5">
-					{member.roles.map((r) => (
-						<span
-							key={r.projectId}
-							className="text-sm text-foreground truncate"
-						>
-							{r.projectRole || "Other"}
-						</span>
-					))}
-				</div>
-			</td>
-			<td className="px-4 py-3">
 				<div className="flex flex-col gap-1">
 					{member.roles.map((r) => (
-						<AccessBadge key={r.projectId} role={r.role} />
+						<MembershipLine key={r.projectId} membership={r} />
 					))}
 				</div>
 			</td>
@@ -523,7 +526,7 @@ export function TeamPageClient({
 	}, [activeTab, inviteId, initialMyInvites]);
 	const [viewMode, setViewMode] = useState<ViewMode>("card");
 	const [search, setSearch] = useState("");
-	const [filterAccess, setFilterAccess] = useState("");
+	const [filterPermission, setFilterPermission] = useState("");
 	const [filterRole, setFilterRole] = useState("");
 	const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
@@ -538,28 +541,12 @@ export function TeamPageClient({
 		}
 	}, [activeTab, canManageAnyMembers]);
 
-	const filteredMembers = members.filter((m) => {
-		const q = search.toLowerCase();
-		const matchesSearch =
-			!q ||
-			m.name?.toLowerCase().includes(q) ||
-			m.email.toLowerCase().includes(q) ||
-			m.roles.some((r) => r.projectRole?.toLowerCase().includes(q));
-		const matchesAccess =
-			!filterAccess || m.roles.some((r) => r.role === filterAccess);
-		const matchesRole =
-			!filterRole || m.roles.some((r) => r.projectRole === filterRole);
-		return matchesSearch && matchesAccess && matchesRole;
+	const filteredMembers = filterTeamMembers(members, {
+		search,
+		permission: filterPermission,
+		projectRole: filterRole,
 	});
-
-	const uniqueAccess = Array.from(
-		new Set(members.flatMap((m) => m.roles.map((r) => r.role))),
-	);
-	const uniqueRoles = Array.from(
-		new Set(
-			members.flatMap((m) => m.roles.map((r) => r.projectRole).filter(Boolean)),
-		),
-	);
+	const projectRoleOptions = getProjectRoleOptions(members, PROJECT_ROLES);
 
 	const handleMemberRemoved = (id: string, projectId: string) => {
 		setMembers((prev) =>
@@ -661,7 +648,8 @@ export function TeamPageClient({
 						Team
 					</h1>
 					<p className="mt-1 text-sm text-muted-foreground">
-						Manage members, roles, and invitations
+						Manage collaborators, project roles, and invitations across your
+						projects.
 					</p>
 				</div>
 				<div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
@@ -689,7 +677,8 @@ export function TeamPageClient({
 						Team
 					</h1>
 					<p className="text-sm text-muted-foreground mt-1">
-						Manage members, roles, and invitations
+						Manage collaborators, project roles, and invitations across your
+						projects.
 					</p>
 				</div>
 				{canManageAnyMembers && (
@@ -729,13 +718,17 @@ export function TeamPageClient({
 
 			{activeTab === "members" && (
 				<div className="space-y-4">
-					<div className="flex flex-col sm:flex-row gap-2">
-						<div className="relative flex-1">
+					<div className="grid grid-cols-1 min-[375px]:grid-cols-2 lg:flex gap-2">
+						<div className="relative min-[375px]:col-span-2 lg:flex-1">
+							<label htmlFor="team-member-search" className="sr-only">
+								Search team members
+							</label>
 							<Search
 								size={14}
 								className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
 							/>
 							<input
+								id="team-member-search"
 								type="search"
 								placeholder="Search members..."
 								value={search}
@@ -743,33 +736,40 @@ export function TeamPageClient({
 								className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 							/>
 						</div>
+						<label htmlFor="team-permission-filter" className="sr-only">
+							Filter by permission level
+						</label>
 						<select
-							value={filterAccess}
-							onChange={(e) => setFilterAccess(e.target.value)}
-							aria-label="Filter by access level"
-							className="px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+							id="team-permission-filter"
+							value={filterPermission}
+							onChange={(e) => setFilterPermission(e.target.value)}
+							className="w-full lg:w-auto px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 						>
-							<option value="">All access</option>
-							{uniqueAccess.map((r) => (
-								<option key={r} value={r}>
-									{r.charAt(0).toUpperCase() + r.slice(1)}
+							<option value="">All Permissions</option>
+							{PROJECT_PERMISSIONS.map((permission) => (
+								<option key={permission} value={permission}>
+									{PROJECT_PERMISSION_LABELS[permission]}
 								</option>
 							))}
 						</select>
+						<label htmlFor="team-project-role-filter" className="sr-only">
+							Filter by project role
+						</label>
 						<select
+							id="team-project-role-filter"
 							value={filterRole}
 							onChange={(e) => setFilterRole(e.target.value)}
-							aria-label="Filter by project role"
-							className="px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+							className="w-full lg:w-auto px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 						>
-							<option value="">All roles</option>
-							{uniqueRoles.map((r) => (
+							<option value="">All Project Roles</option>
+							{projectRoleOptions.map((r) => (
 								<option key={r} value={r}>
 									{r}
 								</option>
 							))}
 						</select>
-						<div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-background shrink-0">
+						<fieldset className="flex min-w-0 w-fit items-center gap-1 border border-border rounded-lg p-1 bg-background shrink-0 min-[375px]:col-span-2">
+							<legend className="sr-only">Team member view</legend>
 							{canManageAnyMembers && (
 								<button
 									type="button"
@@ -790,7 +790,7 @@ export function TeamPageClient({
 							>
 								<List size={15} />
 							</button>
-						</div>
+						</fieldset>
 					</div>
 
 					{members.length === 0 ? (
@@ -803,7 +803,7 @@ export function TeamPageClient({
 								No team members yet
 							</p>
 							<p className="text-sm text-muted-foreground mb-4">
-								Invite people to start collaborating on this project.
+								Invite people to collaborate across your projects.
 							</p>
 							<button
 								type="button"
@@ -847,10 +847,7 @@ export function TeamPageClient({
 											Member
 										</th>
 										<th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-											Role
-										</th>
-										<th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-											Access
+											Project memberships
 										</th>
 										<th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
 											Status

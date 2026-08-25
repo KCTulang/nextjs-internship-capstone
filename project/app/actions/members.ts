@@ -19,6 +19,7 @@ import {
 	type ProjectPermission,
 } from "@/lib/project-permissions";
 import { publishProjectEvent } from "@/services/realtime/events";
+import { CUSTOM_PROJECT_ROLE_ERROR, OTHER_PROJECT_ROLE } from "@/utils/roles";
 
 async function requireAuth() {
 	const { userId } = await auth();
@@ -26,18 +27,26 @@ async function requireAuth() {
 	return userId;
 }
 
+const projectRoleSchema = z
+	.string()
+	.trim()
+	.min(1, CUSTOM_PROJECT_ROLE_ERROR)
+	.refine((value) => value.toLowerCase() !== OTHER_PROJECT_ROLE.toLowerCase(), {
+		message: CUSTOM_PROJECT_ROLE_ERROR,
+	});
+
 const inviteMemberSchema = z.object({
 	projectId: z.string().uuid(),
 	email: z.string().email("Invalid email address"),
 	role: z.enum(MEMBERSHIP_PERMISSIONS).default("member"),
-	projectRole: z.string().default("Other"),
+	projectRole: projectRoleSchema,
 });
 
 export async function inviteMemberAction(rawData: {
 	projectId: string;
 	email: string;
 	role?: MembershipPermission;
-	projectRole?: string;
+	projectRole: string;
 }) {
 	try {
 		const clerkId = await requireAuth();
@@ -383,8 +392,8 @@ export async function updateMemberRoleAction(
 		} = {
 			role: validatedRole,
 		};
-		if (projectRole) {
-			updateData.projectRole = projectRole;
+		if (projectRole !== undefined) {
+			updateData.projectRole = projectRoleSchema.parse(projectRole);
 		}
 
 		const updatedMember = await db
@@ -480,6 +489,9 @@ export async function getTeamMembersAction() {
 		};
 		const teamMap = new Map<string, TeamMemberRow>();
 		for (const m of membersList) {
+			const isOwner = m.ownerId === m.id;
+			const projectRole =
+				isOwner && m.projectRole === "Other" ? "" : m.projectRole;
 			if (!teamMap.has(m.id)) {
 				teamMap.set(m.id, {
 					id: m.id,
@@ -487,13 +499,12 @@ export async function getTeamMembersAction() {
 					email: m.email,
 					roles: [
 						{
-							role:
-								m.ownerId === m.id
-									? "owner"
-									: isMembershipPermission(m.role)
-										? m.role
-										: "member",
-							projectRole: m.projectRole,
+							role: isOwner
+								? "owner"
+								: isMembershipPermission(m.role)
+									? m.role
+									: "member",
+							projectRole,
 							projectName: m.projectName,
 							projectId: m.projectId,
 						},
@@ -501,13 +512,12 @@ export async function getTeamMembersAction() {
 				});
 			} else {
 				teamMap.get(m.id)?.roles.push({
-					role:
-						m.ownerId === m.id
-							? "owner"
-							: isMembershipPermission(m.role)
-								? m.role
-								: "member",
-					projectRole: m.projectRole,
+					role: isOwner
+						? "owner"
+						: isMembershipPermission(m.role)
+							? m.role
+							: "member",
+					projectRole,
 					projectName: m.projectName,
 					projectId: m.projectId,
 				});
@@ -517,7 +527,7 @@ export async function getTeamMembersAction() {
 			const existing = teamMap.get(owner.id);
 			const ownerRole: TeamMemberRow["roles"][number] = {
 				role: "owner",
-				projectRole: "Project Owner",
+				projectRole: "",
 				projectName: owner.projectName,
 				projectId: owner.projectId,
 			};
@@ -691,7 +701,9 @@ export async function updateProjectMemberAction(
 		if (data.role) {
 			updateData.role = z.enum(MEMBERSHIP_PERMISSIONS).parse(data.role);
 		}
-		if (data.projectRole) updateData.projectRole = data.projectRole;
+		if (data.projectRole !== undefined) {
+			updateData.projectRole = projectRoleSchema.parse(data.projectRole);
+		}
 
 		if (Object.keys(updateData).length === 0) {
 			return { success: false, error: "No changes provided" };
