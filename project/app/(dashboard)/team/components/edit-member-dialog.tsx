@@ -4,12 +4,17 @@ import { Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateProjectMemberAction } from "@/app/actions/members";
+import { ProjectRoleFields } from "@/components/project-role-fields";
 import {
 	isMembershipPermission,
 	type MembershipPermission,
 } from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
-import { PROJECT_ROLES } from "@/utils/roles";
+import {
+	CUSTOM_PROJECT_ROLE_ERROR,
+	getProjectRoleFormValues,
+	resolveProjectRole,
+} from "@/utils/roles";
 import type { TeamMember } from "../types";
 
 interface EditMemberDialogProps {
@@ -35,18 +40,38 @@ export function EditMemberDialog({
 	const [role, setRole] = useState<MembershipPermission>(
 		isMembershipPermission(currentRole) ? currentRole : "member",
 	);
-	const [projectRole, setProjectRole] = useState(currentProjectRole || "Other");
+	const initialProjectRole = getProjectRoleFormValues(currentProjectRole);
+	const [projectRole, setProjectRole] = useState(
+		initialProjectRole.selectedRole,
+	);
+	const [customProjectRole, setCustomProjectRole] = useState(
+		initialProjectRole.customRole,
+	);
+	const [customProjectRoleError, setCustomProjectRoleError] = useState<
+		string | null
+	>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		const resolvedProjectRole = resolveProjectRole(
+			projectRole,
+			customProjectRole,
+		);
+		if (!resolvedProjectRole) {
+			setCustomProjectRoleError(CUSTOM_PROJECT_ROLE_ERROR);
+			return;
+		}
 		setIsSubmitting(true);
 		setError(null);
+		setCustomProjectRoleError(null);
 
 		const updates: { role?: MembershipPermission; projectRole?: string } = {};
 		if (role !== currentRole) updates.role = role;
-		if (projectRole !== currentProjectRole) updates.projectRole = projectRole;
+		if (resolvedProjectRole !== currentProjectRole) {
+			updates.projectRole = resolvedProjectRole;
+		}
 
 		if (Object.keys(updates).length === 0) {
 			onClose();
@@ -77,7 +102,7 @@ export function EditMemberDialog({
 			className="fixed inset-0 z-200 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 text-left"
 			onClick={(e) => e.target === e.currentTarget && onClose()}
 		>
-			<div className="bg-card border border-border shadow-2xl rounded-xl p-5 w-full max-w-100 animate-in fade-in zoom-in-95 duration-200">
+			<div className="max-h-[calc(100vh-2rem)] w-full max-w-100 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
 				<div className="flex items-start justify-between mb-5">
 					<div>
 						<h2
@@ -163,30 +188,22 @@ export function EditMemberDialog({
 						</select>
 					</div>
 
-					<div className="space-y-1.5">
-						<label
-							htmlFor="edit-project-role"
-							className="block text-sm font-semibold text-foreground"
-						>
-							Project Role / Job Title
-						</label>
-						<p className="text-xs text-muted-foreground leading-snug pb-1">
-							Describes the member's responsibility on this project.
-						</p>
-						<select
-							id="edit-project-role"
-							value={projectRole}
-							onChange={(e) => setProjectRole(e.target.value)}
-							disabled={readOnly}
-							className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							{PROJECT_ROLES.map((pr) => (
-								<option key={pr} value={pr}>
-									{pr}
-								</option>
-							))}
-						</select>
-					</div>
+					<ProjectRoleFields
+						idPrefix="edit-team-member"
+						selectedRole={projectRole}
+						customRole={customProjectRole}
+						onSelectedRoleChange={(nextRole) => {
+							setProjectRole(nextRole);
+							setCustomProjectRoleError(null);
+						}}
+						onCustomRoleChange={(nextRole) => {
+							setCustomProjectRole(nextRole);
+							setCustomProjectRoleError(null);
+						}}
+						error={customProjectRoleError}
+						description="Describes the member's responsibility on this project."
+						disabled={readOnly}
+					/>
 
 					<div className="flex items-center justify-end gap-2.5 pt-3">
 						{readOnly ? (

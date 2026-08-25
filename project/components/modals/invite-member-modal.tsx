@@ -3,6 +3,7 @@
 import { Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { inviteMemberAction } from "@/app/actions/members";
+import { ProjectRoleFields } from "@/components/project-role-fields";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectStore } from "@/hooks/use-projects";
 import {
@@ -10,7 +11,12 @@ import {
 	type MembershipPermission,
 } from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
-import { PROJECT_ROLES } from "@/utils/roles";
+import {
+	CUSTOM_PROJECT_ROLE_ERROR,
+	PROJECT_ROLES,
+	type ProjectRoleOption,
+	resolveProjectRole,
+} from "@/utils/roles";
 
 export function InviteMemberModal() {
 	const { isInviteMemberModalOpen, closeInviteMemberModal } = useUIStore();
@@ -28,7 +34,13 @@ export function InviteMemberModal() {
 	const [email, setEmail] = useState("");
 	const [projectId, setProjectId] = useState("");
 	const [role, setRole] = useState<MembershipPermission>("member");
-	const [projectRole, setProjectRole] = useState(PROJECT_ROLES[0].toString());
+	const [projectRole, setProjectRole] = useState<ProjectRoleOption>(
+		PROJECT_ROLES[0],
+	);
+	const [customProjectRole, setCustomProjectRole] = useState("");
+	const [customProjectRoleError, setCustomProjectRoleError] = useState<
+		string | null
+	>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -49,20 +61,31 @@ export function InviteMemberModal() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!email.trim() || !projectId) return;
+		const resolvedProjectRole = resolveProjectRole(
+			projectRole,
+			customProjectRole,
+		);
+		if (!resolvedProjectRole) {
+			setCustomProjectRoleError(CUSTOM_PROJECT_ROLE_ERROR);
+			return;
+		}
 
 		setIsSubmitting(true);
 		setError(null);
+		setCustomProjectRoleError(null);
 
 		try {
 			const res = await inviteMemberAction({
 				projectId,
 				email: email.trim(),
 				role,
-				projectRole,
+				projectRole: resolvedProjectRole,
 			});
 
 			if (res.success) {
 				setEmail("");
+				setProjectRole(PROJECT_ROLES[0]);
+				setCustomProjectRole("");
 				closeInviteMemberModal();
 				useUIStore.getState().addToast({
 					type: "success",
@@ -95,7 +118,7 @@ export function InviteMemberModal() {
 				}
 			}}
 		>
-			<div className="bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
+			<div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
 				<div className="flex items-center justify-between mb-6">
 					<div>
 						<h3
@@ -197,23 +220,21 @@ export function InviteMemberModal() {
 						</select>
 					</div>
 
-					<div className="space-y-2">
-						<label htmlFor="projectRole" className="block text-sm font-medium">
-							Project Role
-						</label>
-						<select
-							id="projectRole"
-							value={projectRole}
-							onChange={(e) => setProjectRole(e.target.value)}
-							className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-						>
-							{PROJECT_ROLES.map((pr) => (
-								<option key={pr} value={pr}>
-									{pr}
-								</option>
-							))}
-						</select>
-					</div>
+					<ProjectRoleFields
+						idPrefix="invite-member"
+						selectedRole={projectRole}
+						customRole={customProjectRole}
+						onSelectedRoleChange={(nextRole) => {
+							setProjectRole(nextRole);
+							setCustomProjectRoleError(null);
+						}}
+						onCustomRoleChange={(nextRole) => {
+							setCustomProjectRole(nextRole);
+							setCustomProjectRoleError(null);
+						}}
+						error={customProjectRoleError}
+						description="Descriptive only; it does not grant access."
+					/>
 
 					<div className="flex justify-end gap-3 mt-6">
 						<button
