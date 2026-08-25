@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectBySlugAction } from "@/app/actions/projects";
 import { KanbanBoard } from "@/components/kanban-board";
+import { ProjectMembersModal } from "@/components/modals/project-members-modal";
 import { PresenceAvatars } from "@/components/presence-avatars";
 import { ProjectHeaderActions } from "@/components/project-header-actions";
 
@@ -34,7 +35,7 @@ export default async function ProjectPage({
 	const project = response.data;
 
 	return (
-		<div className="space-y-6">
+		<div className="mx-auto max-w-450 space-y-5">
 			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 				<div className="flex items-center space-x-2 sm:space-x-4">
 					<Link
@@ -59,7 +60,7 @@ export default async function ProjectPage({
 				</div>
 			</div>
 
-			<div className="flex-1 bg-card rounded-lg border border-border p-3 sm:p-4 lg:p-6 min-h-125 sm:min-h-150 overflow-hidden flex flex-col">
+			<div className="flex min-h-125 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-muted/30 p-2 sm:min-h-150 sm:p-3 lg:p-4">
 				<KanbanBoard
 					projectId={project.id}
 					projectName={project.name}
@@ -78,6 +79,13 @@ export default async function ProjectPage({
 					)}
 				/>
 			</div>
+
+			<ProjectMembersModal
+				project={project}
+				currentUserId={project.currentUserId}
+				permission={project.permission}
+				canManageMembers={project.capabilities.canManageMembers}
+			/>
 		</div>
 	);
 }

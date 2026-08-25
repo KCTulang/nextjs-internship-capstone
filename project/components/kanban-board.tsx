@@ -34,6 +34,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { BulkSelectionToolbar } from "./bulk-selection-toolbar";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";
+import { ProjectDeadlinesModal } from "./modals/project-deadlines-modal";
 import { TaskCard } from "./task-card";
 import { TaskDetailPanel } from "./task-detail-panel";
 
@@ -56,7 +57,14 @@ export function KanbanBoard({
 	const searchParams = useSearchParams();
 	const taskId = searchParams.get("taskId");
 
-	const { setMembers, applyRealtimeEvent, fetchBoard } = useTasksStore();
+	const {
+		lists,
+		setMembers,
+		applyRealtimeEvent,
+		fetchBoard,
+		isLoading,
+		error,
+	} = useTasksStore();
 	useEffect(() => {
 		if (members) setMembers(members);
 	}, [members, setMembers]);
@@ -115,6 +123,13 @@ export function KanbanBoard({
 			<BulkSelectionToolbar
 				projectId={projectId}
 				canMutateTasks={canMutateTasks}
+			/>
+			<ProjectDeadlinesModal
+				projectName={projectName}
+				lists={lists}
+				isLoading={isLoading}
+				error={error}
+				onRetry={() => void fetchBoard(projectId)}
 			/>
 		</>
 	);

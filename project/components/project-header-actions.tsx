@@ -1,95 +1,50 @@
 "use client";
 
-import {
-	Calendar,
-	MoreHorizontal,
-	Settings,
-	Trash2,
-	Users,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { CalendarDays, Settings, Users } from "lucide-react";
 import type { Project } from "@/hooks/use-projects";
-import { useProjectStore } from "@/hooks/use-projects";
 import { useUIStore } from "@/stores/ui-store";
 
 export function ProjectHeaderActions({ project }: { project: Project }) {
-	const { openEditProjectModal, openConfirmModal } = useUIStore();
-	const { deleteProject } = useProjectStore();
-	const router = useRouter();
-	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	const menuRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-				setIsMenuOpen(false);
-			}
-		};
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => document.removeEventListener("mousedown", handleClickOutside);
-	}, []);
-
-	const handleDelete = async () => {
-		setIsMenuOpen(false);
-		openConfirmModal({
-			title: "Delete project?",
-			description: `This will permanently delete "${project.name}" and its related project data. This action cannot be undone.`,
-			confirmText: "Delete Project",
-			onConfirm: async () => {
-				await deleteProject(project.id);
-				router.push("/dashboard");
-			},
-		});
-	};
+	const {
+		openEditProjectModal,
+		openProjectMembersModal,
+		openProjectDeadlinesModal,
+	} = useUIStore();
+	const canEditProject = project.capabilities?.canEditProject === true;
+	const controlClass =
+		"inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[430px]:px-3";
 
 	return (
-		<div className="flex items-center space-x-1 sm:space-x-2 w-full sm:w-auto">
+		<div className="flex w-full items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm sm:w-auto">
 			<button
 				type="button"
-				onClick={() => useUIStore.getState().openInviteMemberModal()}
-				className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
-				title="Team Members"
+				onClick={openProjectMembersModal}
+				className={controlClass}
+				title="Project members"
 			>
-				<Users size={20} />
+				<Users size={18} />
+				<span className="hidden min-[430px]:inline">Members</span>
 			</button>
 			<button
 				type="button"
-				onClick={() => router.push("/calendar")}
-				className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
-				title="Calendar View"
+				onClick={openProjectDeadlinesModal}
+				className={controlClass}
+				title="Project deadlines"
 			>
-				<Calendar size={20} />
+				<CalendarDays size={18} />
+				<span className="hidden min-[430px]:inline">Deadlines</span>
 			</button>
-			<button
-				type="button"
-				onClick={() => openEditProjectModal(project)}
-				className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
-				title="Project Settings"
-			>
-				<Settings size={20} />
-			</button>
-			<div className="relative" ref={menuRef}>
+			{canEditProject && (
 				<button
 					type="button"
-					onClick={() => setIsMenuOpen(!isMenuOpen)}
-					className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
-					title="More Options"
+					onClick={() => openEditProjectModal(project)}
+					className={controlClass}
+					title="Project settings"
 				>
-					<MoreHorizontal size={20} />
+					<Settings size={18} />
+					<span className="hidden min-[430px]:inline">Settings</span>
 				</button>
-				{isMenuOpen && (
-					<div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border shadow-lg rounded-xl overflow-hidden py-1 z-50 animate-in slide-in-from-top-2">
-						<button
-							type="button"
-							onClick={handleDelete}
-							className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2 font-medium"
-						>
-							<Trash2 size={16} /> Delete Project
-						</button>
-					</div>
-				)}
-			</div>
+			)}
 		</div>
 	);
 }
