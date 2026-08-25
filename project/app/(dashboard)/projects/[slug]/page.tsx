@@ -1,10 +1,24 @@
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectBySlugAction } from "@/app/actions/projects";
 import { KanbanBoard } from "@/components/kanban-board";
 import { PresenceAvatars } from "@/components/presence-avatars";
 import { ProjectHeaderActions } from "@/components/project-header-actions";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+	const { slug } = await params;
+	const response = await getProjectBySlugAction(slug);
+	if (!response.success || !response.data) {
+		return { title: "Project Not Found" };
+	}
+	return { title: response.data.name };
+}
 
 export default async function ProjectPage({
 	params,

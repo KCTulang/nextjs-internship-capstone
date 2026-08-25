@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { getTeamMembersAction } from "@/app/actions/members";
 import { getAnalyticsAction } from "@/app/actions/tasks";
 import { DashboardClient } from "./dashboard-client";
+
+export const metadata: Metadata = {
+	title: "Dashboard",
+};
 
 export default async function DashboardPage() {
 	const [analyticsRes, teamRes] = await Promise.all([

@@ -10,6 +10,12 @@ import { TeamPageClient } from "./team-page-client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+	title: "Team",
+};
+
 export default async function TeamPage() {
 	const { userId: clerkId } = await auth();
 	let currentUserId = "";

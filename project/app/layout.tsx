@@ -13,9 +13,16 @@ import { Toaster } from "@/components/toaster";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "LockIn — Tune out the noise",
+	title: {
+		default: "LockIn — Tune out the noise",
+		template: "%s | LockIn",
+	},
 	description:
 		"A Kanban workspace to manage your projects and execute your deliverables. Tune out the noise. Lock into your work.",
+	icons: {
+		icon: [{ url: "/LockLogo.svg", type: "image/svg+xml" }],
+		other: [{ rel: "mask-icon", url: "/LockLogo.svg" }],
+	},
 };
 
 export default function RootLayout({

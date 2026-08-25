@@ -1,12 +1,16 @@
+import type { Metadata } from "next";
 import { getAllUserTasksAction } from "@/app/actions/tasks";
 import {
 	CalendarGrid,
 	type CalendarTask,
 } from "@/components/calendar/calendar-grid";
 import { UpcomingDeadlines } from "@/components/calendar/upcoming-deadlines";
-
 import { TaskDetailPanel } from "@/components/task-detail-panel";
 import { isDateOnly } from "@/utils/date-only";
+
+export const metadata: Metadata = {
+	title: "Calendar",
+};
 
 export default async function CalendarPage(props: {
 	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

@@ -1,6 +1,11 @@
 import { BarChart3, Clock, TrendingUp, Users } from "lucide-react";
+import type { Metadata } from "next";
 import { getTeamMembersAction } from "@/app/actions/members";
 import { getAnalyticsAction } from "@/app/actions/tasks";
+
+export const metadata: Metadata = {
+	title: "Analytics",
+};
 
 export default async function AnalyticsPage() {
 	const analyticsRes = await getAnalyticsAction();

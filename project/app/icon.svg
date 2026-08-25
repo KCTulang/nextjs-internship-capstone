@@ -1,0 +1,36 @@
+<svg width="28" height="50" viewBox="0 0 28 50" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LockIn Logo Compact">
+<title>LockIn Logo Compact</title>
+<mask id="mask0_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="28" height="50">
+<path d="M28 0H0V50H28V0Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_21_584)">
+<path d="M20.0273 16.857H26.8683V45.4193L7.96915 31.4898V45.4193H1.12924V16.857L20.0273 31.4458V16.857Z" fill="#0F172A"/>
+</g>
+<path d="M4.62857 8.02924V5.64758C4.62857 4.33231 5.69272 3.2662 7.00522 3.2662H17.6861C20.8254 3.2662 23.3704 5.81625 23.3704 8.9624V15.478" stroke="#0F172A" stroke-width="6.5"/>
+<mask id="mask1_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="9" width="7" height="7">
+<path d="M1.1124 9.17392H7.91667V15.9926H1.1124V9.17392Z" fill="white"/>
+</mask>
+<g mask="url(#mask1_21_584)">
+<mask id="mask2_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="9" width="7" height="7">
+<path d="M4.51453 9.17392C2.6357 9.17392 1.1124 10.7002 1.1124 12.5832C1.1124 14.466 2.6357 15.9926 4.51453 15.9926C6.39337 15.9926 7.91667 14.466 7.91667 12.5832C7.91667 10.7002 6.39337 9.17392 4.51453 9.17392Z" fill="white"/>
+</mask>
+<g mask="url(#mask2_21_584)">
+<mask id="mask3_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="9" width="7" height="8">
+<path d="M7.92982 9.14205H1.05263V16.0338H7.92982V9.14205Z" fill="white"/>
+</mask>
+<g mask="url(#mask3_21_584)">
+<mask id="mask4_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="9" width="7" height="7">
+<path d="M1.11237 9.17391H7.91664V15.9925H1.11237V9.17391Z" fill="white"/>
+</mask>
+<g mask="url(#mask4_21_584)">
+<mask id="mask5_21_584" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="1" y="9" width="7" height="7">
+<path d="M4.5145 9.17391C2.63567 9.17391 1.11237 10.7002 1.11237 12.5832C1.11237 14.466 2.63567 15.9925 4.5145 15.9925C6.39334 15.9925 7.91664 14.466 7.91664 12.5832C7.91664 10.7002 6.39334 9.17391 4.5145 9.17391Z" fill="white"/>
+</mask>
+<g mask="url(#mask5_21_584)">
+<path d="M1.11237 9.17391H7.91664V15.9925H1.11237V9.17391Z" fill="#0F172A"/>
+</g>
+</g>
+</g>
+</g>
+</g>
+</svg>
