@@ -155,11 +155,11 @@ export function KanbanColumn({
 		<div
 			ref={setSortableNodeRef}
 			style={style}
-			className={`flex flex-col shrink-0 max-h-full transition-colors duration-200
+			className={`flex shrink-0 flex-col max-h-full transition-colors duration-200
 				bg-card dark:bg-white/3 border
 				${isOver ? "border-primary/50 shadow-lg shadow-primary/10" : "border-border/60"}
-				backdrop-blur-sm group/column
-				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-68.75 sm:w-75 rounded-2xl"}
+				backdrop-blur-sm shadow-sm group/column
+				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-68.75 self-start rounded-2xl sm:w-75"}
 			`}
 		>
 			<div
@@ -167,7 +167,7 @@ export function KanbanColumn({
 				style={{ background: color.accent }}
 			/>
 
-			<div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
+			<div className="flex items-center justify-between gap-2 border-b border-border/50 px-4 pt-3 pb-3">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					{!isMobileView && canManageColumns && (
 						<div
@@ -335,7 +335,7 @@ export function KanbanColumn({
 
 			<div
 				ref={setDroppableNodeRef}
-				className={`flex-1 overflow-y-auto px-3 pb-3 space-y-2.5 min-h-30 transition-colors duration-150 ${
+				className={`min-h-24 space-y-2.5 overflow-y-auto px-3 pt-3 pb-2 transition-colors duration-150 ${
 					isOver ? "bg-primary/3 rounded-b-2xl" : ""
 				}`}
 			>
@@ -358,7 +358,7 @@ export function KanbanColumn({
 
 				{(list.tasks?.length || 0) === 0 && (
 					<div
-						className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+						className={`rounded-xl border border-dashed px-4 py-3 text-center transition-colors ${
 							isOver ? `${color.border} ${color.bg}` : "border-border/40"
 						}`}
 					>

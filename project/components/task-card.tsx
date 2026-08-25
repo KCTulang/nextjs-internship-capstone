@@ -188,7 +188,7 @@ export function TaskCard({
 					}
 				}}
 				onClick={handleCardClick}
-				className={`text-left w-full h-full bg-card dark:bg-white/2 border rounded-xl p-3.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+				className={`h-full w-full cursor-pointer rounded-xl border bg-card p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-white/2 ${
 					isSelected && (!isDragging || isOverlay)
 						? "border-primary ring-1 ring-primary"
 						: "border-border/60 hover:border-border"
@@ -236,7 +236,7 @@ export function TaskCard({
 					)}
 				</div>
 
-				<div className="flex items-center justify-between mt-4 pl-2">
+				<div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3 pl-2">
 					<div className="flex items-center gap-2">
 						<span
 							className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${pColor} uppercase tracking-wider`}

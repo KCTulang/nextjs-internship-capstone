@@ -379,110 +379,108 @@ function DesktopKanbanBoard({
 	};
 
 	return (
-		<>
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragStart={handleDragStart}
-				onDragEnd={handleDragEnd}
+		<DndContext
+			sensors={sensors}
+			collisionDetection={closestCenter}
+			onDragStart={handleDragStart}
+			onDragEnd={handleDragEnd}
+		>
+			<div
+				ref={boardScrollRef}
+				className={`flex h-[calc(100vh-180px)] items-start gap-4 overflow-x-auto overflow-y-hidden pb-4 sm:h-[calc(100vh-160px)] sm:gap-5 sm:pb-5 lg:h-[calc(100vh-140px)] ${isSyncing ? "pointer-events-none opacity-80" : ""}`}
 			>
-				<div
-					ref={boardScrollRef}
-					className={`flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin ${isSyncing ? "pointer-events-none opacity-80" : ""}`}
+				<SortableContext
+					items={lists.map((l) => l.id)}
+					strategy={rectSortingStrategy}
 				>
-					<SortableContext
-						items={lists.map((l) => l.id)}
-						strategy={rectSortingStrategy}
-					>
-						{lists.map((list) => (
-							<KanbanColumn
-								key={list.id}
-								list={list}
-								projectId={projectId}
-								projectName={projectName}
-								canManageColumns={canManageColumns}
-								canMutateTasks={canMutateTasks}
-							/>
-						))}
-					</SortableContext>
+					{lists.map((list) => (
+						<KanbanColumn
+							key={list.id}
+							list={list}
+							projectId={projectId}
+							projectName={projectName}
+							canManageColumns={canManageColumns}
+							canMutateTasks={canMutateTasks}
+						/>
+					))}
+				</SortableContext>
 
-					{canManageColumns && (
-						<div className="shrink-0 w-68.75 sm:w-75">
-							{isAddingList ? (
-								<div className="bg-card dark:bg-white/3 border border-border/60 rounded-2xl p-3 shadow-sm">
-									<input
-										ref={addListInputRef}
-										type="text"
-										placeholder="Enter list title..."
-										value={newListTitle}
-										onChange={(e) => setNewListTitle(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") void commitAddList();
-											if (e.key === "Escape") {
-												setNewListTitle("");
-												setIsAddingList(false);
-											}
+				{canManageColumns && (
+					<div className="shrink-0 w-68.75 sm:w-75">
+						{isAddingList ? (
+							<div className="bg-card dark:bg-white/3 border border-border/60 rounded-2xl p-3 shadow-sm">
+								<input
+									ref={addListInputRef}
+									type="text"
+									placeholder="Enter list title..."
+									value={newListTitle}
+									onChange={(e) => setNewListTitle(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") void commitAddList();
+										if (e.key === "Escape") {
+											setNewListTitle("");
+											setIsAddingList(false);
+										}
+									}}
+									className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+								/>
+								<div className="flex items-center gap-2 mt-3">
+									<button
+										type="button"
+										onClick={() => void commitAddList()}
+										disabled={isCreatingList}
+										className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+									>
+										{isCreatingList ? "Adding..." : "Add List"}
+									</button>
+									<button
+										type="button"
+										onClick={() => {
+											setNewListTitle("");
+											setIsAddingList(false);
 										}}
-										className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
-									/>
-									<div className="flex items-center gap-2 mt-3">
-										<button
-											type="button"
-											onClick={() => void commitAddList()}
-											disabled={isCreatingList}
-											className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-										>
-											{isCreatingList ? "Adding..." : "Add List"}
-										</button>
-										<button
-											type="button"
-											onClick={() => {
-												setNewListTitle("");
-												setIsAddingList(false);
-											}}
-											className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
-										>
-											<X size={16} />
-										</button>
-									</div>
+										className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+									>
+										<X size={16} />
+									</button>
 								</div>
-							) : (
-								<button
-									type="button"
-									onClick={() => setIsAddingList(true)}
-									className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
-								>
-									<Plus size={18} />
-									<span className="font-medium text-sm">Add column</span>
-								</button>
-							)}
-						</div>
-					)}
-				</div>
+							</div>
+						) : (
+							<button
+								type="button"
+								onClick={() => setIsAddingList(true)}
+								className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
+							>
+								<Plus size={18} />
+								<span className="font-medium text-sm">Add column</span>
+							</button>
+						)}
+					</div>
+				)}
+			</div>
 
-				<DragOverlay>
-					{activeColumn ? (
-						<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
-							<KanbanColumn
-								list={activeColumn}
-								projectId={projectId}
-								projectName={projectName}
-								canManageColumns={canManageColumns}
-								canMutateTasks={canMutateTasks}
-								isOverlay
-							/>
-						</div>
-					) : activeTask ? (
-						<div className="cursor-grabbing pointer-events-none">
-							<TaskCard
-								task={activeTask}
-								isOverlay
-								canMutateTasks={canMutateTasks}
-							/>
-						</div>
-					) : null}
-				</DragOverlay>
-			</DndContext>
-		</>
+			<DragOverlay>
+				{activeColumn ? (
+					<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
+						<KanbanColumn
+							list={activeColumn}
+							projectId={projectId}
+							projectName={projectName}
+							canManageColumns={canManageColumns}
+							canMutateTasks={canMutateTasks}
+							isOverlay
+						/>
+					</div>
+				) : activeTask ? (
+					<div className="cursor-grabbing pointer-events-none">
+						<TaskCard
+							task={activeTask}
+							isOverlay
+							canMutateTasks={canMutateTasks}
+						/>
+					</div>
+				) : null}
+			</DragOverlay>
+		</DndContext>
 	);
 }
