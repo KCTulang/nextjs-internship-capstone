@@ -26,7 +26,7 @@ export async function saveFocusSession(data: {
 	taskId: string;
 	startTime: Date;
 	endTime: Date;
-	duration: number; // in seconds
+	duration: number;
 }) {
 	try {
 		const user = await requireAuth();

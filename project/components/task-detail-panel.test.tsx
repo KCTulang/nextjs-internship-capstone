@@ -52,7 +52,7 @@ vi.mock("@/hooks/use-collaboration", () => ({
 	}),
 }));
 vi.mock("@/hooks/use-media-query", () => ({
-	useMediaQuery: vi.fn().mockReturnValue(true), // assume desktop
+	useMediaQuery: vi.fn().mockReturnValue(true),
 }));
 
 class ResizeObserver {
@@ -149,7 +149,7 @@ describe("TaskDetailPanel", () => {
 		const titleInput = titleInputs[0];
 		await user.clear(titleInput);
 		await user.type(titleInput, "Updated Task");
-		fireEvent.blur(titleInput); // explicitly trigger blur
+		fireEvent.blur(titleInput);
 
 		await waitFor(() => {
 			expect(mockUpdateTaskDetails).toHaveBeenCalledWith(
