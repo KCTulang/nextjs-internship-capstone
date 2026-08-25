@@ -31,8 +31,11 @@ import {
 	useTasksStore,
 } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
+import { BulkSelectionToolbar } from "./bulk-selection-toolbar";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";
+import { ProjectDeadlinesModal } from "./modals/project-deadlines-modal";
+import { KanbanBoardSkeleton } from "./skeletons/kanban-board-skeleton";
 import { TaskCard } from "./task-card";
 import { TaskDetailPanel } from "./task-detail-panel";
 
@@ -41,6 +44,7 @@ interface KanbanBoardProps {
 	projectName: string;
 	members?: Member[];
 	canManageColumns?: boolean;
+	canMutateTasks?: boolean;
 }
 
 export function KanbanBoard({
@@ -48,12 +52,20 @@ export function KanbanBoard({
 	projectName,
 	members,
 	canManageColumns = false,
+	canMutateTasks = true,
 }: KanbanBoardProps) {
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const searchParams = useSearchParams();
 	const taskId = searchParams.get("taskId");
 
-	const { setMembers, applyRealtimeEvent, fetchBoard } = useTasksStore();
+	const {
+		lists,
+		setMembers,
+		applyRealtimeEvent,
+		fetchBoard,
+		isLoading,
+		error,
+	} = useTasksStore();
 	useEffect(() => {
 		if (members) setMembers(members);
 	}, [members, setMembers]);
@@ -81,10 +93,7 @@ export function KanbanBoard({
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
 
-	if (!mounted)
-		return (
-			<div className="h-[calc(100vh-140px)] animate-pulse bg-muted/20 rounded-2xl" />
-		);
+	if (!mounted) return <KanbanBoardSkeleton />;
 
 	return (
 		<>
@@ -93,18 +102,32 @@ export function KanbanBoard({
 					projectId={projectId}
 					projectName={projectName}
 					canManageColumns={canManageColumns}
+					canMutateTasks={canMutateTasks}
 				/>
 			) : (
 				<MobileKanbanBoard
 					projectId={projectId}
 					projectName={projectName}
 					canManageColumns={canManageColumns}
+					canMutateTasks={canMutateTasks}
 				/>
 			)}
 			<TaskDetailPanel
 				key={taskId ?? "empty"}
 				taskId={taskId}
 				projectId={projectId}
+				readOnly={!canMutateTasks}
+			/>
+			<BulkSelectionToolbar
+				projectId={projectId}
+				canMutateTasks={canMutateTasks}
+			/>
+			<ProjectDeadlinesModal
+				projectName={projectName}
+				lists={lists}
+				isLoading={isLoading}
+				error={error}
+				onRetry={() => void fetchBoard(projectId)}
 			/>
 		</>
 	);
@@ -114,6 +137,7 @@ function DesktopKanbanBoard({
 	projectId,
 	projectName,
 	canManageColumns = false,
+	canMutateTasks = true,
 }: KanbanBoardProps) {
 	const {
 		lists,
@@ -135,14 +159,9 @@ function DesktopKanbanBoard({
 	const addListInputRef = useRef<HTMLInputElement>(null);
 	const boardScrollRef = useRef<HTMLDivElement>(null);
 
-	const {
-		selectedTaskIds,
-		clearSelection,
-		deleteSelectedTasks,
-		moveSelectedTasks,
-	} = useTasksStore();
-	const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
-	const { openCreateTaskModal } = useUIStore();
+	const { selectedTaskIds, clearSelection, deleteSelectedTasks } =
+		useTasksStore();
+	const { openCreateTaskModal, openConfirmModal } = useUIStore();
 
 	useEffect(() => {
 		fetchBoard(projectId);
@@ -172,17 +191,21 @@ function DesktopKanbanBoard({
 
 			if (e.key === "Escape" && selectedTaskIds.length > 0) {
 				clearSelection();
-				setIsBulkMoveOpen(false);
 			} else if (
+				canMutateTasks &&
 				(e.key === "Delete" || e.key === "Backspace") &&
 				selectedTaskIds.length > 0
 			) {
-				if (
-					window.confirm(`Delete ${selectedTaskIds.length} selected task(s)?`)
-				) {
-					deleteSelectedTasks(projectId);
-				}
-			} else if (e.key.toLowerCase() === "n") {
+				const count = selectedTaskIds.length;
+				openConfirmModal({
+					title: "Delete tasks?",
+					description: `This will permanently delete ${count} selected task${count === 1 ? "" : "s"}. This action cannot be undone.`,
+					confirmText: "Delete Tasks",
+					onConfirm: async () => {
+						await deleteSelectedTasks(projectId);
+					},
+				});
+			} else if (canMutateTasks && e.key.toLowerCase() === "n") {
 				if (lists.length > 0) {
 					e.preventDefault();
 					openCreateTaskModal({
@@ -204,6 +227,8 @@ function DesktopKanbanBoard({
 		clearSelection,
 		deleteSelectedTasks,
 		openCreateTaskModal,
+		openConfirmModal,
+		canMutateTasks,
 	]);
 
 	const sensors = useSensors(
@@ -217,19 +242,8 @@ function DesktopKanbanBoard({
 		}),
 	);
 
-	if (isLoading) {
-		return (
-			<div className="flex-1 flex items-center justify-center p-8 h-full">
-				<div className="animate-pulse flex gap-6 overflow-x-auto w-full h-150">
-					{[1, 2, 3].map((i) => (
-						<div
-							key={i}
-							className="w-75 bg-card border border-border/50 rounded-2xl shrink-0"
-						/>
-					))}
-				</div>
-			</div>
-		);
+	if (isLoading && lists.length === 0) {
+		return <KanbanBoardSkeleton />;
 	}
 
 	if (error) {
@@ -287,6 +301,7 @@ function DesktopKanbanBoard({
 	}
 
 	function handleDragStart(event: DragStartEvent) {
+		if (!canMutateTasks) return;
 		const { active } = event;
 		if (active.data.current?.type === "Task") {
 			setActiveTask(active.data.current.task);
@@ -296,6 +311,7 @@ function DesktopKanbanBoard({
 	}
 
 	function handleDragEnd(event: DragEndEvent) {
+		if (!canMutateTasks) return;
 		const { active, over } = event;
 		setActiveTask(null);
 		setActiveColumn(null);
@@ -363,170 +379,108 @@ function DesktopKanbanBoard({
 	};
 
 	return (
-		<>
-			{selectedTaskIds.length > 0 && (
-				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5">
-					<div className="flex items-center gap-2 px-2 border-r border-background/20 font-medium">
-						<span className="bg-background text-foreground w-6 h-6 flex items-center justify-center rounded-full text-xs">
-							{selectedTaskIds.length}
-						</span>
-						<span className="text-sm">selected</span>
-					</div>
+		<DndContext
+			sensors={sensors}
+			collisionDetection={closestCenter}
+			onDragStart={handleDragStart}
+			onDragEnd={handleDragEnd}
+		>
+			<div
+				ref={boardScrollRef}
+				className={`flex h-[calc(100vh-180px)] items-start gap-4 overflow-x-auto overflow-y-hidden pb-4 sm:h-[calc(100vh-160px)] sm:gap-5 sm:pb-5 lg:h-[calc(100vh-140px)] ${isSyncing ? "pointer-events-none opacity-80" : ""}`}
+			>
+				<SortableContext
+					items={lists.map((l) => l.id)}
+					strategy={rectSortingStrategy}
+				>
+					{lists.map((list) => (
+						<KanbanColumn
+							key={list.id}
+							list={list}
+							projectId={projectId}
+							projectName={projectName}
+							canManageColumns={canManageColumns}
+							canMutateTasks={canMutateTasks}
+						/>
+					))}
+				</SortableContext>
 
-					<div className="flex items-center gap-2">
-						<div className="relative">
+				{canManageColumns && (
+					<div className="shrink-0 w-68.75 sm:w-75">
+						{isAddingList ? (
+							<div className="bg-card dark:bg-white/3 border border-border/60 rounded-2xl p-3 shadow-sm">
+								<input
+									ref={addListInputRef}
+									type="text"
+									placeholder="Enter list title..."
+									value={newListTitle}
+									onChange={(e) => setNewListTitle(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") void commitAddList();
+										if (e.key === "Escape") {
+											setNewListTitle("");
+											setIsAddingList(false);
+										}
+									}}
+									className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+								/>
+								<div className="flex items-center gap-2 mt-3">
+									<button
+										type="button"
+										onClick={() => void commitAddList()}
+										disabled={isCreatingList}
+										className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+									>
+										{isCreatingList ? "Adding..." : "Add List"}
+									</button>
+									<button
+										type="button"
+										onClick={() => {
+											setNewListTitle("");
+											setIsAddingList(false);
+										}}
+										className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
+									>
+										<X size={16} />
+									</button>
+								</div>
+							</div>
+						) : (
 							<button
 								type="button"
-								onClick={() => setIsBulkMoveOpen(!isBulkMoveOpen)}
-								className="text-sm px-3 py-1.5 hover:bg-background/20 rounded-lg transition-colors flex items-center gap-2"
+								onClick={() => setIsAddingList(true)}
+								className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
 							>
-								Move to...
+								<Plus size={18} />
+								<span className="font-medium text-sm">Add column</span>
 							</button>
-							{isBulkMoveOpen && (
-								<div className="absolute bottom-full left-0 mb-2 w-48 bg-card text-foreground border border-border rounded-xl shadow-xl overflow-hidden py-1">
-									{lists.map((list) => (
-										<button
-											type="button"
-											key={list.id}
-											onClick={() => {
-												moveSelectedTasks(list.id, projectId);
-												setIsBulkMoveOpen(false);
-											}}
-											className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-										>
-											{list.name}
-										</button>
-									))}
-								</div>
-							)}
-						</div>
-
-						<button
-							type="button"
-							onClick={() => {
-								if (
-									window.confirm(
-										`Delete ${selectedTaskIds.length} selected task(s)?`,
-									)
-								) {
-									deleteSelectedTasks(projectId);
-								}
-							}}
-							className="text-sm px-3 py-1.5 hover:bg-destructive hover:text-destructive-foreground text-destructive/90 rounded-lg transition-colors"
-						>
-							Delete
-						</button>
-
-						<button
-							type="button"
-							onClick={() => {
-								clearSelection();
-								setIsBulkMoveOpen(false);
-							}}
-							className="text-sm p-1.5 hover:bg-background/20 rounded-lg transition-colors ml-2"
-						>
-							<X size={16} />
-						</button>
+						)}
 					</div>
-				</div>
-			)}
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragStart={handleDragStart}
-				onDragEnd={handleDragEnd}
-			>
-				<div
-					ref={boardScrollRef}
-					className={`flex h-[calc(100vh-180px)] sm:h-[calc(100vh-160px)] lg:h-[calc(100vh-140px)] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-4 sm:pb-6 scrollbar-thin ${isSyncing ? "pointer-events-none opacity-80" : ""}`}
-				>
-					<SortableContext
-						items={lists.map((l) => l.id)}
-						strategy={rectSortingStrategy}
-					>
-						{lists.map((list) => (
-							<KanbanColumn
-								key={list.id}
-								list={list}
-								projectId={projectId}
-								projectName={projectName}
-								canManageColumns={canManageColumns}
-							/>
-						))}
-					</SortableContext>
+				)}
+			</div>
 
-					{canManageColumns && (
-						<div className="shrink-0 w-68.75 sm:w-75">
-							{isAddingList ? (
-								<div className="bg-card dark:bg-white/3 border border-border/60 rounded-2xl p-3 shadow-sm">
-									<input
-										ref={addListInputRef}
-										type="text"
-										placeholder="Enter list title..."
-										value={newListTitle}
-										onChange={(e) => setNewListTitle(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") void commitAddList();
-											if (e.key === "Escape") {
-												setNewListTitle("");
-												setIsAddingList(false);
-											}
-										}}
-										className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
-									/>
-									<div className="flex items-center gap-2 mt-3">
-										<button
-											type="button"
-											onClick={() => void commitAddList()}
-											disabled={isCreatingList}
-											className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-										>
-											{isCreatingList ? "Adding..." : "Add List"}
-										</button>
-										<button
-											type="button"
-											onClick={() => {
-												setNewListTitle("");
-												setIsAddingList(false);
-											}}
-											className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors"
-										>
-											<X size={16} />
-										</button>
-									</div>
-								</div>
-							) : (
-								<button
-									type="button"
-									onClick={() => setIsAddingList(true)}
-									className="flex items-center gap-2 w-full px-4 py-3.5 bg-card/50 hover:bg-card border-2 border-dashed border-border/60 hover:border-border text-muted-foreground hover:text-foreground rounded-2xl transition-all"
-								>
-									<Plus size={18} />
-									<span className="font-medium text-sm">Add column</span>
-								</button>
-							)}
-						</div>
-					)}
-				</div>
-
-				<DragOverlay>
-					{activeColumn ? (
-						<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
-							<KanbanColumn
-								list={activeColumn}
-								projectId={projectId}
-								projectName={projectName}
-								canManageColumns={canManageColumns}
-								isOverlay
-							/>
-						</div>
-					) : activeTask ? (
-						<div className="cursor-grabbing pointer-events-none">
-							<TaskCard task={activeTask} isOverlay />
-						</div>
-					) : null}
-				</DragOverlay>
-			</DndContext>
-		</>
+			<DragOverlay>
+				{activeColumn ? (
+					<div className="rotate-2 scale-105 shadow-2xl opacity-90 cursor-grabbing pointer-events-none">
+						<KanbanColumn
+							list={activeColumn}
+							projectId={projectId}
+							projectName={projectName}
+							canManageColumns={canManageColumns}
+							canMutateTasks={canMutateTasks}
+							isOverlay
+						/>
+					</div>
+				) : activeTask ? (
+					<div className="cursor-grabbing pointer-events-none">
+						<TaskCard
+							task={activeTask}
+							isOverlay
+							canMutateTasks={canMutateTasks}
+						/>
+					</div>
+				) : null}
+			</DragOverlay>
+		</DndContext>
 	);
 }

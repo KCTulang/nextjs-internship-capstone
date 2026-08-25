@@ -10,6 +10,12 @@ import { TeamPageClient } from "./team-page-client";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+	title: "Team",
+};
+
 export default async function TeamPage() {
 	const { userId: clerkId } = await auth();
 	let currentUserId = "";
@@ -28,6 +34,11 @@ export default async function TeamPage() {
 	const members = teamRes.success ? (teamRes.data ?? []) : [];
 	const myInvites = myInvitesRes.success ? (myInvitesRes.data ?? []) : [];
 	const sentInvites = sentInvitesRes.success ? (sentInvitesRes.data ?? []) : [];
+	const initialLoadError = [
+		teamRes.success ? null : teamRes.error,
+		myInvitesRes.success ? null : myInvitesRes.error,
+		sentInvitesRes.success ? null : sentInvitesRes.error,
+	].find((error): error is string => Boolean(error));
 
 	return (
 		<TeamPageClient
@@ -35,6 +46,7 @@ export default async function TeamPage() {
 			initialMyInvites={myInvites}
 			initialSentInvites={sentInvites}
 			currentUserId={currentUserId}
+			initialLoadError={initialLoadError}
 		/>
 	);
 }

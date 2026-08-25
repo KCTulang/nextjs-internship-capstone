@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { type RefObject, useEffect, useRef } from "react";
 import { cn } from "@/utils";
 
@@ -77,30 +78,40 @@ export function Modal({
 		};
 	}, [isOpen]);
 
-	if (!isOpen) return null;
-
 	return (
-		<div
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby={labelledBy}
-			aria-label={labelledBy ? undefined : title || "Dialog window"}
-			className="fixed inset-0 z-200 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 text-left"
-			onMouseDown={(e) => {
-				if (e.target === e.currentTarget) {
-					onClose();
-				}
-			}}
-		>
-			<div
-				ref={modalRef}
-				className={cn(
-					"bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200",
-					className,
-				)}
-			>
-				{children}
-			</div>
-		</div>
+		<AnimatePresence>
+			{isOpen && (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					exit={{ opacity: 0 }}
+					transition={{ duration: 0.15, ease: "easeOut" }}
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby={labelledBy}
+					aria-label={labelledBy ? undefined : title || "Dialog window"}
+					className="fixed inset-0 z-200 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 sm:p-6 text-left"
+					onMouseDown={(e) => {
+						if (e.target === e.currentTarget) {
+							onClose();
+						}
+					}}
+				>
+					<motion.div
+						ref={modalRef}
+						initial={{ scale: 0.98, opacity: 0 }}
+						animate={{ scale: 1, opacity: 1 }}
+						exit={{ scale: 0.98, opacity: 0 }}
+						transition={{ duration: 0.15, ease: "easeOut" }}
+						className={cn(
+							"bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md",
+							className,
+						)}
+					>
+						{children}
+					</motion.div>
+				</motion.div>
+			)}
+		</AnimatePresence>
 	);
 }

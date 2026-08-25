@@ -52,7 +52,7 @@ vi.mock("@/hooks/use-collaboration", () => ({
 	}),
 }));
 vi.mock("@/hooks/use-media-query", () => ({
-	useMediaQuery: vi.fn().mockReturnValue(true), // assume desktop
+	useMediaQuery: vi.fn().mockReturnValue(true),
 }));
 
 class ResizeObserver {
@@ -149,7 +149,7 @@ describe("TaskDetailPanel", () => {
 		const titleInput = titleInputs[0];
 		await user.clear(titleInput);
 		await user.type(titleInput, "Updated Task");
-		fireEvent.blur(titleInput); // explicitly trigger blur
+		fireEvent.blur(titleInput);
 
 		await waitFor(() => {
 			expect(mockUpdateTaskDetails).toHaveBeenCalledWith(
@@ -175,5 +175,25 @@ describe("TaskDetailPanel", () => {
 				"proj-1",
 			);
 		});
+	});
+
+	it("renders task details without mutation controls in read-only mode", async () => {
+		const { container } = render(
+			<TaskDetailPanel taskId="task-1" projectId="proj-1" readOnly />,
+		);
+
+		await waitFor(() => {
+			const title = container.querySelector(
+				'textarea[placeholder="Task Title"]',
+			);
+			expect(title).toHaveProperty("readOnly", true);
+		});
+		for (const select of container.querySelectorAll("select")) {
+			expect(select).toBeDisabled();
+		}
+		expect(container.querySelector('[title="Delete Task"]')).toBeNull();
+		expect(
+			container.querySelector('textarea[placeholder="Write a comment..."]'),
+		).toBeNull();
 	});
 });

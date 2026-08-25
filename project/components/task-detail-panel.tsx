@@ -10,10 +10,12 @@ import {
 	getCommentsAction,
 } from "@/app/actions/comments";
 import type { CalendarTask } from "@/components/calendar/calendar-grid";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCollaboration } from "@/hooks/use-collaboration";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { type Task, useTasksStore } from "@/stores/board-store";
 import { useFocusStore } from "@/stores/focus-store";
+import { useUIStore } from "@/stores/ui-store";
 import { formatFocusDuration } from "@/utils";
 
 interface TaskDetailPanelProps {
@@ -22,6 +24,89 @@ interface TaskDetailPanelProps {
 	initialTask?: Task | CalendarTask | null;
 	onClose?: () => void;
 	onUpdate?: () => void;
+	readOnly?: boolean;
+}
+
+const taskFieldSkeletonIds = [
+	"status",
+	"priority",
+	"assignee",
+	"due-date",
+	"labels",
+];
+const commentSkeletonIds = ["comment-one", "comment-two"];
+const activitySkeletonIds = ["activity-one", "activity-two", "activity-three"];
+
+function TaskDetailPanelSkeleton({
+	isDesktop,
+	onClose,
+}: {
+	isDesktop: boolean;
+	onClose: () => void;
+}) {
+	return (
+		<AnimatePresence>
+			<motion.div
+				key="loading-backdrop"
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				exit={{ opacity: 0 }}
+				onClick={onClose}
+				className="fixed inset-0 z-50 bg-background/80"
+			/>
+			<motion.div
+				key="loading-panel"
+				initial={isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 }}
+				animate={{ x: 0, y: 0 }}
+				exit={isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 }}
+				transition={{ type: "spring", damping: 30, stiffness: 300 }}
+				className={`fixed z-50 overflow-y-auto border-border bg-background shadow-2xl ${
+					isDesktop
+						? "top-0 right-0 bottom-0 w-150 border-l"
+						: "right-0 bottom-0 left-0 h-[90vh] rounded-t-3xl border-t"
+				}`}
+				role="dialog"
+				aria-modal="true"
+				aria-busy="true"
+				aria-label="Loading task details"
+			>
+				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-4 backdrop-blur-md">
+					<Skeleton className="h-3 w-24" />
+					<button
+						type="button"
+						onClick={onClose}
+						aria-label="Close task details"
+						className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+					>
+						<X size={20} />
+					</button>
+				</div>
+				<div className="px-6 py-8" aria-hidden="true">
+					<Skeleton className="h-9 w-4/5" />
+					<div className="mt-8 max-w-md space-y-3">
+						{taskFieldSkeletonIds.map((id) => (
+							<div
+								key={id}
+								className="flex h-11 items-center gap-4 rounded-xl border border-border bg-card px-4"
+							>
+								<Skeleton className="h-3 w-24" />
+								<Skeleton className="h-3 flex-1" />
+							</div>
+						))}
+					</div>
+					<div className="mt-8 max-w-md rounded-xl border border-border bg-card p-4">
+						<Skeleton className="h-6 w-28" />
+						<Skeleton className="mt-3 h-3 w-48" />
+					</div>
+					<div className="mt-10 space-y-3 border-t border-border pt-8">
+						<Skeleton className="h-4 w-full" />
+						<Skeleton className="h-4 w-11/12" />
+						<Skeleton className="h-4 w-3/4" />
+					</div>
+				</div>
+			</motion.div>
+		</AnimatePresence>
+	);
 }
 
 export function TaskDetailPanel({
@@ -30,11 +115,14 @@ export function TaskDetailPanel({
 	initialTask,
 	onClose,
 	onUpdate,
+	readOnly = false,
 }: TaskDetailPanelProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const { lists, members, updateTaskDetails, deleteTask } = useTasksStore();
+	const { lists, members, updateTaskDetails, deleteTask, isLoading } =
+		useTasksStore();
+	const { openConfirmModal } = useUIStore();
 	const { startLockIn, isLockedIn } = useFocusStore();
 	const isDesktop = useMediaQuery("(min-width: 768px)");
 	const [mounted, setMounted] = useState(false);
@@ -87,6 +175,8 @@ export function TaskDetailPanel({
 	const [newComment, setNewComment] = useState("");
 	const [isCommentsLoading, setIsCommentsLoading] = useState(false);
 	const [isActivityLoading, setIsActivityLoading] = useState(false);
+	const [commentsError, setCommentsError] = useState<string | null>(null);
+	const [activityError, setActivityError] = useState<string | null>(null);
 	const titleRef = useRef<HTMLTextAreaElement>(null);
 
 	type FocusSession = {
@@ -95,17 +185,68 @@ export function TaskDetailPanel({
 		startTime: Date;
 	};
 	const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+	const [isFocusLoading, setIsFocusLoading] = useState(false);
+	const [focusError, setFocusError] = useState<string | null>(null);
 
-	const fetchFocusSessions = useCallback((id: string) => {
-		import("@/app/actions/focus-sessions").then(
-			({ getFocusSessionsByTaskAction }) => {
-				getFocusSessionsByTaskAction(id).then((res) => {
-					if (res.success && res.data) {
-						setFocusSessions(res.data as unknown as FocusSession[]);
-					}
-				});
-			},
-		);
+	const fetchFocusSessions = useCallback(async (id: string) => {
+		setIsFocusLoading(true);
+		setFocusError(null);
+		try {
+			const { getFocusSessionsByTaskAction } = await import(
+				"@/app/actions/focus-sessions"
+			);
+			const res = await getFocusSessionsByTaskAction(id);
+			if (res.success && res.data) {
+				setFocusSessions(res.data as unknown as FocusSession[]);
+			} else {
+				setFocusError(res.error || "Unable to load focus history.");
+			}
+		} catch {
+			setFocusError("Unable to load focus history.");
+		} finally {
+			setIsFocusLoading(false);
+		}
+	}, []);
+
+	const fetchComments = useCallback(async (id: string) => {
+		setIsCommentsLoading(true);
+		setCommentsError(null);
+		try {
+			const res = await getCommentsAction(id);
+			if (res.success && res.data) {
+				setComments(res.data);
+				useTasksStore.getState().updateTaskComments(
+					id,
+					res.data.map((comment) => ({ id: comment.id })),
+				);
+			} else {
+				setCommentsError(res.error || "Unable to load comments.");
+			}
+		} catch {
+			setCommentsError("Unable to load comments.");
+		} finally {
+			setIsCommentsLoading(false);
+		}
+	}, []);
+
+	const fetchActivity = useCallback(async (id: string) => {
+		setIsActivityLoading(true);
+		setActivityError(null);
+		try {
+			const { getActivityByTaskAction } = await import(
+				"@/app/actions/activity"
+			);
+			const res = await getActivityByTaskAction(id);
+			if (res.success && res.data) {
+				setActivities(res.data);
+			} else {
+				setActivityError(res.error || "Unable to load activity.");
+			}
+		} catch {
+			setActivityError("Unable to load activity.");
+		} finally {
+			setIsActivityLoading(false);
+		}
 	}, []);
 
 	useEffect(() => {
@@ -145,27 +286,8 @@ export function TaskDetailPanel({
 			setDescription(currentTask.description || "");
 			setLabelsString(currentTask.labels?.join(", ") || "");
 
-			setIsCommentsLoading(true);
-			getCommentsAction(currentTask.id).then((res) => {
-				if (res.success && res.data) {
-					setComments(res.data);
-					useTasksStore.getState().updateTaskComments(
-						currentTask.id,
-						res.data.map((c) => ({ id: c.id })),
-					);
-				}
-				setIsCommentsLoading(false);
-			});
-
-			setIsActivityLoading(true);
-			import("@/app/actions/activity").then(({ getActivityByTaskAction }) => {
-				getActivityByTaskAction(currentTask.id).then((res) => {
-					if (res.success && res.data) {
-						setActivities(res.data);
-					}
-					setIsActivityLoading(false);
-				});
-			});
+			void fetchComments(currentTask.id);
+			void fetchActivity(currentTask.id);
 
 			setTimeout(() => {
 				if (titleRef.current) {
@@ -174,7 +296,7 @@ export function TaskDetailPanel({
 				}
 			}, 0);
 		}
-	}, [task, taskId]);
+	}, [fetchActivity, fetchComments, task, taskId]);
 
 	const { useEvent } = useCollaboration(projectId);
 	useEvent(
@@ -208,7 +330,7 @@ export function TaskDetailPanel({
 	);
 
 	useEffect(() => {
-		if (!taskId) return;
+		if (!taskId || readOnly) return;
 
 		const handler = setTimeout(() => {
 			const currentTask = taskRef.current;
@@ -249,7 +371,7 @@ export function TaskDetailPanel({
 		}, 500);
 
 		return () => clearTimeout(handler);
-	}, [title, description, labelsString, taskId]);
+	}, [title, description, labelsString, taskId, readOnly]);
 
 	const handleClose = useCallback(() => {
 		if (onClose) {
@@ -330,10 +452,15 @@ export function TaskDetailPanel({
 
 	const handleDelete = async () => {
 		if (!task) return;
-		setIsConfirmingDelete(true);
+		openConfirmModal({
+			title: "Delete task?",
+			description: `This will permanently delete "${task.title}". This action cannot be undone.`,
+			confirmText: "Delete Task",
+			onConfirm: async () => {
+				await confirmDelete();
+			},
+		});
 	};
-
-	const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
 	const confirmDelete = async () => {
 		if (!task) return;
@@ -449,6 +576,11 @@ export function TaskDetailPanel({
 	};
 
 	if (!mounted) return null;
+	if (taskId && !task && isLoading) {
+		return (
+			<TaskDetailPanelSkeleton isDesktop={isDesktop} onClose={handleClose} />
+		);
+	}
 
 	return (
 		<AnimatePresence>
@@ -485,35 +617,6 @@ export function TaskDetailPanel({
 						<div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-border rounded-full z-20" />
 					)}
 
-					{isConfirmingDelete && (
-						<div className="absolute inset-0 z-50 bg-background/95 backdrop-blur flex items-center justify-center p-6">
-							<div className="bg-card border border-border p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-								<h4 className="text-lg font-semibold text-foreground mb-2">
-									Delete Task?
-								</h4>
-								<p className="text-muted-foreground text-sm mb-6">
-									This action cannot be undone.
-								</p>
-								<div className="flex gap-3 justify-center">
-									<button
-										type="button"
-										onClick={() => setIsConfirmingDelete(false)}
-										className="px-4 py-2 rounded-lg bg-muted text-foreground font-medium hover:bg-muted/80"
-									>
-										Cancel
-									</button>
-									<button
-										type="button"
-										onClick={confirmDelete}
-										className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90"
-									>
-										Yes, Delete
-									</button>
-								</div>
-							</div>
-						</div>
-					)}
-
 					<div className="flex flex-col min-h-full pb-20 relative z-10">
 						<div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-background/80 backdrop-blur-md border-b border-primary/10 mt-4 md:mt-0">
 							<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
@@ -521,27 +624,31 @@ export function TaskDetailPanel({
 								<span>{lists.find((l) => l.id === task.listId)?.name}</span>
 							</div>
 							<div className="flex items-center gap-1">
-								<button
-									type="button"
-									onClick={() => {
-										if (task) {
-											startLockIn(task);
-											window.dispatchEvent(new Event("prime-audio"));
-										}
-									}}
-									className="p-2 text-primary hover:text-primary-foreground hover:bg-primary rounded-xl transition-all"
-									title="Lock In"
-								>
-									<Target size={18} />
-								</button>
-								<button
-									type="button"
-									onClick={handleDelete}
-									className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
-									title="Delete Task"
-								>
-									<Trash2 size={18} />
-								</button>
+								{!readOnly && (
+									<button
+										type="button"
+										onClick={() => {
+											if (task) {
+												startLockIn(task);
+												window.dispatchEvent(new Event("prime-audio"));
+											}
+										}}
+										className="p-2 text-primary hover:text-primary-foreground hover:bg-primary rounded-xl transition-all"
+										title="Lock In"
+									>
+										<Target size={18} />
+									</button>
+								)}
+								{!readOnly && (
+									<button
+										type="button"
+										onClick={handleDelete}
+										className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+										title="Delete Task"
+									>
+										<Trash2 size={18} />
+									</button>
+								)}
 								<button
 									type="button"
 									onClick={handleClose}
@@ -556,6 +663,7 @@ export function TaskDetailPanel({
 							<textarea
 								ref={titleRef}
 								value={title}
+								readOnly={readOnly}
 								onChange={(e) => setTitle(e.target.value)}
 								placeholder="Task Title"
 								className="w-full text-2xl md:text-3xl font-bold bg-transparent border-none focus:outline-none focus:ring-0 resize-none overflow-hidden text-foreground placeholder:text-muted-foreground/30 leading-tight tracking-tight mt-2"
@@ -576,6 +684,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.listId}
+										disabled={readOnly}
 										onChange={handleStatusChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10"
 									>
@@ -599,6 +708,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.priority}
+										disabled={readOnly}
 										onChange={handlePriorityChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10 capitalize"
 									>
@@ -636,6 +746,7 @@ export function TaskDetailPanel({
 									</div>
 									<select
 										value={task.assigneeId || "unassigned"}
+										disabled={readOnly}
 										onChange={handleAssigneeChange}
 										className="flex-1 bg-transparent text-sm font-medium text-foreground focus:outline-none appearance-none cursor-pointer relative z-10"
 									>
@@ -665,6 +776,7 @@ export function TaskDetailPanel({
 									</div>
 									<input
 										type="date"
+										disabled={readOnly}
 										value={task.dueDate || ""}
 										onChange={(e) => {
 											const date = e.target.value || null;
@@ -706,6 +818,7 @@ export function TaskDetailPanel({
 									</div>
 									<input
 										type="text"
+										readOnly={readOnly}
 										value={labelsString}
 										onChange={(e) => setLabelsString(e.target.value)}
 										placeholder="Comma-separated"
@@ -720,7 +833,26 @@ export function TaskDetailPanel({
 									Focus Time
 								</h3>
 								<div className="bg-card border border-border rounded-xl p-4 flex flex-wrap gap-6 items-start">
-									{focusSessions.length === 0 ? (
+									{isFocusLoading ? (
+										<div role="status" className="w-full space-y-2">
+											<span className="sr-only">Loading focus history</span>
+											<Skeleton className="h-6 w-28" />
+											<Skeleton className="h-3 w-44" />
+										</div>
+									) : focusError ? (
+										<div className="w-full">
+											<p className="text-sm text-destructive">{focusError}</p>
+											{taskId && (
+												<button
+													type="button"
+													onClick={() => void fetchFocusSessions(taskId)}
+													className="mt-2 text-xs font-semibold text-destructive underline underline-offset-2"
+												>
+													Try again
+												</button>
+											)}
+										</div>
+									) : focusSessions.length === 0 ? (
 										<p className="text-sm text-muted-foreground">0m total</p>
 									) : (
 										<>
@@ -769,6 +901,7 @@ export function TaskDetailPanel({
 								<div className="absolute top-0 left-0 w-24 h-px bg-linear-to-r from-primary/40 to-transparent -translate-y-px" />
 								<textarea
 									value={description}
+									readOnly={readOnly}
 									onChange={(e) => setDescription(e.target.value)}
 									placeholder="Add a more detailed description..."
 									className="w-full min-h-37.5 text-[15px] leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 resize-none text-foreground/90 placeholder:text-muted-foreground/40"
@@ -797,9 +930,36 @@ export function TaskDetailPanel({
 									<div>
 										<div className="space-y-4 mb-6">
 											{isCommentsLoading ? (
-												<p className="text-sm text-muted-foreground">
-													Loading comments...
-												</p>
+												<div role="status" className="space-y-3">
+													<span className="sr-only">Loading comments</span>
+													{commentSkeletonIds.map((id) => (
+														<div
+															key={id}
+															className="rounded-lg border border-border bg-muted/30 p-3"
+														>
+															<div className="flex justify-between gap-4">
+																<Skeleton className="h-3 w-24" />
+																<Skeleton className="h-3 w-16" />
+															</div>
+															<Skeleton className="mt-3 h-3 w-4/5" />
+														</div>
+													))}
+												</div>
+											) : commentsError ? (
+												<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+													<p className="text-sm text-destructive">
+														{commentsError}
+													</p>
+													{taskId && (
+														<button
+															type="button"
+															onClick={() => void fetchComments(taskId)}
+															className="mt-2 text-xs font-semibold text-destructive underline underline-offset-2"
+														>
+															Try again
+														</button>
+													)}
+												</div>
 											) : comments.length === 0 ? (
 												<p className="text-sm text-muted-foreground">
 													No comments yet.
@@ -830,46 +990,74 @@ export function TaskDetailPanel({
 														<p className="text-sm text-foreground/90 whitespace-pre-wrap">
 															{comment.content}
 														</p>
-														<button
-															type="button"
-															onClick={() => handleDeleteComment(comment.id)}
-															className="absolute top-2 right-2 p-1.5 bg-background rounded-md text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-															title="Delete comment"
-														>
-															<Trash2 size={14} />
-														</button>
+														{!readOnly && (
+															<button
+																type="button"
+																onClick={() => handleDeleteComment(comment.id)}
+																className="absolute top-2 right-2 p-1.5 bg-background rounded-md text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+																title="Delete comment"
+															>
+																<Trash2 size={14} />
+															</button>
+														)}
 													</div>
 												))
 											)}
 										</div>
 
-										<div className="flex flex-col gap-2">
-											<textarea
-												value={newComment}
-												onChange={(e) => setNewComment(e.target.value)}
-												placeholder="Write a comment..."
-												className="w-full min-h-20 p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-											/>
-											<div className="flex justify-end">
-												<button
-													type="button"
-													onClick={handleAddComment}
-													disabled={!newComment.trim()}
-													className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-												>
-													Comment
-												</button>
+										{!readOnly && (
+											<div className="flex flex-col gap-2">
+												<textarea
+													value={newComment}
+													onChange={(e) => setNewComment(e.target.value)}
+													placeholder="Write a comment..."
+													className="w-full min-h-20 p-3 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+												/>
+												<div className="flex justify-end">
+													<button
+														type="button"
+														onClick={handleAddComment}
+														disabled={!newComment.trim()}
+														className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+													>
+														Comment
+													</button>
+												</div>
 											</div>
-										</div>
+										)}
 									</div>
 								)}
 
 								{activeTab === "activity" && (
 									<div className="space-y-4">
 										{isActivityLoading ? (
-											<p className="text-sm text-muted-foreground">
-												Loading history...
-											</p>
+											<div role="status" className="space-y-4">
+												<span className="sr-only">Loading activity</span>
+												{activitySkeletonIds.map((id) => (
+													<div key={id} className="flex items-start gap-3">
+														<Skeleton className="size-6 shrink-0 rounded-full" />
+														<div className="flex-1 space-y-2">
+															<Skeleton className="h-3 w-4/5" />
+															<Skeleton className="h-2.5 w-20" />
+														</div>
+													</div>
+												))}
+											</div>
+										) : activityError ? (
+											<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+												<p className="text-sm text-destructive">
+													{activityError}
+												</p>
+												{taskId && (
+													<button
+														type="button"
+														onClick={() => void fetchActivity(taskId)}
+														className="mt-2 text-xs font-semibold text-destructive underline underline-offset-2"
+													>
+														Try again
+													</button>
+												)}
+											</div>
 										) : activities.length === 0 ? (
 											<p className="text-sm text-muted-foreground">
 												No activity recorded yet.

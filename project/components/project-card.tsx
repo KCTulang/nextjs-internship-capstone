@@ -13,7 +13,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
 	const { deleteProject } = useProjectStore();
-	const { openEditProjectModal } = useUIStore();
+	const { openEditProjectModal, openConfirmModal } = useUIStore();
 
 	const realMemberCount = project.members ? project.members.length : 1;
 
@@ -47,34 +47,44 @@ export function ProjectCard({ project }: ProjectCardProps) {
 					</div>
 				</div>
 
-				<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-					<button
-						type="button"
-						title="Edit Project"
-						className="relative z-20 p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
-						onClick={(e) => {
-							e.preventDefault();
-							openEditProjectModal(project);
-						}}
-					>
-						<Edit size={16} />
-					</button>
-					<button
-						type="button"
-						title="Delete Project"
-						className="relative z-20 p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-md transition-colors"
-						onClick={(e) => {
-							e.preventDefault();
-							if (
-								window.confirm("Are you sure you want to delete this project?")
-							) {
-								deleteProject(project.id);
-							}
-						}}
-					>
-						<Trash size={16} />
-					</button>
-				</div>
+				{(project.capabilities?.canEditProject ||
+					project.capabilities?.canDeleteProject) && (
+					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+						{project.capabilities?.canEditProject && (
+							<button
+								type="button"
+								title="Edit Project"
+								className="relative z-20 p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
+								onClick={(e) => {
+									e.preventDefault();
+									openEditProjectModal(project);
+								}}
+							>
+								<Edit size={16} />
+							</button>
+						)}
+						{project.capabilities?.canDeleteProject && (
+							<button
+								type="button"
+								title="Delete Project"
+								className="relative z-20 p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 rounded-md transition-colors"
+								onClick={(e) => {
+									e.preventDefault();
+									openConfirmModal({
+										title: "Delete project?",
+										description: `This will permanently delete "${project.name}" and its related project data. This action cannot be undone.`,
+										confirmText: "Delete Project",
+										onConfirm: async () => {
+											await deleteProject(project.id);
+										},
+									});
+								}}
+							>
+								<Trash size={16} />
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 
 			<p className="text-sm text-muted-foreground line-clamp-2 mb-4 h-10">

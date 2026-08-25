@@ -1,7 +1,6 @@
 "use client";
 
-import { CheckCircle2, Trash2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { CalendarDays, CheckCircle2, Circle, Trash2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
 	bulkDeleteTasksAction,
@@ -12,7 +11,11 @@ import { useCalendarShortcuts } from "@/hooks/use-calendar-shortcuts";
 import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
-import { isDateOnlyOverdue } from "@/utils/date-only";
+import {
+	formatDateOnly,
+	formatDateOnlyDeadlineLabel,
+	isDateOnlyOverdue,
+} from "@/utils/date-only";
 import type { CalendarTask } from "./calendar-grid";
 
 function isOverdue(
@@ -29,20 +32,22 @@ interface UpcomingDeadlinesProps {
 }
 
 export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
-	const router = useRouter();
 	const {
 		selectedTaskIds,
 		toggleTaskSelection,
 		clearSelection,
 		reconcileTasks,
 	} = useTasksStore();
-	const { addToast, setLoading, openConfirmModal } = useUIStore();
+	const { addToast, setLoading, openConfirmModal, openPreviewTaskModal } =
+		useUIStore();
 	const [isPending, startTransition] = useTransition();
 	const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
 		null,
 	);
 
-	const taskIds = tasksWithDates.map((t) => t.id);
+	const taskIds = tasksWithDates
+		.filter((task) => task.canMutateTasks !== false)
+		.map((task) => task.id);
 
 	const handleBulkDelete = () => {
 		if (selectedTaskIds.length === 0) return;
@@ -121,24 +126,16 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 		});
 	};
 
-	function handleTaskClick(task: CalendarTask, e: React.MouseEvent) {
-		if ((e.target as HTMLElement).closest(".task-checkbox")) {
-			return;
-		}
-		if (task.projectSlug) {
-			router.push(`/projects/${task.projectSlug}?taskId=${task.id}`, {
-				scroll: false,
-			});
-		}
+	function handleTaskClick(task: CalendarTask) {
+		openPreviewTaskModal(task);
 	}
 
 	function handleCheckboxClick(
 		taskId: string,
 		index: number,
-		e: React.MouseEvent,
+		shiftKey: boolean,
 	) {
-		e.stopPropagation();
-		if (e.shiftKey && lastSelectedIndex !== null) {
+		if (shiftKey && lastSelectedIndex !== null) {
 			const start = Math.min(lastSelectedIndex, index);
 			const end = Math.max(lastSelectedIndex, index);
 			const rangeIds = tasksWithDates.slice(start, end + 1).map((t) => t.id);
@@ -156,14 +153,24 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 
 	if (tasksWithDates.length === 0) {
 		return (
-			<div className="text-center py-8 text-muted-foreground">
-				<p>No upcoming deadlines found.</p>
+			<div className="flex flex-col items-center py-8 text-center">
+				<div className="mb-3 flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+					<CalendarDays size={18} aria-hidden="true" />
+				</div>
+				<p className="text-sm font-semibold text-foreground">
+					No deadlines yet
+				</p>
+				<p className="mt-1 text-xs text-muted-foreground">
+					Tasks with due dates will appear here.
+				</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="space-y-3 relative pb-16">
+		<div
+			className={`relative w-full min-w-0 space-y-1 ${selectedTaskIds.length > 0 ? "pb-16" : ""}`}
+		>
 			{selectedTaskIds.length > 0 && (
 				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-3 bg-card border border-border shadow-xl rounded-full animate-in slide-in-from-bottom-5">
 					<div className="flex items-center gap-2 pr-4 border-r border-border">
@@ -228,104 +235,111 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 			)}
 
 			{tasksWithDates.map((task, index) => {
+				if (!task.dueDate) return null;
 				const overdue = isOverdue(task.dueDate, task.listIsCompleted);
 				const hasLink = !!task.projectSlug;
 				const isSelected = selectedTaskIds.includes(task.id);
+				const showDateHeading =
+					index === 0 || tasksWithDates[index - 1]?.dueDate !== task.dueDate;
 
 				const rowContent = (
 					<>
-						<div className="min-w-0 flex-1">
+						<div className="min-w-0 flex-1 py-0.5">
 							<h4
-								className={`font-medium truncate ${
+								className={`truncate text-sm font-medium ${
 									overdue ? "text-destructive" : "text-foreground"
-								}`}
+								} ${task.listIsCompleted ? "line-through opacity-60" : ""}`}
 							>
 								{task.title}
 							</h4>
-							<div className="flex items-center flex-wrap gap-2 mt-1">
+							<div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
 								{task.projectName && (
-									<p className="text-sm text-muted-foreground">
-										{task.projectName}
-									</p>
+									<p className="truncate">{task.projectName}</p>
 								)}
-								<span
-									className={`text-[10px] uppercase font-bold border px-1.5 py-0.5 rounded ${priorityClass(task.priority)}`}
-								>
-									{(task.priority ?? "medium").toLowerCase()}
-								</span>
-								{task.labels?.slice(0, 3).map((label) => (
-									<span
-										key={label}
-										className="text-[10px] font-medium text-muted-foreground bg-muted border border-border px-1.5 py-0.5 rounded"
-									>
-										{label}
-									</span>
-								))}
-								{task.labels && task.labels.length > 3 && (
-									<span className="text-[10px] text-muted-foreground">
-										+{task.labels.length - 3}
-									</span>
+								{task.listName && (
+									<>
+										<span aria-hidden="true">·</span>
+										<span className="truncate">{task.listName}</span>
+									</>
 								)}
 							</div>
 						</div>
+						<span
+							className={`hidden shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-wide min-[430px]:inline-flex ${priorityClass(task.priority)}`}
+						>
+							{task.priority ?? "medium"}
+						</span>
+						<span
+							className={`hidden w-18 shrink-0 text-right text-xs font-medium sm:block ${overdue ? "text-destructive" : "text-muted-foreground"}`}
+						>
+							{formatDateOnly(task.dueDate, { month: "short", day: "numeric" })}
+						</span>
 					</>
 				);
 
-				const containerClasses = `relative flex items-start w-full p-4 rounded-lg border transition-all focus-within:ring-2 focus-within:ring-primary ${
+				const containerClasses = `relative flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-primary ${
 					isSelected
 						? "bg-primary/5 border-primary/20 shadow-sm"
-						: "bg-muted/50 border-border hover:bg-muted/80"
+						: "bg-card border-transparent hover:border-border hover:bg-muted/50"
 				} ${!hasLink ? "opacity-60" : ""}`;
 
 				return (
-					<div
-						key={task.id}
-						data-task-id={task.id}
-						className={containerClasses}
-					>
-						<button
-							type="button"
-							className="task-checkbox hidden sm:flex pt-1 cursor-pointer shrink-0 mt-0.5"
-							onClick={(e) => handleCheckboxClick(task.id, index, e)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									handleCheckboxClick(
-										task.id,
-										index,
-										e as unknown as React.MouseEvent,
-									);
-								}
-							}}
-							tabIndex={-1}
-						>
+					<div key={task.id}>
+						{showDateHeading && (
 							<div
-								className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-									isSelected
-										? "bg-primary border-primary text-primary-foreground"
-										: "border-muted-foreground/30 hover:border-foreground/50"
-								}`}
+								className={`px-3 pb-1.5 text-xs font-semibold text-muted-foreground ${index === 0 ? "pt-0" : "pt-3"}`}
 							>
-								{isSelected && <CheckCircle2 size={12} className="stroke-3" />}
-							</div>
-						</button>
-
-						{hasLink ? (
-							<button
-								type="button"
-								onClick={(e) => handleTaskClick(task, e)}
-								className="flex flex-1 items-start justify-between min-w-0 ml-3 text-left focus:outline-none"
-							>
-								{rowContent}
-							</button>
-						) : (
-							<div
-								className="flex flex-1 items-start justify-between min-w-0 ml-3 text-left"
-								title="No linked project"
-							>
-								{rowContent}
+								{overdue && "Overdue · "}
+								{formatDateOnlyDeadlineLabel(task.dueDate)}
 							</div>
 						)}
+						<div data-task-id={task.id} className={containerClasses}>
+							{task.canMutateTasks !== false && (
+								<button
+									type="button"
+									className="task-checkbox flex shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+									onClick={(e) => {
+										e.stopPropagation();
+										handleCheckboxClick(task.id, index, e.shiftKey);
+									}}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											handleCheckboxClick(task.id, index, e.shiftKey);
+										}
+									}}
+									aria-label={isSelected ? "Deselect task" : "Select task"}
+								>
+									{isSelected || task.listIsCompleted ? (
+										<CheckCircle2
+											size={17}
+											className={
+												isSelected ? "text-primary" : "text-emerald-500"
+											}
+										/>
+									) : (
+										<Circle size={17} />
+									)}
+								</button>
+							)}
+
+							{hasLink ? (
+								<button
+									type="button"
+									onClick={() => handleTaskClick(task)}
+									className="flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none"
+								>
+									{rowContent}
+								</button>
+							) : (
+								<div
+									className="flex min-w-0 flex-1 items-center gap-3 text-left"
+									title="No linked project"
+								>
+									{rowContent}
+								</div>
+							)}
+						</div>
 					</div>
 				);
 			})}

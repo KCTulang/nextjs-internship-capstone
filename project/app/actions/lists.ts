@@ -9,6 +9,7 @@ import {
 	projectCompletionAdvisoryLock,
 	validProjectListTarget,
 } from "@/lib/db/project-column-guards";
+import { requireProjectCapability } from "@/lib/db/project-permissions";
 import { lists, projectMembers, projects, users } from "@/lib/db/schema";
 import { hasExactlyOneCompletedList } from "@/lib/tasks/completion";
 import { toTaskDTO } from "@/lib/tasks/task-dto";
@@ -58,7 +59,8 @@ function isUniqueViolation(error: unknown): boolean {
 
 export async function getListsAction(projectId: string) {
 	try {
-		await requireAuth();
+		const clerkId = await requireAuth();
+		await requireProjectCapability(clerkId, projectId, "canViewProject");
 		const projectLists = await queries.lists.getByProject(projectId);
 		return {
 			success: true,

@@ -20,6 +20,12 @@ interface UIState {
 	selectedProjectForEdit: Project | null;
 	openEditProjectModal: (project: Project) => void;
 	closeEditProjectModal: () => void;
+	isProjectMembersModalOpen: boolean;
+	openProjectMembersModal: () => void;
+	closeProjectMembersModal: () => void;
+	isProjectDeadlinesModalOpen: boolean;
+	openProjectDeadlinesModal: () => void;
+	closeProjectDeadlinesModal: () => void;
 
 	isTaskDetailModalOpen: boolean;
 	selectedTaskId: string | null;
@@ -84,6 +90,8 @@ export const useUIStore = create<UIState>((set) => ({
 	taskCreationSource: "global",
 	isEditProjectModalOpen: false,
 	selectedProjectForEdit: null,
+	isProjectMembersModalOpen: false,
+	isProjectDeadlinesModalOpen: false,
 	isTaskDetailModalOpen: false,
 	selectedTaskId: null,
 	isPreviewTaskModalOpen: false,
@@ -104,6 +112,10 @@ export const useUIStore = create<UIState>((set) => ({
 		set({ isEditProjectModalOpen: true, selectedProjectForEdit: project }),
 	closeEditProjectModal: () =>
 		set({ isEditProjectModalOpen: false, selectedProjectForEdit: null }),
+	openProjectMembersModal: () => set({ isProjectMembersModalOpen: true }),
+	closeProjectMembersModal: () => set({ isProjectMembersModalOpen: false }),
+	openProjectDeadlinesModal: () => set({ isProjectDeadlinesModalOpen: true }),
+	closeProjectDeadlinesModal: () => set({ isProjectDeadlinesModalOpen: false }),
 	isInviteMemberModalOpen: false,
 	openInviteMemberModal: () => set({ isInviteMemberModalOpen: true }),
 	closeInviteMemberModal: () => set({ isInviteMemberModalOpen: false }),

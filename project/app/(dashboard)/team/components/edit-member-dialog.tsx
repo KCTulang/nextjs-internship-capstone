@@ -4,6 +4,10 @@ import { Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateProjectMemberAction } from "@/app/actions/members";
+import {
+	isMembershipPermission,
+	type MembershipPermission,
+} from "@/lib/project-permissions";
 import { useUIStore } from "@/stores/ui-store";
 import { PROJECT_ROLES } from "@/utils/roles";
 import type { TeamMember } from "../types";
@@ -28,8 +32,8 @@ export function EditMemberDialog({
 	onClose,
 }: EditMemberDialogProps) {
 	const router = useRouter();
-	const [role, setRole] = useState<"admin" | "member">(
-		currentRole as "admin" | "member",
+	const [role, setRole] = useState<MembershipPermission>(
+		isMembershipPermission(currentRole) ? currentRole : "member",
 	);
 	const [projectRole, setProjectRole] = useState(currentProjectRole || "Other");
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +44,7 @@ export function EditMemberDialog({
 		setIsSubmitting(true);
 		setError(null);
 
-		const updates: { role?: "admin" | "member"; projectRole?: string } = {};
+		const updates: { role?: MembershipPermission; projectRole?: string } = {};
 		if (role !== currentRole) updates.role = role;
 		if (projectRole !== currentProjectRole) updates.projectRole = projectRole;
 
@@ -146,7 +150,10 @@ export function EditMemberDialog({
 						<select
 							id="edit-permission"
 							value={role}
-							onChange={(e) => setRole(e.target.value as "admin" | "member")}
+							onChange={(e) => {
+								if (isMembershipPermission(e.target.value))
+									setRole(e.target.value);
+							}}
 							disabled={readOnly}
 							className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
 						>

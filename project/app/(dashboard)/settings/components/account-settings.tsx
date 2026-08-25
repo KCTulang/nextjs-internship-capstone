@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { Loader2, Mail, Plus } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import {
 	syncGoogleAvatarAction,
 	updateUserProfileAction,
 } from "@/app/actions/user";
+import { AccountSettingsSkeleton } from "@/components/skeletons/settings-skeletons";
 import { UserAvatar } from "@/components/user-avatar";
 import { useUIStore } from "@/stores/ui-store";
 import { updateNameSchema, validate } from "@/utils/validations";
@@ -68,11 +69,7 @@ export function AccountSettings({
 	}, [isLoaded, user, router]);
 
 	if (!isLoaded) {
-		return (
-			<div className="py-12 flex items-center justify-center">
-				<Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-			</div>
-		);
+		return <AccountSettingsSkeleton />;
 	}
 
 	if (!user) return null;

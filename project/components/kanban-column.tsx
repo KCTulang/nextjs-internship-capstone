@@ -20,76 +20,8 @@ import { useEffect, useRef, useState } from "react";
 import type { List, Task } from "@/stores/board-store";
 import { useTasksStore } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
+import { COLUMN_COLORS, getDefaultColor } from "@/utils/list-colors";
 import { TaskCard } from "./task-card";
-
-const COLUMN_COLORS = [
-	{
-		name: "slate",
-		accent: "#64748b",
-		bg: "bg-slate-500/10",
-		text: "text-slate-500 dark:text-slate-400",
-		border: "border-slate-500/20",
-		dot: "bg-slate-400",
-	},
-	{
-		name: "blue",
-		accent: "#3b82f6",
-		bg: "bg-blue-500/10",
-		text: "text-blue-500 dark:text-blue-400",
-		border: "border-blue-500/20",
-		dot: "bg-blue-400",
-	},
-	{
-		name: "violet",
-		accent: "#8b5cf6",
-		bg: "bg-violet-500/10",
-		text: "text-violet-500 dark:text-violet-400",
-		border: "border-violet-500/20",
-		dot: "bg-violet-400",
-	},
-	{
-		name: "amber",
-		accent: "#f59e0b",
-		bg: "bg-amber-500/10",
-		text: "text-amber-600 dark:text-amber-400",
-		border: "border-amber-500/20",
-		dot: "bg-amber-400",
-	},
-	{
-		name: "emerald",
-		accent: "#10b981",
-		bg: "bg-emerald-500/10",
-		text: "text-emerald-600 dark:text-emerald-400",
-		border: "border-emerald-500/20",
-		dot: "bg-emerald-400",
-	},
-	{
-		name: "rose",
-		accent: "#f43f5e",
-		bg: "bg-rose-500/10",
-		text: "text-rose-500 dark:text-rose-400",
-		border: "border-rose-500/20",
-		dot: "bg-rose-400",
-	},
-];
-
-function getDefaultColor(name: string, isCompleted: boolean) {
-	if (isCompleted) return COLUMN_COLORS[4];
-	const lower = name.toLowerCase();
-	if (
-		lower.includes("do") ||
-		lower.includes("todo") ||
-		lower.includes("backlog")
-	)
-		return COLUMN_COLORS[0];
-	if (lower.includes("progress") || lower.includes("doing"))
-		return COLUMN_COLORS[1];
-	if (lower.includes("review") || lower.includes("test"))
-		return COLUMN_COLORS[2];
-	if (lower.includes("hold") || lower.includes("block"))
-		return COLUMN_COLORS[3];
-	return COLUMN_COLORS[0];
-}
 
 interface KanbanColumnProps {
 	list: List;
@@ -98,6 +30,7 @@ interface KanbanColumnProps {
 	isOverlay?: boolean;
 	isMobileView?: boolean;
 	canManageColumns?: boolean;
+	canMutateTasks?: boolean;
 	onMoveTaskClick?: (task: Task) => void;
 }
 
@@ -108,14 +41,16 @@ export function KanbanColumn({
 	isOverlay = false,
 	isMobileView = false,
 	canManageColumns = false,
+	canMutateTasks = true,
 	onMoveTaskClick,
 }: KanbanColumnProps) {
 	const { renameList, removeList, setCompletedList } = useTasksStore();
-	const { addToast, openCreateTaskModal } = useUIStore();
+	const { addToast, openCreateTaskModal, openConfirmModal } = useUIStore();
 
 	const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
 		id: `drop-${list.id}`,
 		data: { type: "Column", list },
+		disabled: !canMutateTasks,
 	});
 
 	const {
@@ -195,10 +130,15 @@ export function KanbanColumn({
 			setMenuOpen(false);
 			return;
 		}
-		if (window.confirm(`Delete column "${list.name}" and all its tasks?`)) {
-			removeList(list.id, projectId);
-		}
 		setMenuOpen(false);
+		openConfirmModal({
+			title: "Delete column?",
+			description: `This will permanently delete "${list.name}" and all its tasks. This action cannot be undone.`,
+			confirmText: "Delete Column",
+			onConfirm: async () => {
+				await removeList(list.id, projectId);
+			},
+		});
 	};
 
 	if (isDragging && !isOverlay) {
@@ -215,11 +155,11 @@ export function KanbanColumn({
 		<div
 			ref={setSortableNodeRef}
 			style={style}
-			className={`flex flex-col shrink-0 max-h-full transition-colors duration-200
+			className={`flex shrink-0 flex-col max-h-full transition-colors duration-200
 				bg-card dark:bg-white/3 border
 				${isOver ? "border-primary/50 shadow-lg shadow-primary/10" : "border-border/60"}
-				backdrop-blur-sm group/column
-				${isMobileView ? "w-full rounded-none border-x-0 border-t-0" : "w-68.75 sm:w-75 rounded-2xl"}
+				backdrop-blur-sm shadow-sm group/column
+				${isMobileView ? "w-full min-w-0 max-w-full rounded-none border-x-0 border-t-0" : "w-68.75 self-start rounded-2xl sm:w-75"}
 			`}
 		>
 			<div
@@ -227,7 +167,7 @@ export function KanbanColumn({
 				style={{ background: color.accent }}
 			/>
 
-			<div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
+			<div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/50 px-3 py-2.5 sm:px-4 sm:pt-3 sm:pb-3">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					{!isMobileView && canManageColumns && (
 						<div
@@ -284,7 +224,7 @@ export function KanbanColumn({
 					</span>
 				</div>
 
-				<div className="flex items-center gap-1 shrink-0">
+				<div className="flex shrink-0 items-center gap-1">
 					<button
 						type="button"
 						onClick={() =>
@@ -296,7 +236,8 @@ export function KanbanColumn({
 							})
 						}
 						title="Add task"
-						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+						className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label={`Add task to ${list.name}`}
 					>
 						<Plus size={15} />
 					</button>
@@ -312,7 +253,7 @@ export function KanbanColumn({
 								title="Column options"
 								aria-label={`Manage ${list.name} column`}
 								aria-expanded={menuOpen}
-								className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								className="inline-flex size-11 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<MoreHorizontal size={15} />
 							</button>
@@ -395,7 +336,7 @@ export function KanbanColumn({
 
 			<div
 				ref={setDroppableNodeRef}
-				className={`flex-1 overflow-y-auto px-3 pb-3 space-y-2.5 min-h-30 transition-colors duration-150 ${
+				className={`min-h-24 space-y-2.5 overflow-y-auto px-3 pt-3 pb-2 transition-colors duration-150 ${
 					isOver ? "bg-primary/3 rounded-b-2xl" : ""
 				}`}
 			>
@@ -409,6 +350,7 @@ export function KanbanColumn({
 								key={task.id}
 								task={task}
 								isMobileView={isMobileView}
+								canMutateTasks={canMutateTasks}
 								onMoveClick={onMoveTaskClick}
 							/>
 						))}
@@ -417,30 +359,34 @@ export function KanbanColumn({
 
 				{(list.tasks?.length || 0) === 0 && (
 					<div
-						className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+						className={`rounded-xl border border-dashed px-4 py-3 text-center transition-colors ${
 							isOver ? `${color.border} ${color.bg}` : "border-border/40"
 						}`}
 					>
-						<p className="text-xs text-muted-foreground">Drop tasks here</p>
+						<p className="text-xs text-muted-foreground">
+							{canMutateTasks ? "Drop tasks here" : "No tasks"}
+						</p>
 					</div>
 				)}
 			</div>
 
-			<button
-				type="button"
-				onClick={() =>
-					openCreateTaskModal({
-						listId: list.id,
-						projectId,
-						projectName,
-						source: "column",
-					})
-				}
-				className="flex items-center gap-2 mx-3 mb-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors border border-dashed border-border/50 hover:border-border"
-			>
-				<Plus size={14} />
-				Add task
-			</button>
+			{canMutateTasks && (
+				<button
+					type="button"
+					onClick={() =>
+						openCreateTaskModal({
+							listId: list.id,
+							projectId,
+							projectName,
+							source: "column",
+						})
+					}
+					className="mx-3 mb-3 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-border/50 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+				>
+					<Plus size={14} />
+					Add task
+				</button>
+			)}
 		</div>
 	);
 }

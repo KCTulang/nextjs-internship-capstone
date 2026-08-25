@@ -8,13 +8,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Task } from "@/stores/board-store";
 import { useTasksStore } from "@/stores/board-store";
-import { priorityClass } from "@/utils";
+import { priorityAccentClass, priorityClass } from "@/utils";
 import { formatDateOnly } from "@/utils/date-only";
 
 interface TaskCardProps {
 	task: Task;
 	isOverlay?: boolean;
 	isMobileView?: boolean;
+	canMutateTasks?: boolean;
 	onMoveClick?: (task: Task) => void;
 }
 
@@ -22,6 +23,7 @@ export function TaskCard({
 	task,
 	isOverlay = false,
 	isMobileView = false,
+	canMutateTasks = true,
 	onMoveClick,
 }: TaskCardProps) {
 	const router = useRouter();
@@ -43,7 +45,7 @@ export function TaskCard({
 			e.stopPropagation();
 			return;
 		}
-		if (hasSelection) {
+		if (canMutateTasks && hasSelection) {
 			e.preventDefault();
 			e.stopPropagation();
 			toggleTaskSelection(task.id);
@@ -66,7 +68,7 @@ export function TaskCard({
 			type: "Task",
 			task,
 		},
-		disabled: isOverlay,
+		disabled: isOverlay || !canMutateTasks,
 	});
 
 	useEffect(() => {
@@ -114,6 +116,7 @@ export function TaskCard({
 	};
 
 	const pColor = priorityClass(task.priority);
+	const priorityAccent = priorityAccentClass(task.priority);
 
 	let stateClasses = "shadow-sm hover:shadow-md active:scale-[0.98]";
 	if (isDragging && !isOverlay) {
@@ -135,46 +138,57 @@ export function TaskCard({
 			className={`relative w-full group transition-all duration-200 ease-out z-0 ${stateClasses}`}
 		>
 			<div
-				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${pColor.split(" ")[1].replace("text-", "bg-")}`}
+				className={`absolute left-0 top-3 bottom-3 w-0.75 rounded-r-full ${priorityAccent}`}
 			/>
 
-			<div
-				className={`absolute top-2 left-2 z-20 ${isSelected || hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
-			>
-				<button
-					type="button"
-					onClick={(e) => {
-						e.stopPropagation();
-						e.preventDefault();
-						toggleTaskSelection(task.id);
-					}}
-					className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 hover:border-foreground bg-background"}`}
+			{canMutateTasks && (
+				<div
+					className={`absolute top-0 left-0 z-20 ${isSelected || hasSelection || isMobileView ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
 				>
-					{isSelected && (
-						<svg
-							aria-hidden="true"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="3"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="w-3 h-3"
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							e.preventDefault();
+							toggleTaskSelection(task.id);
+						}}
+						aria-label={isSelected ? "Deselect task" : "Select task"}
+						className="p-2 cursor-pointer"
+					>
+						<div
+							className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40 group-hover:border-foreground bg-background"}`}
 						>
-							<polyline points="20 6 9 17 4 12"></polyline>
-						</svg>
-					)}
-				</button>
-			</div>
+							{isSelected && (
+								<svg
+									aria-hidden="true"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="3"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									className="w-3 h-3"
+								>
+									<polyline points="20 6 9 17 4 12"></polyline>
+								</svg>
+							)}
+						</div>
+					</button>
+				</div>
+			)}
 
 			<button
 				type="button"
-				{...(isMobileView && !isOverlay ? { ...attributes, ...listeners } : {})}
+				{...(isMobileView && canMutateTasks && !isOverlay
+					? { ...attributes, ...listeners }
+					: {})}
 				onPointerDown={(event) => {
-					if (isMobileView && !isOverlay) event.stopPropagation();
+					if (isMobileView && canMutateTasks && !isOverlay) {
+						event.stopPropagation();
+					}
 				}}
 				onClick={handleCardClick}
-				className={`text-left w-full h-full bg-card dark:bg-white/2 border rounded-xl p-3.5 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+				className={`h-full w-full cursor-pointer rounded-xl border bg-card p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-white/2 ${
 					isSelected && (!isDragging || isOverlay)
 						? "border-primary ring-1 ring-primary"
 						: "border-border/60 hover:border-border"
@@ -211,7 +225,7 @@ export function TaskCard({
 						)}
 					</div>
 
-					{!isMobileView && (
+					{!isMobileView && canMutateTasks && (
 						<div
 							{...attributes}
 							{...listeners}
@@ -222,7 +236,7 @@ export function TaskCard({
 					)}
 				</div>
 
-				<div className="flex items-center justify-between mt-4 pl-2">
+				<div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3 pl-2">
 					<div className="flex items-center gap-2">
 						<span
 							className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${pColor} uppercase tracking-wider`}
@@ -271,7 +285,7 @@ export function TaskCard({
 				</div>
 			</button>
 
-			{isMobileView && (
+			{isMobileView && canMutateTasks && (
 				<button
 					type="button"
 					onClick={(e) => {

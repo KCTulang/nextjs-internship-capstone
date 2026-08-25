@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { queries } from "@/lib/db";
+import { requireTaskCapability } from "@/lib/db/project-permissions";
 
 async function requireAuth() {
 	const { userId } = await auth();
@@ -14,7 +15,8 @@ async function requireAuth() {
 
 export async function getActivityByTaskAction(taskId: string) {
 	try {
-		await requireAuth();
+		const user = await requireAuth();
+		await requireTaskCapability(user.clerkId, taskId, "canViewProject");
 		const activities = await queries.activityLogs.getByTask(taskId);
 		return { success: true, data: activities };
 	} catch (error) {
@@ -43,6 +45,7 @@ export async function logActivity(
 ) {
 	try {
 		const user = await requireAuth();
+		await requireTaskCapability(user.clerkId, taskId, "canMutateTasks");
 		await queries.activityLogs.create({
 			taskId,
 			userId: user.id,

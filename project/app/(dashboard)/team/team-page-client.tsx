@@ -45,6 +45,7 @@ interface TeamPageClientProps {
 	initialMyInvites: ProjectInvitation[];
 	initialSentInvites: ProjectInvitation[];
 	currentUserId: string;
+	initialLoadError?: string;
 }
 
 function AccessBadge({ role }: { role: string }) {
@@ -478,6 +479,7 @@ export function TeamPageClient({
 	initialMyInvites,
 	initialSentInvites,
 	currentUserId,
+	initialLoadError,
 }: TeamPageClientProps) {
 	const { openInviteMemberModal } = useUIStore();
 	const [members, setMembers] = useState<TeamMember[]>(initialMembers);
@@ -526,6 +528,15 @@ export function TeamPageClient({
 	const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
 	const currentUser = members.find((m) => m.id === currentUserId) || null;
+	const canManageAnyMembers =
+		currentUser?.roles.some(
+			(role) => role.role === "owner" || role.role === "admin",
+		) ?? false;
+	useEffect(() => {
+		if (!canManageAnyMembers && activeTab === "invitations") {
+			setActiveTab("members");
+		}
+	}, [activeTab, canManageAnyMembers]);
 
 	const filteredMembers = members.filter((m) => {
 		const q = search.toLowerCase();
@@ -624,12 +635,16 @@ export function TeamPageClient({
 			icon: <Users size={14} />,
 			count: members.length,
 		},
-		{
-			id: "invitations",
-			label: "Sent Invitations",
-			icon: <SendHorizontal size={14} />,
-			count: initialSentInvites.length,
-		},
+		...(canManageAnyMembers
+			? [
+					{
+						id: "invitations",
+						label: "Sent Invitations",
+						icon: <SendHorizontal size={14} />,
+						count: initialSentInvites.length,
+					} as const,
+				]
+			: []),
 		{
 			id: "my-invitations",
 			label: "My Invitations",
@@ -637,6 +652,34 @@ export function TeamPageClient({
 			count: initialMyInvites.length,
 		},
 	];
+
+	if (initialLoadError) {
+		return (
+			<div className="space-y-6">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-foreground">
+						Team
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Manage members, roles, and invitations
+					</p>
+				</div>
+				<div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+					<p className="text-sm font-semibold text-destructive">
+						Unable to load team data
+					</p>
+					<p className="mt-1 text-sm text-destructive/80">{initialLoadError}</p>
+					<button
+						type="button"
+						onClick={() => router.refresh()}
+						className="mt-4 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						Try again
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6">
@@ -649,14 +692,16 @@ export function TeamPageClient({
 						Manage members, roles, and invitations
 					</p>
 				</div>
-				<button
-					type="button"
-					onClick={openInviteMemberModal}
-					className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shrink-0"
-				>
-					<UserPlus size={15} />
-					Invite Member
-				</button>
+				{canManageAnyMembers && (
+					<button
+						type="button"
+						onClick={openInviteMemberModal}
+						className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm shrink-0"
+					>
+						<UserPlus size={15} />
+						Invite Member
+					</button>
+				)}
 			</div>
 
 			<div className="flex items-center gap-0.5 border-b border-border">
@@ -725,15 +770,17 @@ export function TeamPageClient({
 							))}
 						</select>
 						<div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-background shrink-0">
-							<button
-								type="button"
-								onClick={() => setViewMode("card")}
-								aria-label="Card view"
-								aria-pressed={viewMode === "card"}
-								className={`p-1.5 rounded transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-							>
-								<LayoutGrid size={15} />
-							</button>
+							{canManageAnyMembers && (
+								<button
+									type="button"
+									onClick={() => setViewMode("card")}
+									aria-label="Card view"
+									aria-pressed={viewMode === "card"}
+									className={`p-1.5 rounded transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+								>
+									<LayoutGrid size={15} />
+								</button>
+							)}
 							<button
 								type="button"
 								onClick={() => setViewMode("list")}

@@ -1,13 +1,15 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/hooks/use-projects";
 import { useUIStore } from "@/stores/ui-store";
 import { updateProjectSchema } from "@/utils/validations";
 
 export function EditProjectModal() {
-	const { updateProject } = useProjectStore();
+	const router = useRouter();
+	const { updateProject, deleteProject } = useProjectStore();
 	const {
 		isEditProjectModalOpen,
 		closeEditProjectModal,
@@ -18,6 +20,8 @@ export function EditProjectModal() {
 	const [description, setDescription] = useState("");
 	const [dueDate, setDueDate] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [deleteConfirmation, setDeleteConfirmation] = useState("");
+	const [isDeleting, setIsDeleting] = useState(false);
 
 	useEffect(() => {
 		if (selectedProjectForEdit) {
@@ -28,6 +32,7 @@ export function EditProjectModal() {
 					? new Date(selectedProjectForEdit.dueDate).toISOString().split("T")[0]
 					: "",
 			);
+			setDeleteConfirmation("");
 		}
 	}, [selectedProjectForEdit]);
 
@@ -40,7 +45,12 @@ export function EditProjectModal() {
 		}
 	}, [isEditProjectModalOpen]);
 
-	if (!isEditProjectModalOpen || !selectedProjectForEdit) return null;
+	if (
+		!isEditProjectModalOpen ||
+		!selectedProjectForEdit ||
+		selectedProjectForEdit.capabilities?.canEditProject === false
+	)
+		return null;
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -86,6 +96,18 @@ export function EditProjectModal() {
 			(selectedProjectForEdit.dueDate
 				? new Date(selectedProjectForEdit.dueDate).toISOString().split("T")[0]
 				: "");
+	const canDelete =
+		selectedProjectForEdit.permission === "owner" ||
+		selectedProjectForEdit.capabilities?.canDeleteProject === true;
+
+	const handleDelete = async () => {
+		if (deleteConfirmation !== selectedProjectForEdit.name) return;
+		setIsDeleting(true);
+		await deleteProject(selectedProjectForEdit.id);
+		setIsDeleting(false);
+		closeEditProjectModal();
+		router.push("/dashboard");
+	};
 
 	return (
 		<div
@@ -100,143 +122,200 @@ export function EditProjectModal() {
 				}
 			}}
 		>
-			<div className="bg-card border border-border shadow-2xl rounded-2xl p-6 w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
-				<div className="flex items-center justify-between mb-6">
-					<div>
-						<h3
-							id="edit-project-title"
-							className="text-xl font-semibold text-foreground"
-						>
-							Edit Project
-						</h3>
-						<p className="text-sm text-muted-foreground mt-0.5">
-							Update your project details
-						</p>
-					</div>
-					<button
-						type="button"
-						onClick={closeEditProjectModal}
-						className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-						aria-label="Close modal"
-					>
-						<X size={18} />
-					</button>
-				</div>
-
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<div>
-						<label
-							htmlFor="edit-project-name"
-							className="block text-sm font-medium text-foreground mb-1.5"
-						>
-							Project Name <span className="text-destructive">*</span>
-						</label>
-						<input
-							id="edit-project-name"
-							ref={nameInputRef}
-							type="text"
-							required
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							maxLength={80}
-							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground"
-							placeholder="e.g., Marketing Campaign"
-						/>
-						<div className="flex justify-end mt-1">
-							<span className="text-xs text-muted-foreground">
-								{name.length}/80
-							</span>
+			<div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+				<div className="overflow-y-auto p-6">
+					<div className="flex items-center justify-between mb-6">
+						<div>
+							<h3
+								id="edit-project-title"
+								className="text-xl font-semibold text-foreground"
+							>
+								Project Settings
+							</h3>
+							<p className="text-sm text-muted-foreground mt-0.5">
+								Configure {selectedProjectForEdit.name}
+							</p>
 						</div>
-					</div>
-
-					<div>
-						<label
-							htmlFor="edit-project-description"
-							className="block text-sm font-medium text-foreground mb-1.5"
-						>
-							Description{" "}
-							<span className="text-muted-foreground font-normal">
-								(optional)
-							</span>
-						</label>
-						<textarea
-							id="edit-project-description"
-							rows={3}
-							value={description}
-							onChange={(e) => setDescription(e.target.value)}
-							maxLength={500}
-							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground resize-none"
-							placeholder="What is this project about?"
-						/>
-						<div className="flex justify-end mt-1">
-							<span className="text-xs text-muted-foreground">
-								{description.length}/500
-							</span>
-						</div>
-					</div>
-
-					<div>
-						<label
-							htmlFor="edit-project-due-date"
-							className="block text-sm font-medium text-foreground mb-1.5"
-						>
-							Target Date{" "}
-							<span className="text-muted-foreground font-normal">
-								(optional)
-							</span>
-						</label>
-						<input
-							id="edit-project-due-date"
-							type="date"
-							value={dueDate}
-							onChange={(e) => setDueDate(e.target.value)}
-							className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground dark:[scheme:dark]"
-						/>
-					</div>
-
-					<div className="flex justify-end gap-3 pt-2">
 						<button
 							type="button"
 							onClick={closeEditProjectModal}
-							className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+							className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+							aria-label="Close modal"
 						>
-							Cancel
-						</button>
-						<button
-							type="submit"
-							disabled={isSubmitting || !name.trim() || !hasChanges}
-							className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-30"
-						>
-							{isSubmitting ? (
-								<span className="flex items-center gap-2 justify-center">
-									<svg
-										className="animate-spin h-3.5 w-3.5"
-										viewBox="0 0 24 24"
-										fill="none"
-										aria-hidden="true"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										/>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-										/>
-									</svg>
-									Saving...
-								</span>
-							) : (
-								"Save Changes"
-							)}
+							<X size={18} />
 						</button>
 					</div>
-				</form>
+
+					<h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+						General
+					</h4>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div>
+							<label
+								htmlFor="edit-project-name"
+								className="block text-sm font-medium text-foreground mb-1.5"
+							>
+								Project Name <span className="text-destructive">*</span>
+							</label>
+							<input
+								id="edit-project-name"
+								ref={nameInputRef}
+								type="text"
+								required
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								maxLength={80}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground"
+								placeholder="e.g., Marketing Campaign"
+							/>
+							<div className="flex justify-end mt-1">
+								<span className="text-xs text-muted-foreground">
+									{name.length}/80
+								</span>
+							</div>
+						</div>
+
+						<div>
+							<label
+								htmlFor="edit-project-description"
+								className="block text-sm font-medium text-foreground mb-1.5"
+							>
+								Description{" "}
+								<span className="text-muted-foreground font-normal">
+									(optional)
+								</span>
+							</label>
+							<textarea
+								id="edit-project-description"
+								rows={3}
+								value={description}
+								onChange={(e) => setDescription(e.target.value)}
+								maxLength={500}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground resize-none"
+								placeholder="What is this project about?"
+							/>
+							<div className="flex justify-end mt-1">
+								<span className="text-xs text-muted-foreground">
+									{description.length}/500
+								</span>
+							</div>
+						</div>
+
+						<div>
+							<label
+								htmlFor="edit-project-due-date"
+								className="block text-sm font-medium text-foreground mb-1.5"
+							>
+								Target Date{" "}
+								<span className="text-muted-foreground font-normal">
+									(optional)
+								</span>
+							</label>
+							<input
+								id="edit-project-due-date"
+								type="date"
+								value={dueDate}
+								onChange={(e) => setDueDate(e.target.value)}
+								className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition placeholder:text-muted-foreground dark:[scheme:dark]"
+							/>
+						</div>
+
+						<div className="flex justify-end gap-3 pt-2">
+							<button
+								type="button"
+								onClick={closeEditProjectModal}
+								className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								disabled={isSubmitting || !name.trim() || !hasChanges}
+								className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-30"
+							>
+								{isSubmitting ? (
+									<span className="flex items-center gap-2 justify-center">
+										<svg
+											className="animate-spin h-3.5 w-3.5"
+											viewBox="0 0 24 24"
+											fill="none"
+											aria-hidden="true"
+										>
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+											/>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+											/>
+										</svg>
+										Saving...
+									</span>
+								) : (
+									"Save Changes"
+								)}
+							</button>
+						</div>
+					</form>
+
+					{canDelete && (
+						<section className="mt-7 border-t border-destructive/20 pt-6">
+							<div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+								<div className="flex items-start gap-3">
+									<Trash2
+										size={18}
+										className="mt-0.5 shrink-0 text-destructive"
+									/>
+									<div className="min-w-0 flex-1">
+										<h4 className="text-sm font-semibold text-destructive">
+											Danger Zone
+										</h4>
+										<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+											Deleting this project permanently removes its tasks,
+											columns, memberships, and invitations.
+										</p>
+										<label
+											htmlFor="delete-project-confirmation"
+											className="mt-4 block text-xs font-medium text-foreground"
+										>
+											Type{" "}
+											<span className="font-semibold">
+												{selectedProjectForEdit.name}
+											</span>{" "}
+											to confirm
+										</label>
+										<input
+											id="delete-project-confirmation"
+											value={deleteConfirmation}
+											onChange={(event) =>
+												setDeleteConfirmation(event.target.value)
+											}
+											className="mt-1.5 w-full rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/40"
+										/>
+										<button
+											type="button"
+											onClick={handleDelete}
+											disabled={
+												isDeleting ||
+												deleteConfirmation !== selectedProjectForEdit.name
+											}
+											className="mt-3 inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
+										>
+											<Trash2 size={15} />
+											{isDeleting ? "Deleting…" : "Delete Project"}
+										</button>
+									</div>
+								</div>
+							</div>
+						</section>
+					)}
+				</div>
 			</div>
 		</div>
 	);

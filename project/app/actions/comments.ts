@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
+import {
+	getTaskProjectId,
+	requireProjectCapability,
+} from "@/lib/db/project-permissions";
 import { lists, projectMembers, tasks } from "@/lib/db/schema";
 import { publishProjectEvent } from "@/services/realtime/events";
 
@@ -22,7 +26,10 @@ const createCommentSchema = z.object({
 
 export async function getCommentsAction(taskId: string) {
 	try {
-		await requireAuth();
+		const clerkId = await requireAuth();
+		const projectId = await getTaskProjectId(taskId);
+		if (!projectId) return { success: false, error: "Task not found" };
+		await requireProjectCapability(clerkId, projectId, "canViewProject");
 		const comments = await queries.comments.getByTask(taskId);
 		return { success: true, data: comments };
 	} catch (error) {
@@ -41,6 +48,9 @@ export async function createCommentAction(rawData: {
 		if (!user) return { success: false, error: "User not found" };
 
 		const data = createCommentSchema.parse(rawData);
+		const projectId = await getTaskProjectId(data.taskId);
+		if (!projectId) return { success: false, error: "Task not found" };
+		await requireProjectCapability(clerkId, projectId, "canMutateTasks");
 		const newComment = await queries.comments.create({
 			content: data.content,
 			taskId: data.taskId,
@@ -141,6 +151,9 @@ export async function deleteCommentAction(commentId: string) {
 
 		const comment = await queries.comments.getById(commentId);
 		if (!comment) return { success: false, error: "Comment not found" };
+		const projectId = await getTaskProjectId(comment.taskId);
+		if (!projectId) return { success: false, error: "Task not found" };
+		await requireProjectCapability(clerkId, projectId, "canMutateTasks");
 		if (comment.authorId !== user.id)
 			return { success: false, error: "Not authorized to delete this comment" };
 

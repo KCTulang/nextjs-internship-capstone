@@ -1,18 +1,20 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { createNotificationAction } from "@/app/actions/notifications";
 import { db, queries } from "@/lib/db";
 import {
-	canAccessProject,
+	canMutateProjectTasks,
 	projectCompletionAdvisoryLock,
 	projectCompletionAdvisoryLocks,
 	validateProjectId,
 } from "@/lib/db/project-column-guards";
+import { requireProjectCapability } from "@/lib/db/project-permissions";
 import {
+	focusSessions,
 	lists,
 	projectMembers,
 	projects,
@@ -44,9 +46,17 @@ export async function getTaskCreationOptionsAction() {
 		if (!currentUser) return { success: false, error: "User not found" };
 
 		const memberships = await db
-			.select({ projectId: projectMembers.projectId })
+			.select({
+				projectId: projectMembers.projectId,
+				role: projectMembers.role,
+			})
 			.from(projectMembers)
-			.where(eq(projectMembers.userId, currentUser.id));
+			.where(
+				and(
+					eq(projectMembers.userId, currentUser.id),
+					inArray(projectMembers.role, ["admin", "member"]),
+				),
+			);
 		const ownedProjects = await db
 			.select({ projectId: projects.id })
 			.from(projects)
@@ -192,18 +202,17 @@ export async function createTaskAction(
 		const project = await db.query.projects.findFirst({
 			where: eq(projects.id, destinationList.projectId),
 		});
-		const membership = await db.query.projectMembers.findFirst({
-			where: and(
-				eq(projectMembers.projectId, destinationList.projectId),
-				eq(projectMembers.userId, currentUser.id),
-			),
-		});
-		if (!project || (project.ownerId !== currentUser.id && !membership)) {
+		if (!project) {
 			return {
 				success: false,
-				error: "You do not have access to this project.",
+				error: "The selected project no longer exists.",
 			};
 		}
+		await requireProjectCapability(
+			clerkId,
+			destinationList.projectId,
+			"canMutateTasks",
+		);
 
 		if (data.assigneeId) {
 			const assigneeMembership = await db.query.projectMembers.findFirst({
@@ -295,47 +304,85 @@ export async function updateTaskAction(
 	projectId?: string | null,
 ) {
 	try {
-		await requireAuth();
+		const clerkId = await requireAuth();
 		const data = updateTaskSchema.parse(rawData);
 
 		const [currentTask] = await db
-			.select()
+			.select({ task: tasks, projectId: lists.projectId })
 			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
 			.where(eq(tasks.id, taskId));
 
 		if (!currentTask) {
 			return { success: false, error: "Task not found" };
 		}
+		if (projectId && projectId !== currentTask.projectId) {
+			return { success: false, error: "Task does not belong to this project." };
+		}
+		await requireProjectCapability(
+			clerkId,
+			currentTask.projectId,
+			"canMutateTasks",
+		);
+		if (data.listId) {
+			const destination = await db.query.lists.findFirst({
+				where: and(
+					eq(lists.id, data.listId),
+					eq(lists.projectId, currentTask.projectId),
+				),
+				columns: { id: true },
+			});
+			if (!destination) {
+				return { success: false, error: "Destination list is unavailable." };
+			}
+		}
+		if (data.assigneeId) {
+			const targetProject = await db.query.projects.findFirst({
+				where: eq(projects.id, currentTask.projectId),
+				columns: { ownerId: true },
+			});
+			const assigneeMembership = await db.query.projectMembers.findFirst({
+				where: and(
+					eq(projectMembers.projectId, currentTask.projectId),
+					eq(projectMembers.userId, data.assigneeId),
+				),
+				columns: { id: true },
+			});
+			if (targetProject?.ownerId !== data.assigneeId && !assigneeMembership) {
+				return { success: false, error: "Assignee is not a project member." };
+			}
+		}
 
 		await queries.tasks.update(taskId, data);
+		const taskBeforeUpdate = currentTask.task;
 
 		const logPromises = [];
-		if (data.title && data.title !== currentTask.title) {
+		if (data.title && data.title !== taskBeforeUpdate.title) {
 			logPromises.push(
-				logActivity(taskId, "task_updated", currentTask.title, data.title),
+				logActivity(taskId, "task_updated", taskBeforeUpdate.title, data.title),
 			);
 		}
 		if (
 			data.description !== undefined &&
-			data.description !== currentTask.description
+			data.description !== taskBeforeUpdate.description
 		) {
 			logPromises.push(logActivity(taskId, "task_updated"));
 		}
-		if (data.listId && data.listId !== currentTask.listId) {
+		if (data.listId && data.listId !== taskBeforeUpdate.listId) {
 			logPromises.push(logActivity(taskId, "task_moved"));
 		}
-		if (data.priority && data.priority !== currentTask.priority) {
+		if (data.priority && data.priority !== taskBeforeUpdate.priority) {
 			logPromises.push(
 				logActivity(
 					taskId,
 					"task_priority_changed",
-					currentTask.priority || "medium",
+					taskBeforeUpdate.priority || "medium",
 					data.priority,
 				),
 			);
 		}
 		if (data.dueDate !== undefined) {
-			const currentStr = currentTask.dueDate;
+			const currentStr = taskBeforeUpdate.dueDate;
 			const newStr = data.dueDate;
 			if (currentStr !== newStr) {
 				logPromises.push(
@@ -375,45 +422,27 @@ export async function updateTaskAction(
 				const addValues = toAdd.map((uid) => ({ taskId, userId: uid }));
 				await db.insert(taskAssignees).values(addValues);
 
-				const clerkId = await requireAuth();
 				const currentUser = await queries.users.getByClerkId(clerkId);
 
 				for (const uid of toAdd) {
 					logPromises.push(logActivity(taskId, "task_assigned", null, uid));
 
 					if (currentUser && uid !== currentUser.id) {
-						const notifProjectId = projectId;
-						if (!notifProjectId && currentTask.listId) {
-							const l = await db.query.lists.findFirst({
-								where: eq(lists.id, currentTask.listId),
-							});
-							if (l?.projectId) {
-								await createNotificationAction({
-									userId: uid,
-									actorId: currentUser.id,
-									type: "assignment",
-									taskId,
-									projectId: l.projectId,
-									message: "assigned you to a task",
-								});
-							}
-						} else if (notifProjectId) {
-							await createNotificationAction({
-								userId: uid,
-								actorId: currentUser.id,
-								type: "assignment",
-								taskId,
-								projectId: notifProjectId,
-								message: "assigned you to a task",
-							});
-						}
+						await createNotificationAction({
+							userId: uid,
+							actorId: currentUser.id,
+							type: "assignment",
+							taskId,
+							projectId: currentTask.projectId,
+							message: "assigned you to a task",
+						});
 					}
 				}
 			}
 		}
 
 		if (data.labels !== undefined) {
-			const oldLabels = currentTask.labels || [];
+			const oldLabels = taskBeforeUpdate.labels || [];
 			const newLabels = data.labels || [];
 
 			const added = newLabels.filter((l) => !oldLabels.includes(l));
@@ -432,19 +461,13 @@ export async function updateTaskAction(
 		if (!hydratedTask) throw new Error("Updated task could not be hydrated");
 		const taskDTO = toTaskDTO(hydratedTask);
 
-		let actualProjectId = projectId;
-		if (!actualProjectId && currentTask.listId) {
-			const list = await db.query.lists.findFirst({
-				where: eq(lists.id, currentTask.listId),
-			});
-			actualProjectId = list?.projectId || null;
-		}
+		const actualProjectId = currentTask.projectId;
 
 		if (actualProjectId) {
 			await publishProjectEvent({
 				type: "task.updated",
 				projectId: actualProjectId,
-				actorId: await auth().then((a) => a.userId as string),
+				actorId: clerkId,
 				entityId: taskId,
 				timestamp: new Date().toISOString(),
 				payload: { task: taskDTO },
@@ -464,30 +487,27 @@ export async function deleteTaskAction(
 	projectId?: string | null,
 ) {
 	try {
-		const userId = await requireAuth();
-
-		let actualProjectId = projectId;
-		if (!actualProjectId) {
-			const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
-			if (task?.listId) {
-				const list = await db.query.lists.findFirst({
-					where: eq(lists.id, task.listId),
-				});
-				actualProjectId = list?.projectId || null;
-			}
+		const clerkId = await requireAuth();
+		const [task] = await db
+			.select({ projectId: lists.projectId })
+			.from(tasks)
+			.innerJoin(lists, eq(tasks.listId, lists.id))
+			.where(eq(tasks.id, taskId));
+		if (!task) return { success: false, error: "Task not found" };
+		if (projectId && projectId !== task.projectId) {
+			return { success: false, error: "Task does not belong to this project." };
 		}
+		await requireProjectCapability(clerkId, task.projectId, "canMutateTasks");
 
 		await queries.tasks.delete(taskId);
 
-		if (actualProjectId) {
-			await publishProjectEvent({
-				type: "task.deleted",
-				projectId: actualProjectId,
-				actorId: userId,
-				entityId: taskId,
-				timestamp: new Date().toISOString(),
-			});
-		}
+		await publishProjectEvent({
+			type: "task.deleted",
+			projectId: task.projectId,
+			actorId: clerkId,
+			entityId: taskId,
+			timestamp: new Date().toISOString(),
+		});
 
 		revalidatePath(`/`, "layout");
 		return { success: true };
@@ -539,6 +559,7 @@ export async function getAllUserTasksAction() {
 				assigneeId: tasks.assigneeId,
 				assigneeName: users.name,
 				assigneeEmail: users.email,
+				canMutateTasks: canMutateProjectTasks(clerkId, sql`${projects.id}`),
 			})
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
@@ -558,6 +579,7 @@ export async function getAllUserTasksAction() {
 			labels: t.labels,
 			listName: t.listName,
 			listIsCompleted: t.listIsCompleted,
+			canMutateTasks: t.canMutateTasks,
 			status: t.listName,
 			assignee: t.assigneeId
 				? {
@@ -575,7 +597,150 @@ export async function getAllUserTasksAction() {
 	}
 }
 
-export async function getAnalyticsAction() {
+export type AnalyticsRange = "7d" | "30d" | "month" | "all";
+
+export interface AnalyticsData {
+	range: AnalyticsRange;
+	rangeLabel: string;
+	totalTasks: number;
+	completedTasks: number;
+	completionRate: number;
+	projectCount: number;
+	teamMemberCount: number;
+	completionWarning: string | null;
+	trend: { label: string; created: number; completed: number }[];
+	statuses: { label: string; count: number; isCompleted: boolean }[];
+	workload: {
+		id: string;
+		name: string | null;
+		email: string;
+		activeTasks: number;
+	}[];
+	deadlines: { overdue: number; dueSoon: number; upcoming: number };
+	focus: {
+		totalSeconds: number;
+		sessionCount: number;
+		averageSeconds: number;
+		todaySeconds: number;
+	};
+}
+
+const ANALYTICS_RANGE_LABELS: Record<AnalyticsRange, string> = {
+	"7d": "Last 7 days",
+	"30d": "Last 30 days",
+	month: "This month",
+	all: "All time",
+};
+
+function startOfLocalDay(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addLocalDays(date: Date, days: number) {
+	const next = new Date(date);
+	next.setDate(next.getDate() + days);
+	return next;
+}
+
+function getAnalyticsPeriod(range: AnalyticsRange, now: Date) {
+	const today = startOfLocalDay(now);
+	if (range === "7d") return { start: addLocalDays(today, -6), end: now };
+	if (range === "30d") return { start: addLocalDays(today, -29), end: now };
+	if (range === "month") {
+		return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+	}
+	return { start: null, end: now };
+}
+
+function buildAnalyticsTrend(
+	taskRows: {
+		createdAt: Date | null;
+		listIsCompleted: boolean;
+	}[],
+	range: AnalyticsRange,
+	periodStart: Date | null,
+	now: Date,
+) {
+	const today = startOfLocalDay(now);
+	let bucketStarts: Date[] = [];
+	let labelOptions: Intl.DateTimeFormatOptions = {
+		month: "short",
+		day: "numeric",
+	};
+
+	if (range === "7d") {
+		bucketStarts = Array.from({ length: 7 }, (_, index) =>
+			addLocalDays(today, index - 6),
+		);
+		labelOptions = { weekday: "short" };
+	} else if (range === "30d") {
+		const start = periodStart ?? addLocalDays(today, -29);
+		bucketStarts = Array.from({ length: 6 }, (_, index) =>
+			addLocalDays(start, index * 5),
+		);
+	} else if (range === "month") {
+		const start = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
+		for (
+			let cursor = new Date(start);
+			cursor <= now;
+			cursor = addLocalDays(cursor, 7)
+		) {
+			bucketStarts.push(cursor);
+		}
+	} else {
+		const datedTasks = taskRows.filter(
+			(task): task is { createdAt: Date; listIsCompleted: boolean } =>
+				task.createdAt instanceof Date,
+		);
+		const earliest = datedTasks.reduce<Date>(
+			(current, task) => (task.createdAt < current ? task.createdAt : current),
+			now,
+		);
+		const monthCount =
+			(now.getFullYear() - earliest.getFullYear()) * 12 +
+			now.getMonth() -
+			earliest.getMonth() +
+			1;
+		if (monthCount <= 12) {
+			for (let index = 0; index < monthCount; index += 1) {
+				bucketStarts.push(
+					new Date(earliest.getFullYear(), earliest.getMonth() + index, 1),
+				);
+			}
+			labelOptions = { month: "short" };
+		} else {
+			for (
+				let year = earliest.getFullYear();
+				year <= now.getFullYear();
+				year += 1
+			) {
+				bucketStarts.push(new Date(year, 0, 1));
+			}
+			labelOptions = { year: "numeric" };
+		}
+	}
+
+	if (bucketStarts.length === 0) bucketStarts = [today];
+
+	return bucketStarts.map((start, index) => {
+		const end = bucketStarts[index + 1] ?? addLocalDays(today, 1);
+		const tasksInBucket = taskRows.filter(
+			(task) =>
+				task.createdAt && task.createdAt >= start && task.createdAt < end,
+		);
+		return {
+			label: new Intl.DateTimeFormat("en-US", labelOptions).format(start),
+			created: tasksInBucket.length,
+			completed: tasksInBucket.filter((task) => task.listIsCompleted).length,
+		};
+	});
+}
+
+export async function getAnalyticsAction(
+	range: AnalyticsRange = "30d",
+): Promise<
+	{ success: true; data: AnalyticsData } | { success: false; error: string }
+> {
 	try {
 		const clerkId = await requireAuth();
 		const user = await queries.users.getByClerkId(clerkId);
@@ -598,63 +763,203 @@ export async function getAnalyticsAction() {
 			]),
 		);
 
+		const now = new Date();
+		const normalizedRange: AnalyticsRange =
+			range in ANALYTICS_RANGE_LABELS ? range : "30d";
+		const period = getAnalyticsPeriod(normalizedRange, now);
+
 		if (projectIds.length === 0) {
 			return {
 				success: true,
 				data: {
+					range: normalizedRange,
+					rangeLabel: ANALYTICS_RANGE_LABELS[normalizedRange],
 					totalTasks: 0,
 					completedTasks: 0,
 					completionRate: 0,
 					projectCount: 0,
+					teamMemberCount: 0,
+					completionWarning: null,
+					trend: [],
+					statuses: [],
+					workload: [],
+					deadlines: { overdue: 0, dueSoon: 0, upcoming: 0 },
+					focus: {
+						totalSeconds: 0,
+						sessionCount: 0,
+						averageSeconds: 0,
+						todaySeconds: 0,
+					},
 				},
 			};
 		}
 
-		const allTasks = await db
-			.select({
-				id: tasks.id,
-				listId: tasks.listId,
-				projectId: lists.projectId,
-				listIsCompleted: lists.isCompleted,
-			})
-			.from(tasks)
-			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.where(inArray(lists.projectId, projectIds));
-
-		const allLists = await db
-			.select({
-				id: lists.id,
-				projectId: lists.projectId,
-				isCompleted: lists.isCompleted,
-			})
-			.from(lists)
-			.where(inArray(lists.projectId, projectIds));
+		const [allTasks, allLists, focusRows, memberRows, ownerRows] =
+			await Promise.all([
+				db
+					.select({
+						id: tasks.id,
+						projectId: lists.projectId,
+						listName: lists.name,
+						listIsCompleted: lists.isCompleted,
+						dueDate: tasks.dueDate,
+						createdAt: tasks.createdAt,
+						assigneeId: tasks.assigneeId,
+					})
+					.from(tasks)
+					.innerJoin(lists, eq(tasks.listId, lists.id))
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({
+						id: lists.id,
+						projectId: lists.projectId,
+						isCompleted: lists.isCompleted,
+					})
+					.from(lists)
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({
+						duration: focusSessions.duration,
+						startTime: focusSessions.startTime,
+						status: focusSessions.status,
+					})
+					.from(focusSessions)
+					.innerJoin(tasks, eq(focusSessions.taskId, tasks.id))
+					.innerJoin(lists, eq(tasks.listId, lists.id))
+					.where(inArray(lists.projectId, projectIds)),
+				db
+					.select({ id: users.id, name: users.name, email: users.email })
+					.from(projectMembers)
+					.innerJoin(users, eq(projectMembers.userId, users.id))
+					.where(inArray(projectMembers.projectId, projectIds)),
+				db
+					.select({ id: users.id, name: users.name, email: users.email })
+					.from(projects)
+					.innerJoin(users, eq(projects.ownerId, users.id))
+					.where(inArray(projects.id, projectIds)),
+			]);
 
 		const destinations = resolveCompletionDestinations(projectIds, allLists);
-		if (!destinations.success) {
-			return {
-				success: false,
-				code: destinations.code,
-				error: destinations.error,
-				guidance: destinations.guidance,
-				projectCount: projectIds.length,
-			};
-		}
-
-		const totalTasks = allTasks.length;
-		const completedTasks = allTasks.filter(
+		const completionWarning = destinations.success
+			? null
+			: `${destinations.error} ${destinations.guidance}`;
+		const periodTasks = allTasks.filter(
+			(task) =>
+				!period.start || (task.createdAt && task.createdAt >= period.start),
+		);
+		const totalTasks = periodTasks.length;
+		const completedTasks = periodTasks.filter(
 			(task) => task.listIsCompleted,
 		).length;
 		const completionRate =
 			totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+		const statusMap = new Map<
+			string,
+			{ label: string; count: number; isCompleted: boolean }
+		>();
+		for (const task of periodTasks) {
+			const key = `${task.listIsCompleted}:${task.listName}`;
+			const existing = statusMap.get(key);
+			if (existing) existing.count += 1;
+			else {
+				statusMap.set(key, {
+					label: task.listName,
+					count: 1,
+					isCompleted: task.listIsCompleted,
+				});
+			}
+		}
+
+		const members = new Map(
+			[...ownerRows, ...memberRows].map((member) => [member.id, member]),
+		);
+		const activeTaskCounts = new Map<string, number>();
+		for (const task of allTasks) {
+			if (task.assigneeId && !task.listIsCompleted) {
+				activeTaskCounts.set(
+					task.assigneeId,
+					(activeTaskCounts.get(task.assigneeId) ?? 0) + 1,
+				);
+			}
+		}
+		const workload = Array.from(members.values())
+			.map((member) => ({
+				...member,
+				activeTasks: activeTaskCounts.get(member.id) ?? 0,
+			}))
+			.sort(
+				(a, b) =>
+					b.activeTasks - a.activeTasks ||
+					(a.name ?? a.email).localeCompare(b.name ?? b.email),
+			);
+
+		const today = startOfLocalDay(now);
+		const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+		const dueSoonKey = (() => {
+			const dueSoonDate = addLocalDays(today, 7);
+			return `${dueSoonDate.getFullYear()}-${String(dueSoonDate.getMonth() + 1).padStart(2, "0")}-${String(dueSoonDate.getDate()).padStart(2, "0")}`;
+		})();
+		const openDueDates = allTasks.flatMap((task) =>
+			task.dueDate && !task.listIsCompleted ? [task.dueDate] : [],
+		);
+		const deadlines = {
+			overdue: openDueDates.filter((dueDate) => dueDate < todayKey).length,
+			dueSoon: openDueDates.filter(
+				(dueDate) => dueDate >= todayKey && dueDate <= dueSoonKey,
+			).length,
+			upcoming: openDueDates.filter((dueDate) => dueDate > dueSoonKey).length,
+		};
+
+		const periodFocusRows = focusRows.filter(
+			(session) =>
+				session.status === "completed" &&
+				session.duration !== null &&
+				(!period.start || session.startTime >= period.start),
+		);
+		const totalFocusSeconds = periodFocusRows.reduce(
+			(total, session) => total + (session.duration ?? 0),
+			0,
+		);
+		const todayFocusSeconds = focusRows
+			.filter(
+				(session) =>
+					session.status === "completed" && session.startTime >= today,
+			)
+			.reduce((total, session) => total + (session.duration ?? 0), 0);
+
 		return {
 			success: true,
 			data: {
+				range: normalizedRange,
+				rangeLabel: ANALYTICS_RANGE_LABELS[normalizedRange],
 				totalTasks,
 				completedTasks,
 				completionRate,
 				projectCount: projectIds.length,
+				teamMemberCount: members.size,
+				completionWarning,
+				trend: buildAnalyticsTrend(
+					periodTasks,
+					normalizedRange,
+					period.start,
+					now,
+				),
+				statuses: Array.from(statusMap.values()).sort(
+					(a, b) =>
+						Number(a.isCompleted) - Number(b.isCompleted) || b.count - a.count,
+				),
+				workload,
+				deadlines,
+				focus: {
+					totalSeconds: totalFocusSeconds,
+					sessionCount: periodFocusRows.length,
+					averageSeconds:
+						periodFocusRows.length > 0
+							? Math.round(totalFocusSeconds / periodFocusRows.length)
+							: 0,
+					todaySeconds: todayFocusSeconds,
+				},
 			},
 		};
 	} catch (error) {
@@ -666,23 +971,26 @@ export async function getAnalyticsAction() {
 export async function bulkDeleteTasksAction(taskIds: string[]) {
 	try {
 		const clerkId = await requireAuth();
-		const user = await queries.users.getByClerkId(clerkId);
-		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
 		const validTasks = await db
 			.select({ id: tasks.id })
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
 			.where(
 				and(
 					inArray(tasks.id, taskIds),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 				),
 			);
 
 		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length !== taskIds.length) {
+			return {
+				success: false,
+				error: "You do not have permission to delete one or more tasks.",
+			};
+		}
 		if (validTaskIds.length > 0) {
 			await db.delete(tasks).where(inArray(tasks.id, validTaskIds));
 		}
@@ -701,23 +1009,26 @@ export async function bulkUpdateTasksPriorityAction(
 ) {
 	try {
 		const clerkId = await requireAuth();
-		const user = await queries.users.getByClerkId(clerkId);
-		if (!user) throw new Error("Unauthorized");
 		if (taskIds.length === 0) return { success: true };
 
 		const validTasks = await db
 			.select({ id: tasks.id, priority: tasks.priority })
 			.from(tasks)
 			.innerJoin(lists, eq(tasks.listId, lists.id))
-			.innerJoin(projects, eq(lists.projectId, projects.id))
 			.where(
 				and(
 					inArray(tasks.id, taskIds),
-					or(eq(projects.ownerId, user.id), eq(tasks.assigneeId, user.id)),
+					canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 				),
 			);
 
 		const validTaskIds = validTasks.map((t) => t.id);
+		if (validTaskIds.length !== taskIds.length) {
+			return {
+				success: false,
+				error: "You do not have permission to update one or more tasks.",
+			};
+		}
 		if (validTaskIds.length > 0) {
 			await db
 				.update(tasks)
@@ -789,7 +1100,7 @@ async function completeTasksAuthoritatively(
 		.select({
 			taskId: tasks.id,
 			projectId: lists.projectId,
-			allowed: canAccessProject(clerkId, sql`${lists.projectId}`),
+			allowed: canMutateProjectTasks(clerkId, sql`${lists.projectId}`),
 			actorId: sql<string>`(
 				select actor."id" from "users" actor
 				where actor."clerk_id" = ${clerkId}
@@ -821,7 +1132,7 @@ async function completeTasksAuthoritatively(
 	);
 	const allRequestsValid = sql<boolean>`(
 		select count(*) = ${uniqueTaskIds.length}
-			and bool_and(${canAccessProject(clerkId, sql`source."project_id"`)})
+			and bool_and(${canMutateProjectTasks(clerkId, sql`source."project_id"`)})
 		from "tasks" requested_task
 		join "lists" source on source."id" = requested_task."list_id"
 		where requested_task."id" in (${taskIdSql})
@@ -1048,7 +1359,7 @@ export async function bulkUpdateTaskOrderAction(
 			...new Set(parsedUpdates.map((update) => update.listId)),
 		];
 		const relationshipsValid = sql<boolean>`
-			${canAccessProject(clerkId, parsedProjectId)}
+			${canMutateProjectTasks(clerkId, parsedProjectId)}
 			and (
 				select count(*) = ${taskIds.length}
 				from "tasks" requested_task
