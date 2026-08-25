@@ -253,56 +253,59 @@ export function MobileKanbanBoard({
 
 	return (
 		<div className="flex flex-col h-[calc(100vh-140px)] w-full overflow-hidden bg-background">
-			<div className="flex items-center justify-between border-b border-border bg-card sticky top-0 z-10 shadow-sm ">
-				<div className="absolute left-0 top-0 bottom-0 w-4 bg-linear-to-r from-card to-transparent pointer-events-none z-10" />
+			<div className="flex items-center justify-between border-b border-border bg-card sticky top-0 z-10 shadow-sm">
+				<div className="relative flex-1 min-w-0 flex items-center">
+					<div className="absolute left-0 top-0 bottom-0 w-6 bg-linear-to-r from-card to-transparent pointer-events-none z-10" />
 
-				<div className="flex-1 overflow-x-auto scrollbar-none flex items-center space-x-2 py-2 px-4 snap-x relative scroll-smooth">
-					{lists.map((list, idx) => {
-						const isActive = idx === activeListIndex;
-						return (
-							<button
-								key={list.id}
-								ref={(el) => {
-									tabRefs.current[idx] = el;
-								}}
-								type="button"
-								disabled={isTaskDragging}
-								onClick={() => {
-									if (idx !== activeListIndex) {
-										setTuple([
-											page + (idx > activeListIndex ? 1 : -1),
-											idx > activeListIndex ? 1 : -1,
-										]);
-										setActiveListIndex(idx);
-									}
-								}}
-								className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all snap-center shrink-0 ${
-									isActive
-										? "bg-primary text-primary-foreground shadow-sm"
-										: "text-muted-foreground hover:bg-muted hover:text-foreground"
-								}`}
-							>
-								{list.name}{" "}
-								<span className="opacity-60 ml-1 text-xs">
-									({list.tasks?.length || 0})
-								</span>
-							</button>
-						);
-					})}
+					<div className="w-full overflow-x-auto scrollbar-none flex items-center space-x-2 py-2 px-4 snap-x scroll-smooth">
+						{lists.map((list, idx) => {
+							const isActive = idx === activeListIndex;
+							return (
+								<button
+									key={list.id}
+									ref={(el) => {
+										tabRefs.current[idx] = el;
+									}}
+									type="button"
+									disabled={isTaskDragging}
+									onClick={() => {
+										if (idx !== activeListIndex) {
+											setTuple([
+												page + (idx > activeListIndex ? 1 : -1),
+												idx > activeListIndex ? 1 : -1,
+											]);
+											setActiveListIndex(idx);
+										}
+									}}
+									className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all snap-center shrink-0 ${
+										isActive
+											? "bg-primary text-primary-foreground shadow-sm"
+											: "text-muted-foreground hover:bg-muted hover:text-foreground"
+									}`}
+								>
+									{list.name}{" "}
+									<span className="opacity-60 ml-1 text-xs">
+										({list.tasks?.length || 0})
+									</span>
+								</button>
+							);
+						})}
+					</div>
+
+					<div className="absolute right-0 top-0 bottom-0 w-8 bg-linear-to-l from-card to-transparent pointer-events-none z-10" />
 				</div>
-
-				<div className="absolute right-10 top-0 bottom-0 w-10 bg-linear-to-l from-card to-transparent pointer-events-none z-10" />
 
 				{canManageColumns && (
 					<div className="z-10 flex shrink-0 items-center justify-center border-l border-border/50 bg-card px-2">
 						<button
 							type="button"
 							onClick={() => setIsManageColumnsOpen(true)}
-							className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							title="Add or reorder columns"
+							className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card p-2 min-[430px]:px-2.5 min-[430px]:py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							aria-label="Add column"
+							title="Add column"
 						>
-							<Plus size={16} />
-							<span>Add column</span>
+							<Plus size={16} className="shrink-0" />
+							<span className="hidden min-[430px]:inline">Add column</span>
 						</button>
 					</div>
 				)}

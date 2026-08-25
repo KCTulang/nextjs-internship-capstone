@@ -31,6 +31,7 @@ import {
 	useTasksStore,
 } from "@/stores/board-store";
 import { useUIStore } from "@/stores/ui-store";
+import { BulkSelectionToolbar } from "./bulk-selection-toolbar";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";
 import { TaskCard } from "./task-card";
@@ -106,6 +107,7 @@ export function KanbanBoard({
 				taskId={taskId}
 				projectId={projectId}
 			/>
+			<BulkSelectionToolbar projectId={projectId} />
 		</>
 	);
 }
@@ -135,13 +137,8 @@ function DesktopKanbanBoard({
 	const addListInputRef = useRef<HTMLInputElement>(null);
 	const boardScrollRef = useRef<HTMLDivElement>(null);
 
-	const {
-		selectedTaskIds,
-		clearSelection,
-		deleteSelectedTasks,
-		moveSelectedTasks,
-	} = useTasksStore();
-	const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
+	const { selectedTaskIds, clearSelection, deleteSelectedTasks } =
+		useTasksStore();
 	const { openCreateTaskModal, openConfirmModal } = useUIStore();
 
 	useEffect(() => {
@@ -172,7 +169,6 @@ function DesktopKanbanBoard({
 
 			if (e.key === "Escape" && selectedTaskIds.length > 0) {
 				clearSelection();
-				setIsBulkMoveOpen(false);
 			} else if (
 				(e.key === "Delete" || e.key === "Backspace") &&
 				selectedTaskIds.length > 0
@@ -369,74 +365,6 @@ function DesktopKanbanBoard({
 
 	return (
 		<>
-			{selectedTaskIds.length > 0 && (
-				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5">
-					<div className="flex items-center gap-2 px-2 border-r border-background/20 font-medium">
-						<span className="bg-background text-foreground w-6 h-6 flex items-center justify-center rounded-full text-xs">
-							{selectedTaskIds.length}
-						</span>
-						<span className="text-sm">selected</span>
-					</div>
-
-					<div className="flex items-center gap-2">
-						<div className="relative">
-							<button
-								type="button"
-								onClick={() => setIsBulkMoveOpen(!isBulkMoveOpen)}
-								className="text-sm px-3 py-1.5 hover:bg-background/20 rounded-lg transition-colors flex items-center gap-2"
-							>
-								Move to...
-							</button>
-							{isBulkMoveOpen && (
-								<div className="absolute bottom-full left-0 mb-2 w-48 bg-card text-foreground border border-border rounded-xl shadow-xl overflow-hidden py-1">
-									{lists.map((list) => (
-										<button
-											type="button"
-											key={list.id}
-											onClick={() => {
-												moveSelectedTasks(list.id, projectId);
-												setIsBulkMoveOpen(false);
-											}}
-											className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-										>
-											{list.name}
-										</button>
-									))}
-								</div>
-							)}
-						</div>
-
-						<button
-							type="button"
-							onClick={() => {
-								const count = selectedTaskIds.length;
-								openConfirmModal({
-									title: "Delete tasks?",
-									description: `This will permanently delete ${count} selected task${count === 1 ? "" : "s"}. This action cannot be undone.`,
-									confirmText: "Delete Tasks",
-									onConfirm: async () => {
-										await deleteSelectedTasks(projectId);
-									},
-								});
-							}}
-							className="text-sm px-3 py-1.5 hover:bg-destructive hover:text-destructive-foreground text-destructive/90 rounded-lg transition-colors"
-						>
-							Delete
-						</button>
-
-						<button
-							type="button"
-							onClick={() => {
-								clearSelection();
-								setIsBulkMoveOpen(false);
-							}}
-							className="text-sm p-1.5 hover:bg-background/20 rounded-lg transition-colors ml-2"
-						>
-							<X size={16} />
-						</button>
-					</div>
-				</div>
-			)}
 			<DndContext
 				sensors={sensors}
 				collisionDetection={closestCenter}
