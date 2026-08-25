@@ -13,8 +13,8 @@ import { useUIStore } from "@/stores/ui-store";
 import { priorityClass } from "@/utils";
 import {
 	formatDateOnly,
+	formatDateOnlyDeadlineLabel,
 	isDateOnlyOverdue,
-	toDateOnly,
 } from "@/utils/date-only";
 import type { CalendarTask } from "./calendar-grid";
 
@@ -29,19 +29,6 @@ function isOverdue(
 
 interface UpcomingDeadlinesProps {
 	tasksWithDates: CalendarTask[];
-}
-
-function deadlineGroupLabel(dueDate: string) {
-	const today = new Date();
-	const tomorrow = new Date(today);
-	tomorrow.setDate(today.getDate() + 1);
-	if (dueDate === toDateOnly(today)) return "Today";
-	if (dueDate === toDateOnly(tomorrow)) return "Tomorrow";
-	return formatDateOnly(dueDate, {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-	});
 }
 
 export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
@@ -303,7 +290,7 @@ export function UpcomingDeadlines({ tasksWithDates }: UpcomingDeadlinesProps) {
 								className={`px-3 pb-1.5 text-xs font-semibold text-muted-foreground ${index === 0 ? "pt-0" : "pt-3"}`}
 							>
 								{overdue && "Overdue · "}
-								{deadlineGroupLabel(task.dueDate)}
+								{formatDateOnlyDeadlineLabel(task.dueDate)}
 							</div>
 						)}
 						<div data-task-id={task.id} className={containerClasses}>

@@ -43,3 +43,18 @@ export function formatDateOnly(
 export function isDateOnlyOverdue(value: string, today = new Date()): boolean {
 	return isDateOnly(value) && value < toDateOnly(today);
 }
+
+export function formatDateOnlyDeadlineLabel(
+	value: string,
+	today = new Date(),
+): string {
+	const tomorrow = new Date(today);
+	tomorrow.setDate(today.getDate() + 1);
+	if (value === toDateOnly(today)) return "Today";
+	if (value === toDateOnly(tomorrow)) return "Tomorrow";
+	return formatDateOnly(value, {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+	});
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	formatDateOnlyDeadlineLabel,
 	isDateOnly,
 	isDateOnlyOverdue,
 	parseDateOnly,
@@ -24,5 +25,12 @@ describe("date-only utilities", () => {
 		const today = new Date(2026, 7, 31, 23, 59, 59);
 		expect(isDateOnlyOverdue("2026-08-30", today)).toBe(true);
 		expect(isDateOnlyOverdue("2026-08-31", today)).toBe(false);
+	});
+
+	it("formats deadline labels relative to the local date", () => {
+		const today = new Date(2026, 7, 31, 23, 59, 59);
+		expect(formatDateOnlyDeadlineLabel("2026-08-31", today)).toBe("Today");
+		expect(formatDateOnlyDeadlineLabel("2026-09-01", today)).toBe("Tomorrow");
+		expect(formatDateOnlyDeadlineLabel("2026-09-02", today)).toBe("Wed, Sep 2");
 	});
 });
