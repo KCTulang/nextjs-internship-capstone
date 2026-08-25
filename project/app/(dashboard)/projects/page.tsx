@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ProjectCard } from "@/components/project-card";
+import { ProjectGridSkeleton } from "@/components/skeletons/project-card-skeleton";
 import { useProjectStore } from "@/hooks/use-projects";
 import { getProjectCompletionStats } from "@/lib/tasks/completion";
 import { useUIStore } from "@/stores/ui-store";
@@ -28,7 +29,7 @@ type SortOption = (typeof SORT_OPTIONS)[number]["value"];
 
 export default function ProjectsPage() {
 	const { openCreateProjectModal } = useUIStore();
-	const { projects, isLoading, fetchProjects } = useProjectStore();
+	const { projects, isLoading, error, fetchProjects } = useProjectStore();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState<StatusTab>("All");
@@ -259,27 +260,26 @@ export default function ProjectsPage() {
 			)}
 
 			{isLoading && projects.length === 0 ? (
-				<div
-					className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}
-				>
-					{[1, 2, 3, 4, 5, 6].map((i) => (
-						<div
-							key={i}
-							className="bg-card border border-border rounded-xl p-5 h-52 animate-pulse"
-						>
-							<div className="flex gap-3 mb-4">
-								<div className="w-10 h-10 bg-muted rounded-lg" />
-								<div className="flex-1 space-y-2">
-									<div className="h-4 bg-muted rounded w-3/4" />
-									<div className="h-3 bg-muted rounded w-1/2" />
-								</div>
-							</div>
-							<div className="space-y-2">
-								<div className="h-3 bg-muted rounded" />
-								<div className="h-3 bg-muted rounded w-4/5" />
-							</div>
-						</div>
-					))}
+				<ProjectGridSkeleton
+					className={
+						viewMode === "grid"
+							? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+							: "grid-cols-1"
+					}
+				/>
+			) : error && projects.length === 0 ? (
+				<div className="flex flex-col items-center justify-center rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-16 text-center">
+					<p className="font-medium text-destructive">
+						Unable to load projects
+					</p>
+					<p className="mt-1 text-sm text-destructive/80">{error}</p>
+					<button
+						type="button"
+						onClick={() => void fetchProjects(true)}
+						className="mt-4 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						Try again
+					</button>
 				</div>
 			) : filteredAndSorted.length === 0 ? (
 				<div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-xl text-center">

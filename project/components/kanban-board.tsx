@@ -35,6 +35,7 @@ import { BulkSelectionToolbar } from "./bulk-selection-toolbar";
 import { KanbanColumn } from "./kanban-column";
 import { MobileKanbanBoard } from "./mobile-kanban-board";
 import { ProjectDeadlinesModal } from "./modals/project-deadlines-modal";
+import { KanbanBoardSkeleton } from "./skeletons/kanban-board-skeleton";
 import { TaskCard } from "./task-card";
 import { TaskDetailPanel } from "./task-detail-panel";
 
@@ -92,10 +93,7 @@ export function KanbanBoard({
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
 
-	if (!mounted)
-		return (
-			<div className="h-[calc(100vh-140px)] animate-pulse bg-muted/20 rounded-2xl" />
-		);
+	if (!mounted) return <KanbanBoardSkeleton />;
 
 	return (
 		<>
@@ -244,19 +242,8 @@ function DesktopKanbanBoard({
 		}),
 	);
 
-	if (isLoading) {
-		return (
-			<div className="flex-1 flex items-center justify-center p-8 h-full">
-				<div className="animate-pulse flex gap-6 overflow-x-auto w-full h-150">
-					{[1, 2, 3].map((i) => (
-						<div
-							key={i}
-							className="w-75 bg-card border border-border/50 rounded-2xl shrink-0"
-						/>
-					))}
-				</div>
-			</div>
-		);
+	if (isLoading && lists.length === 0) {
+		return <KanbanBoardSkeleton />;
 	}
 
 	if (error) {

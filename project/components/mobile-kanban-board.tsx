@@ -23,6 +23,7 @@ import { type List, type Task, useTasksStore } from "@/stores/board-store";
 import { KanbanColumn } from "./kanban-column";
 import { ManageColumnsSheet } from "./modals/manage-columns-sheet";
 import { StatusPickerSheet } from "./modals/status-picker-sheet";
+import { KanbanBoardSkeleton } from "./skeletons/kanban-board-skeleton";
 import { TaskCard } from "./task-card";
 
 interface MobileKanbanBoardProps {
@@ -115,15 +116,26 @@ export function MobileKanbanBoard({
 		}),
 	);
 
-	if (isLoading) {
+	if (isLoading && lists.length === 0) {
+		return <KanbanBoardSkeleton />;
+	}
+
+	if (error) {
 		return (
-			<div className="flex-1 flex items-center justify-center p-8 h-[calc(100vh-140px)]">
-				<div className="animate-pulse w-full max-w-sm h-full bg-card border border-border/50 rounded-2xl" />
+			<div className="flex min-h-100 flex-1 flex-col items-center justify-center px-6 text-center">
+				<p className="text-sm font-medium text-destructive">{error}</p>
+				<button
+					type="button"
+					onClick={() => void fetchBoard(projectId)}
+					className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					Try again
+				</button>
 			</div>
 		);
 	}
 
-	if (error || !lists.length) return null;
+	if (!lists.length) return null;
 	const activeList = lists[activeListIndex] || lists[0];
 	const [page, direction] = tuple;
 

@@ -1,16 +1,17 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	getNotificationPreferencesAction,
 	updateNotificationPreferencesAction,
 } from "@/app/actions/notifications";
+import { NotificationSettingsSkeleton } from "@/components/skeletons/settings-skeletons";
 import { useUIStore } from "@/stores/ui-store";
 
 export function NotificationsSettings() {
 	const addToast = useUIStore((state) => state.addToast);
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [prefs, setPrefs] = useState({
 		muteAll: false,
@@ -23,8 +24,10 @@ export function NotificationsSettings() {
 		projectActivity: true,
 	});
 
-	useEffect(() => {
-		const loadPrefs = async () => {
+	const loadPrefs = useCallback(async () => {
+		setIsLoading(true);
+		setLoadError(null);
+		try {
 			const res = await getNotificationPreferencesAction();
 			if (res.success && res.data) {
 				setPrefs({
@@ -37,11 +40,19 @@ export function NotificationsSettings() {
 					invitations: res.data.invitations,
 					projectActivity: res.data.projectActivity,
 				});
+			} else {
+				setLoadError(res.error || "Unable to load notification preferences.");
 			}
+		} catch {
+			setLoadError("Unable to load notification preferences.");
+		} finally {
 			setIsLoading(false);
-		};
-		loadPrefs();
+		}
 	}, []);
+
+	useEffect(() => {
+		void loadPrefs();
+	}, [loadPrefs]);
 
 	const handleToggle = async (key: keyof typeof prefs) => {
 		const newVal = !prefs[key];
@@ -59,9 +70,20 @@ export function NotificationsSettings() {
 	};
 
 	if (isLoading) {
+		return <NotificationSettingsSkeleton />;
+	}
+
+	if (loadError) {
 		return (
-			<div className="flex items-center justify-center py-16">
-				<Loader2 className="animate-spin text-muted-foreground w-6 h-6" />
+			<div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5">
+				<p className="text-sm font-medium text-destructive">{loadError}</p>
+				<button
+					type="button"
+					onClick={() => void loadPrefs()}
+					className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					Try again
+				</button>
 			</div>
 		);
 	}

@@ -3,6 +3,7 @@
 import { CheckCircle, Clock, Plus, TrendingUp, Users } from "lucide-react";
 import { useEffect } from "react";
 import { ProjectCard } from "@/components/project-card";
+import { ProjectGridSkeleton } from "@/components/skeletons/project-card-skeleton";
 import { useProjectStore } from "@/hooks/use-projects";
 import { useUIStore } from "@/stores/ui-store";
 
@@ -23,7 +24,7 @@ export function DashboardClient({
 	completionError,
 }: DashboardClientProps) {
 	const { openCreateProjectModal, openInviteMemberModal } = useUIStore();
-	const { projects, isLoading, fetchProjects } = useProjectStore();
+	const { projects, isLoading, error, fetchProjects } = useProjectStore();
 	const canManageAnyMembers = projects.some(
 		(project) => project.capabilities?.canManageMembers,
 	);
@@ -134,8 +135,17 @@ export function DashboardClient({
 				</div>
 
 				{isLoading && projects.length === 0 ? (
-					<div className="text-center py-10 text-muted-foreground animate-pulse">
-						Loading projects...
+					<ProjectGridSkeleton count={3} label="Loading dashboard projects" />
+				) : error && projects.length === 0 ? (
+					<div className="rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-6 text-center">
+						<p className="text-sm font-medium text-destructive">{error}</p>
+						<button
+							type="button"
+							onClick={() => void fetchProjects(true)}
+							className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							Try again
+						</button>
 					</div>
 				) : projects.length === 0 ? (
 					<div className="text-center py-10 border border-dashed border-border rounded-xl">

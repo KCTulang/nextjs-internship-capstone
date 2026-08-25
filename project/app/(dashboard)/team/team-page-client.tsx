@@ -45,6 +45,7 @@ interface TeamPageClientProps {
 	initialMyInvites: ProjectInvitation[];
 	initialSentInvites: ProjectInvitation[];
 	currentUserId: string;
+	initialLoadError?: string;
 }
 
 function AccessBadge({ role }: { role: string }) {
@@ -478,6 +479,7 @@ export function TeamPageClient({
 	initialMyInvites,
 	initialSentInvites,
 	currentUserId,
+	initialLoadError,
 }: TeamPageClientProps) {
 	const { openInviteMemberModal } = useUIStore();
 	const [members, setMembers] = useState<TeamMember[]>(initialMembers);
@@ -650,6 +652,34 @@ export function TeamPageClient({
 			count: initialMyInvites.length,
 		},
 	];
+
+	if (initialLoadError) {
+		return (
+			<div className="space-y-6">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-foreground">
+						Team
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Manage members, roles, and invitations
+					</p>
+				</div>
+				<div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+					<p className="text-sm font-semibold text-destructive">
+						Unable to load team data
+					</p>
+					<p className="mt-1 text-sm text-destructive/80">{initialLoadError}</p>
+					<button
+						type="button"
+						onClick={() => router.refresh()}
+						className="mt-4 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						Try again
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6">

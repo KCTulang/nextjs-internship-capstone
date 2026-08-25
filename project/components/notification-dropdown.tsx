@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, BellOff, Check, ChevronRight, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	getNotificationPreferencesAction,
 	getNotificationsAction,
@@ -12,6 +12,7 @@ import {
 	markNotificationReadAction,
 	updateNotificationPreferencesAction,
 } from "@/app/actions/notifications";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type NotificationType = {
 	id: string;
@@ -35,12 +36,20 @@ interface PusherInstance {
 	unsubscribe: (channel: string) => void;
 }
 
+const notificationSkeletonIds = [
+	"notification-one",
+	"notification-two",
+	"notification-three",
+	"notification-four",
+];
+
 export function NotificationDropdown() {
 	const { userId } = useAuth();
 	const router = useRouter();
 	const [notifications, setNotifications] = useState<NotificationType[]>([]);
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [showMuteMenu, setShowMuteMenu] = useState(false);
 	const [prefs, setPrefs] = useState<{
 		muteAll?: boolean;
@@ -80,22 +89,33 @@ export function NotificationDropdown() {
 		};
 	}, [pusher, userId]);
 
-	useEffect(() => {
+	const loadNotifications = useCallback(async () => {
 		if (!userId) return;
 		setIsLoading(true);
-		Promise.all([
-			getNotificationsAction(),
-			getNotificationPreferencesAction(),
-		]).then(([notifRes, prefsRes]) => {
+		setLoadError(null);
+		try {
+			const [notifRes, prefsRes] = await Promise.all([
+				getNotificationsAction(),
+				getNotificationPreferencesAction(),
+			]);
 			if (notifRes.success && notifRes.data) {
 				setNotifications(notifRes.data);
+			} else {
+				setLoadError(notifRes.error || "Unable to load notifications.");
 			}
 			if (prefsRes.success && prefsRes.data) {
 				setPrefs(prefsRes.data);
 			}
+		} catch {
+			setLoadError("Unable to load notifications.");
+		} finally {
 			setIsLoading(false);
-		});
+		}
 	}, [userId]);
+
+	useEffect(() => {
+		void loadNotifications();
+	}, [loadNotifications]);
 
 	useEffect(() => {
 		const handleClickOutside = (e: MouseEvent) => {
@@ -226,7 +246,7 @@ export function NotificationDropdown() {
 						animate={{ opacity: 1, y: 0, scale: 1 }}
 						exit={{ opacity: 0, y: 10, scale: 0.95 }}
 						transition={{ duration: 0.2 }}
-						className="absolute right-0 mt-2 w-80 sm:w-96 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col"
+						className="fixed top-17.5 left-4 right-4 sm:absolute sm:top-auto sm:left-auto sm:right-0 sm:mt-2 w-auto sm:w-96 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col"
 					>
 						<div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
 							<h3 className="font-semibold text-sm flex items-center gap-2">
@@ -307,10 +327,44 @@ export function NotificationDropdown() {
 							</div>
 						) : (
 							<>
-								<div className="max-h-[60vh] overflow-y-auto scrollbar-thin">
+								<div
+									className="max-h-[60dvh] overflow-y-auto scrollbar-thin"
+									aria-busy={isLoading}
+								>
 									{isLoading ? (
-										<div className="p-8 text-center text-muted-foreground text-sm">
-											Loading...
+										<div role="status">
+											<span className="sr-only">Loading notifications</span>
+											<div
+												aria-hidden="true"
+												className="divide-y divide-border/50"
+											>
+												{notificationSkeletonIds.map((id) => (
+													<div key={id} className="flex gap-3 p-4">
+														<Skeleton className="size-8 shrink-0 rounded-full" />
+														<div className="flex-1 space-y-2">
+															<Skeleton className="h-3.5 w-4/5" />
+															<Skeleton className="h-3 w-full" />
+															<div className="flex justify-between gap-4 pt-1">
+																<Skeleton className="h-2.5 w-20" />
+																<Skeleton className="h-2.5 w-10" />
+															</div>
+														</div>
+													</div>
+												))}
+											</div>
+										</div>
+									) : loadError ? (
+										<div className="flex flex-col items-center p-8 text-center">
+											<p className="text-sm font-medium text-destructive">
+												{loadError}
+											</p>
+											<button
+												type="button"
+												onClick={() => void loadNotifications()}
+												className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											>
+												Try again
+											</button>
 										</div>
 									) : notifications.length === 0 ? (
 										<div className="p-8 text-center flex flex-col items-center">
@@ -347,13 +401,13 @@ export function NotificationDropdown() {
 																</span>
 																{n.message}
 															</p>
-															<div className="flex items-center gap-2 mt-1">
+															<div className="flex items-center justify-between gap-2 mt-1">
 																{n.project && (
 																	<span className="text-xs text-primary/80 font-medium truncate">
 																		{n.project.name}
 																	</span>
 																)}
-																<span className="text-[10px] text-muted-foreground">
+																<span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-auto">
 																	{formatRelativeTime(n.createdAt)}
 																</span>
 															</div>

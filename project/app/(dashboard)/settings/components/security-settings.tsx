@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { SecuritySettingsSkeleton } from "@/components/skeletons/settings-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore } from "@/stores/ui-store";
 import { updatePasswordSchema, validate } from "@/utils/validations";
 import { Modal } from "./../../../../components/ui/modal";
@@ -22,6 +24,8 @@ import {
 	type ReverificationHandler,
 	ReverificationModal,
 } from "./../../../../components/ui/reverification-modal";
+
+const sessionSkeletonIds = ["session-one", "session-two"];
 
 export function SecuritySettings() {
 	const { user, isLoaded } = useUser();
@@ -43,6 +47,7 @@ export function SecuritySettings() {
 	};
 	const [sessions, setSessions] = useState<SessionItem[]>([]);
 	const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+	const [sessionsError, setSessionsError] = useState<string | null>(null);
 
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 	const [currentPassword, setCurrentPassword] = useState("");
@@ -79,6 +84,7 @@ export function SecuritySettings() {
 
 	const loadSessions = useCallback(async () => {
 		setIsLoadingSessions(true);
+		setSessionsError(null);
 		try {
 			const activeSessions = await user?.getSessions();
 			if (activeSessions) {
@@ -93,6 +99,7 @@ export function SecuritySettings() {
 			}
 		} catch (err) {
 			console.error("Failed to load sessions", err);
+			setSessionsError("Unable to load active devices.");
 		} finally {
 			setIsLoadingSessions(false);
 		}
@@ -105,11 +112,7 @@ export function SecuritySettings() {
 	}, [isLoaded, user, loadSessions]);
 
 	if (!isLoaded || !user) {
-		return (
-			<div className="py-12 flex items-center justify-center">
-				<Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-			</div>
-		);
+		return <SecuritySettingsSkeleton />;
 	}
 
 	const handleOpenPasswordModal = () => {
@@ -290,8 +293,35 @@ export function SecuritySettings() {
 				</div>
 				<div className="border border-border bg-card shadow-sm rounded-xl divide-y divide-border">
 					{isLoadingSessions ? (
-						<div className="p-6 flex justify-center">
-							<Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+						<div role="status" aria-busy="true">
+							<span className="sr-only">Loading active devices</span>
+							{sessionSkeletonIds.map((id) => (
+								<div
+									key={id}
+									aria-hidden="true"
+									className="flex items-center gap-3 p-6"
+								>
+									<Skeleton className="size-10 shrink-0 rounded-full" />
+									<div className="flex-1 space-y-2">
+										<Skeleton className="h-3.5 w-2/5" />
+										<Skeleton className="h-3 w-3/5" />
+									</div>
+									<Skeleton className="h-8 w-20 rounded-lg" />
+								</div>
+							))}
+						</div>
+					) : sessionsError ? (
+						<div className="p-6 text-center">
+							<p className="text-sm font-medium text-destructive">
+								{sessionsError}
+							</p>
+							<button
+								type="button"
+								onClick={() => void loadSessions()}
+								className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								Try again
+							</button>
 						</div>
 					) : sessions.length === 0 ? (
 						<div className="p-6 flex flex-col items-center justify-center text-center">

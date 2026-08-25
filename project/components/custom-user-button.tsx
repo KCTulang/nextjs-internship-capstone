@@ -5,6 +5,7 @@ import { LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/user-avatar";
 
 interface CustomUserButtonProps {
@@ -42,7 +43,7 @@ export function CustomUserButton({
 	}, [isOpen]);
 
 	if (!isLoaded || !user) {
-		return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
+		return <Skeleton className="size-8 rounded-full" />;
 	}
 
 	const handleSignOut = async () => {
